@@ -1,13 +1,98 @@
 import os
 import uuid
-from typing import Dict, Any, Optional
+import logging
+from typing import Dict, Any, Optional, List
 from packages.observability.pii import PIIRedactor
+
+logger = logging.getLogger(__name__)
 
 
 class ObservabilityTracer:
     """
-    Manages LangSmith tracing, structured telemetry, and audit correlations.
+    Manages Langfuse end-to-end tracing, structured telemetry, and score correlations.
+    Replaces LangSmith across the entire editorial system.
     """
+
+    _client = None
+
+    @classmethod
+    def is_tracing_enabled(cls) -> bool:
+        """Checks if Langfuse tracing is enabled and configured."""
+        enabled_flag = os.getenv("LANGFUSE_TRACING_ENABLED", "true").lower() == "true"
+        has_keys = bool(os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"))
+        return enabled_flag and has_keys
+
+    @classmethod
+    def get_langfuse_client(cls):
+        """Returns a singleton instance of the Langfuse client if configured."""
+        if cls._client is not None:
+            return cls._client
+
+        if not cls.is_tracing_enabled():
+            return None
+
+        try:
+            from langfuse import Langfuse
+            cls._client = Langfuse(
+                public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+                secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+                host=os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+            )
+            return cls._client
+        except Exception as e:
+            logger.warning(f"Unable to initialize Langfuse client: {e}")
+            return None
+
+    @classmethod
+    def get_callback_handler(
+        cls,
+        session_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        tags: Optional[List[str]] = None
+    ):
+        """
+        Returns a Langfuse CallbackHandler for LangChain and LangGraph executions.
+        Gracefully returns None if Langfuse is not configured.
+        """
+        if not cls.is_tracing_enabled():
+            return None
+
+        try:
+            from langfuse.langchain import CallbackHandler
+            handler = CallbackHandler(
+                public_key=os.getenv("LANGFUSE_PUBLIC_KEY")
+            )
+            return handler
+        except Exception as e:
+            logger.warning(f"Unable to instantiate Langfuse CallbackHandler: {e}")
+            return None
+
+    @classmethod
+    def record_score(
+        cls,
+        name: str,
+        value: float,
+        trace_id: Optional[str] = None,
+        comment: Optional[str] = None
+    ) -> bool:
+        """
+        Records an evaluation score (e.g. human_approval, qa_score) in Langfuse.
+        """
+        client = cls.get_langfuse_client()
+        if not client or not trace_id:
+            return False
+
+        try:
+            client.create_score(
+                name=name,
+                value=float(value),
+                trace_id=trace_id,
+                comment=comment
+            )
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to record score in Langfuse: {e}")
+            return False
 
     @classmethod
     def get_run_metadata(
@@ -15,23 +100,28 @@ class ObservabilityTracer:
         workspace_id: str,
         graph_name: str,
         node_name: str,
-        extra_tags: Optional[list] = None
+        extra_tags: Optional[List[str]] = None,
+        trace_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        run_id = str(uuid.uuid4())
+        """
+        Generates correlation metadata for Langfuse traces and local audit logs.
+        """
+        resolved_trace_id = trace_id or str(uuid.uuid4())
         return {
-            "run_id": run_id,
+            "run_id": resolved_trace_id,
+            "trace_id": resolved_trace_id,
             "workspace_id": workspace_id,
             "graph": graph_name,
             "node": node_name,
-            "tags": ["contentops", graph_name] + (extra_tags or []),
-            "langsmith_project": os.getenv("LANGCHAIN_PROJECT", "contentops-harness"),
-            "tracing_enabled": os.getenv("LANGCHAIN_TRACING_V2", "false").lower() == "true",
+            "tags": ["contentops", graph_name, node_name] + (extra_tags or []),
+            "langfuse_host": os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com"),
+            "tracing_enabled": cls.is_tracing_enabled(),
         }
 
     @classmethod
     def sanitize_payload_for_trace(cls, data: Any) -> Any:
         """
-        Recursively applies PII redactor to strings in dictionaries or lists.
+        Recursively applies PII and secret redactor to dictionary, list, or string payloads.
         """
         if isinstance(data, str):
             return PIIRedactor.redact(data)
