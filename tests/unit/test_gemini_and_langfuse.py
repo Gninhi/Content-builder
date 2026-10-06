@@ -1,4 +1,3 @@
-import pytest
 import os
 from unittest.mock import MagicMock, patch
 from services.orchestration.llm import (
@@ -9,16 +8,13 @@ from services.orchestration.llm import (
     GeneratedIdeaEvidence,
     GeneratedVariant,
     GeneratedClaim,
-    GeneratedStrategyBatch,
-    GeneratedStrategyHypothesis,
-    GeneratedRecommendation,
 )
 from packages.observability.tracing import ObservabilityTracer
 from packages.observability.metrics import CostAndTokenEstimator
 from packages.observability.pii import PIIRedactor
 from infra.db.database import SessionLocal, init_db
 from infra.db.repository import ContentOpsRepository
-from infra.db.models import MetricSnapshotModel, WorkspaceModel
+from infra.db.models import MetricSnapshotModel
 
 
 def test_gemini_availability_and_instantiation():
@@ -133,6 +129,7 @@ def test_strategy_query_metric_snapshot_model_fixed():
     db = SessionLocal()
     try:
         repo = ContentOpsRepository(db)
+        assert repo is not None
         # Directly query MetricSnapshotModel via session
         snapshots = db.query(MetricSnapshotModel).all()
         assert isinstance(snapshots, list)

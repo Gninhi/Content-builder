@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from typing import Dict, Any, List
+from typing import Dict, Any
 from packages.contracts.schemas import MetricSnapshotCreate
 from infra.db.repository import ContentOpsRepository
 from infra.db.models import MetricSnapshotModel, PublishedPostModel

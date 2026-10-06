@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends, Body
-from typing import Dict, Any
 from datetime import datetime
 from packages.contracts.schemas import StrategyInsightsResponse, StrategyInsight
 from services.orchestration.graphs.strategy_insights import graph as strategy_insights_graph
 from packages.observability.tracing import ObservabilityTracer
 from infra.db.models import MetricSnapshotModel
 from infra.db.repository import ContentOpsRepository
-from apps.api.dependencies import get_repository, get_current_user, UserContext, require_roles
+from apps.api.dependencies import get_repository, UserContext, require_roles
 
 router = APIRouter(tags=["Strategy & Insights"])
 

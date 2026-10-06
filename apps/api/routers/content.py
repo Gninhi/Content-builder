@@ -1,18 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
-from typing import List, Dict, Any, Optional
 from packages.contracts.schemas import (
-    ContentPackageResponse,
     ApprovalRequest,
     ApprovalResponse,
-    QAReviewResult,
 )
 from packages.domain.state_machine import ContentStatus
 from services.orchestration.graphs.content_production import graph as content_production_graph
-from services.orchestration.graphs.quality_review import graph as quality_review_graph
 from packages.observability.tracing import ObservabilityTracer
-from apps.api.dependencies import get_repository, get_current_user, UserContext, require_roles
+from apps.api.dependencies import get_repository, UserContext, require_roles
 from infra.db.repository import ContentOpsRepository
-from infra.db.models import ContentPackageModel, ContentVariantModel, ContentBriefModel
+from infra.db.models import ContentVariantModel, ContentBriefModel
 
 router = APIRouter(tags=["Content Production & Approvals"])
 

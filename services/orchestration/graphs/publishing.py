@@ -24,6 +24,7 @@ def verify_approval_and_publish_node(state: PublishingState) -> Dict[str, Any]:
         }
 
     try:
+        connector: Any
         if platform == "linkedin":
             connector = LinkedInConnector(sandbox_mode=True)
         elif platform == "x":

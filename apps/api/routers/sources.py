@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from typing import List
 from packages.contracts.schemas import SourceIngestRequest, SourceResponse
 from packages.connectors.sources.web_extractor import WebExtractorConnector
-from apps.api.dependencies import get_repository, get_current_user, UserContext, require_roles
+from apps.api.dependencies import get_repository, UserContext, require_roles
 from infra.db.repository import ContentOpsRepository
 
 router = APIRouter(tags=["Sources & Provenance"])

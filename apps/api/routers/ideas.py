@@ -1,5 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
-from typing import List
+from fastapi import APIRouter, Depends
 from packages.contracts.schemas import (
     IdeaResearchRequest,
     IdeaResearchResponse,
@@ -8,7 +7,7 @@ from packages.contracts.schemas import (
 )
 from services.orchestration.graphs.idea_research import graph as idea_research_graph
 from packages.observability.tracing import ObservabilityTracer
-from apps.api.dependencies import get_repository, get_current_user, UserContext, require_roles
+from apps.api.dependencies import get_repository, UserContext, require_roles
 from infra.db.repository import ContentOpsRepository
 
 router = APIRouter(tags=["Ideation & Research"])
@@ -54,7 +53,7 @@ def research_ideas(
     # Persist generated ideas in DB
     persisted_ideas = []
     for idea in generated:
-        model = repo.save_idea(
+        repo.save_idea(
             workspace_id=req.workspace_id,
             title=idea["title"],
             angle=idea["angle"],

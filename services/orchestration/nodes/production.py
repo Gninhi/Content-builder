@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any
 import uuid
 import logging
 from packages.domain.state_machine import ContentStatus
@@ -107,7 +107,7 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
                         "confidence_score": 0.95
                     }
                 ]
-                media_spec = {
+                media_spec: Dict[str, Any] = {
                     "type": "image_carousel_suggestion",
                     "aspect_ratio": "1:1",
                     "description": "Schéma de l'architecture déterministe avec barrière de validation humaine."

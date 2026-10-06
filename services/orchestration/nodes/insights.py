@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any
 import logging
 from packages.prompts.registry import PromptRegistry
 from packages.observability.tracing import ObservabilityTracer

@@ -4,7 +4,7 @@ from services.orchestration.state.base import ApprovalState
 from services.orchestration.nodes.approval import human_review_decision_node
 
 
-def prepare_for_review_node(state: ApprovalState) -> dict:
+def prepare_for_review_node(state: ApprovalState) -> ApprovalState:
     """Prepares payload and ensures hash integrity prior to human interrupt."""
     return state
 

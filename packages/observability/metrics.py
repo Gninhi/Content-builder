@@ -27,7 +27,7 @@ class CostAndTokenEstimator:
         input_tokens = max(1, len(input_text) // 4)
         output_tokens = max(1, len(output_text) // 4)
 
-        target_model = model or os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+        target_model = (model or os.getenv("GEMINI_MODEL") or "gemini-3.8-flash")
         if "gemini" in target_model.lower():
             rate_in = cls.GEMINI_FLASH_1K_INPUT
             rate_out = cls.GEMINI_FLASH_1K_OUTPUT

@@ -1,7 +1,7 @@
-from typing import Dict, Any, List
+from typing import Dict, Any
 import re
 from packages.domain.state_machine import ContentStatus
-from services.orchestration.state.base import ContentProductionState, QualityReviewState
+from services.orchestration.state.base import ContentProductionState
 
 
 def quality_gate_node(state: ContentProductionState) -> Dict[str, Any]:
@@ -14,7 +14,6 @@ def quality_gate_node(state: ContentProductionState) -> Dict[str, Any]:
     
     total_checks_passed = 0
     total_checks = 0
-    all_reasons = []
     evaluated_variants = []
 
     for variant in variants:

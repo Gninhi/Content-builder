@@ -2,11 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from packages.contracts.schemas import (
     PublicationScheduleRequest,
     PublicationJobResponse,
-    PublishedPostResponse,
 )
 from packages.domain.state_machine import ContentStatus
 from services.publisher.worker import PublisherWorker
-from apps.api.dependencies import get_repository, get_current_user, UserContext, require_roles
+from apps.api.dependencies import get_repository, UserContext, require_roles
 from infra.db.repository import ContentOpsRepository
 from infra.db.models import PublicationJobModel
 

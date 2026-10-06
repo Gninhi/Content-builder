@@ -1,5 +1,5 @@
 from typing import Dict, Any
-from packages.domain.state_machine import ContentStatus, ContentStateMachine
+from packages.domain.state_machine import ContentStatus
 from packages.domain.idempotency import compute_payload_hash
 from services.orchestration.state.base import ApprovalState
 
