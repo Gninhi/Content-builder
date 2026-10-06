@@ -11,4 +11,4 @@ Utilisation de LangGraph avec checkpointer (`MemorySaver` en local/test, Postgre
 **Conséquences :**  
 - Gestion asynchrone native de la boucle humaine (HITL).
 - Reprise sur incident transparente sans perte de données.
-- Observabilité unifiée avec les traces LangSmith.
+- Observabilité unifiée avec les traces Langfuse.

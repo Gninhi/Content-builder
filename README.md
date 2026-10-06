@@ -84,7 +84,7 @@ DeepAgent/
 │   ├── contracts/               # Schémas Pydantic stricts et événements de domaine
 │   ├── prompts/                 # Prompts versionnés (v1.0.0) et registre
 │   ├── connectors/              # Connecteurs Tavily, LinkedIn, X, RSS, extracteur
-│   └── observability/           # Censure PII, tracing LangSmith, métriques de tokens
+│   └── observability/           # Censure PII, tracing Langfuse, métriques de tokens
 ├── services/
 │   ├── orchestration/           # 8 Graphes LangGraph et nœuds d'agents
 │   ├── publisher/               # Worker de publication déterministe

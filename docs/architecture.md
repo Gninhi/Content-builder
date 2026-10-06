@@ -39,7 +39,7 @@ graph TD
     end
 
     subgraph Observabilité & Données [Persistence & Traces]
-        G_QA -.-> LangSmith[LangSmith Tracing & PII Redactor]
+        G_QA -.-> Langfuse[Langfuse Tracing & PII Redactor]
         Publisher -.-> AuditLog[(Agent Runs & Receipts)]
         Connectors --> ExtPlatforms[LinkedIn / X API]
         AnalyticsG[Analytics Graph] --> DB[(PostgreSQL / Supabase)]
@@ -77,7 +77,7 @@ PUBLISHED ➔ MEASURED ➔ ARCHIVED
 - `packages/contracts` : Schémas Pydantic stricts et événements de domaine.
 - `packages/prompts` : Prompts versionnés (`v1.0.0`) avec tests d'instanciation.
 - `packages/connectors` : Connecteurs isolés (Tavily search, LinkedIn, X, RSS, extracteur d'articles).
-- `packages/observability` : Censure PII, tracing LangSmith et suivi des coûts de tokens.
+- `packages/observability` : Censure PII, tracing Langfuse et suivi des coûts de tokens.
 - `services/orchestration` : Graphes LangGraph (`StateGraph`).
 - `services/publisher` : Worker déterministe à effets de bord.
 - `infra/migrations` : DDL SQL pour PostgreSQL/Supabase avec politiques de Row-Level Security (RLS).

@@ -6,14 +6,15 @@
 - Immédiatement en cas de suspicion de fuite ou compromission.
 
 ## Règles de Sécurité
-- Aucun token ou clé secrète ne doit figurer dans les commits Git, les prompts, les traces LangSmith ou les tables de la base de données.
+- Aucun token ou clé secrète ne doit figurer dans les commits Git, les prompts, les traces Langfuse ou les tables de la base de données.
 - Utiliser le `PIIRedactor` pour vérifier la censure automatique.
 
 ## Procédure
-1. Générer le nouveau secret sur la console plateforme (ex: NVIDIA API Catalog, Tavily, LinkedIn Developers).
+1. Générer le nouveau secret sur la console plateforme (ex: Google AI Studio, Langfuse, Tavily, LinkedIn Developers).
 2. Mettre à jour le fichier d'environnement ou le gestionnaire de secrets (ex: AWS Secrets Manager, Vault) :
    ```ini
-   NVIDIA_API_KEY=nvapi-nouveau-secret...
+   GOOGLE_API_KEY=AIzaSy-nouveau-secret...
+   LANGFUSE_SECRET_KEY=sk-lf-nouveau-secret...
    TAVILY_API_KEY=tvly-nouveau-secret...
    ```
 3. Redémarrer l'application avec rechargement sans interruption :

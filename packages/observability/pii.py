@@ -16,7 +16,6 @@ class PIIRedactor:
         (re.compile(r'sk-lf-[A-Za-z0-9_\-]{16,}'), "[REDACTED_LANGFUSE_SECRET_KEY]"),
         (re.compile(r'nvapi-[A-Za-z0-9_\-]{16,}'), "[REDACTED_NVIDIA_KEY]"),
         (re.compile(r'tvly-[A-Za-z0-9_\-]{16,}'), "[REDACTED_TAVILY_KEY]"),
-        (re.compile(r'lsv2_pt_[A-Za-z0-9_\-]{16,}'), "[REDACTED_LANGSMITH_KEY]"),
     ]
 
     @classmethod

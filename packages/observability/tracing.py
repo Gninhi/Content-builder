@@ -9,18 +9,33 @@ logger = logging.getLogger(__name__)
 
 class ObservabilityTracer:
     """
-    Manages Langfuse end-to-end tracing, structured telemetry, and score correlations.
-    Replaces LangSmith across the entire editorial system.
+    Manages Langfuse end-to-end tracing, structured telemetry, and score correlations
+    across the entire editorial system.
     """
 
     _client = None
 
     @classmethod
+    def _resolve_credentials(cls):
+        public_key = (os.getenv("LANGFUSE_PUBLIC_KEY") or "").strip("\"'")
+        secret_key = (os.getenv("LANGFUSE_SECRET_KEY") or "").strip("\"'")
+        host = (os.getenv("LANGFUSE_HOST") or os.getenv("LANGFUSE_BASE_URL") or "https://cloud.langfuse.com").strip("\"'")
+        # Harmonize in os.environ so third-party handlers reading os.environ work seamlessly
+        if public_key:
+            os.environ["LANGFUSE_PUBLIC_KEY"] = public_key
+        if secret_key:
+            os.environ["LANGFUSE_SECRET_KEY"] = secret_key
+        if host:
+            os.environ["LANGFUSE_HOST"] = host
+            os.environ["LANGFUSE_BASE_URL"] = host
+        return public_key, secret_key, host
+
+    @classmethod
     def is_tracing_enabled(cls) -> bool:
         """Checks if Langfuse tracing is enabled and configured."""
         enabled_flag = os.getenv("LANGFUSE_TRACING_ENABLED", "true").lower() == "true"
-        has_keys = bool(os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"))
-        return enabled_flag and has_keys
+        pub, sec, _ = cls._resolve_credentials()
+        return enabled_flag and bool(pub and sec)
 
     @classmethod
     def get_langfuse_client(cls):
@@ -33,10 +48,11 @@ class ObservabilityTracer:
 
         try:
             from langfuse import Langfuse
+            pub, sec, host = cls._resolve_credentials()
             cls._client = Langfuse(
-                public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
-                secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
-                host=os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+                public_key=pub,
+                secret_key=sec,
+                host=host
             )
             return cls._client
         except Exception as e:
@@ -59,8 +75,9 @@ class ObservabilityTracer:
 
         try:
             from langfuse.langchain import CallbackHandler
+            pub, _, _ = cls._resolve_credentials()
             handler = CallbackHandler(
-                public_key=os.getenv("LANGFUSE_PUBLIC_KEY")
+                public_key=pub
             )
             return handler
         except Exception as e:

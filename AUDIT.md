@@ -20,7 +20,7 @@ L'audit approfondi révèle que **si les intentions architecturales (gouvernance
 2. **Simulation du moteur LLM :** 
    - Bien que des templates de prompts existent dans `packages/prompts/registry.py` et que `langchain-nvidia-ai-endpoints` soit listé dans `requirements.txt`, **aucun appel LLM réel n'est effectué dans les nœuds LangGraph** (`research.py`, `production.py`, `insights.py`). Tout le texte est généré à partir de chaînes statiques codées en dur.
 3. **Observabilité inexistante :** 
-   - `packages/observability/tracing.py` ne se connecte à aucun service de télémétrie : il génère un simple dictionnaire local contenant un UUID aléatoire. LangSmith n'est pas branché, et Langfuse n'est pas installé.
+   - `packages/observability/tracing.py` ne se connecte à aucun service de télémétrie : il génère un simple dictionnaire local contenant un UUID aléatoire. Langfuse n'est pas installé ni configuré.
 4. **Perte d'état & Fragilité de production :** 
    - Le graphe d'approbation humaine (`approval.py`) utilise un `MemorySaver` en mémoire vive. En cas de redémarrage du conteneur ou de passage en multi-workers, tous les checkpoints de validation humaine sont perdus.
    - Les connecteurs réseaux sociaux (`linkedin.py`, `x_twitter.py`) forcent le mode sandbox et ne contiennent aucun code d'appel API réel ni gestion des jetons OAuth.
@@ -84,7 +84,7 @@ DeepAgent/ (ContentOps Harness)
 - **Point d'entrée Agentique :** `langgraph.json` déclarant 7 graphes vers `services.orchestration.graphs.*`.
 - **Dépendances :**
   - Spécifiées avec des versions non épinglées (`>=`) dans `requirements.txt` et `pyproject.toml`.
-  - Présence de `langchain-nvidia-ai-endpoints>=0.1.0` et `langsmith>=0.1.0` (incompatibles avec la cible Google Gemini 3.8 et Langfuse).
+  - Présence de dépendances historiques obsolètes (`langchain-nvidia-ai-endpoints>=0.1.0`).
   - Absence de `langchain-google-genai` et `langfuse`.
 
 ### 1.3 Architecture & Flux de Données
@@ -157,7 +157,7 @@ DeepAgent/ (ContentOps Harness)
 | **TST-03** | 6. Tests | **Moyenne** | Absence de configuration `pythonpath = ["."]` provoquant l'échec de pytest | `pyproject.toml:38-41` | S |
 | **CST-01** | 7. Coûts/Perf | **Élevée** | Absence de système de cache sémantique pour les appels LLM | `services/orchestration/` | M |
 | **CST-02** | 7. Coûts/Perf | **Moyenne** | Modèle de calcul de coûts obsolète basé sur des tarifs génériques fixes | `packages/observability/metrics.py:10-23` | S |
-| **OBS-01** | 8. Observabilité | **Critique** | Tracing totalement factice (aucun envoi réseau ni intégration Langfuse/LangSmith) | `packages/observability/tracing.py:13-29` | M |
+| **OBS-01** | 8. Observabilité | **Critique** | Tracing totalement factice (aucun envoi réseau ni intégration Langfuse) | `packages/observability/tracing.py:13-29` | M |
 | **OBS-02** | 8. Observabilité | **Élevée** | Absence de scores d'évaluation et de feedback humain corrélés aux traces | `apps/api/routers/content.py:65-72` | M |
 | **OPS-01** | 9. Exploitation | **Élevée** | Absence de pipeline CI/CD automatisé | Répertoire `.github/workflows/` inexistant | M |
 | **OPS-02** | 9. Exploitation | **Moyenne** | Conteneur Docker exécuté en tant que `root` | `infra/docker/Dockerfile.api:1-21` | S |
@@ -170,7 +170,7 @@ DeepAgent/ (ContentOps Harness)
 
 #### [SEC-01] Critique — Clés API réelles en clair sur disque et absence initiale de `.gitignore`
 - **Localisation :** `.env:11,17,25` et racine du projet.
-- **Preuve :** Le fichier `.env` contenait des clés API opérationnelles (Tavily, LangSmith, NVIDIA), et aucun fichier `.gitignore` n'existait dans le répertoire de travail.
+- **Preuve :** Le fichier `.env` contenait des clés API opérationnelles en clair, et aucun fichier `.gitignore` n'existait dans le répertoire de travail.
 - **Impact :** Tout `git add .` ou initialisation de dépôt risque d'exposer immédiatement des secrets de production sur un serveur git public ou partagé.
 - **Correctif :** Conserver le `.gitignore` créé (ignorant strictement `.env`, `.venv`, `.db`), révoquer immédiatement les clés exposées et basculer sur un gestionnaire de secrets sécurisé.
 - **Effort :** S
@@ -375,7 +375,7 @@ DeepAgent/ (ContentOps Harness)
           "node": node_name, ...
       }
   ```
-- **Impact :** Zéro visibilité en production. Aucune trace de cycle, aucun span par sous-agent, aucune métrique de latence ou de coût n'est envoyée à LangSmith ni à Langfuse.
+- **Impact :** Zéro visibilité en production. Aucune trace de cycle, aucun span par sous-agent, aucune métrique de latence ou de coût n'est envoyée à Langfuse.
 - **Correctif :** Intégrer nativement le SDK Langfuse (`langfuse.callback.CallbackHandler` pour LangChain/LangGraph) et instrumenter les spans par nœud et par outil.
 - **Effort :** M
 
@@ -405,8 +405,8 @@ DeepAgent/ (ContentOps Harness)
    - Installer `langchain-google-genai`.
    - Remplacer `langchain-nvidia-ai-endpoints` par `ChatGoogleGenerativeAI(model="gemini-3.8-flash")`.
    - Brancher les appels LLM réels dans les nœuds LangGraph (`research.py`, `production.py`, `insights.py`) avec sorties structurées Pydantic.
-2. **Remplacement complet de LangSmith par Langfuse :**
-   - Retirer les dépendances et variables LangSmith.
+2. **Intégration complète de l'observabilité Langfuse :**
+   - Retirer toute dépendance ou variable superflue.
    - Installer `langfuse` et configurer le callback handler pour LangGraph.
    - Instrumenter chaque nœud, enregistrer les tokens, latences, tags et scores de validation humaine.
 3. **Mise à jour complète du `.env.example` :**
