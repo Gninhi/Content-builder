@@ -1,0 +1,24 @@
+# Secrets and environment
+.env
+*.env.local
+
+# Python / Virtual Environment
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Testing & Caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs & OS artifacts
+.DS_Store
+.opencode-logs/
+.antigravitycli/
+
+# Databases & local state
+*.db
+*.sqlite3
+contentops.db

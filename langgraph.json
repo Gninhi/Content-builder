@@ -1,0 +1,13 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "idea_research": "services.orchestration.graphs.idea_research:graph",
+    "content_production": "services.orchestration.graphs.content_production:graph",
+    "quality_review": "services.orchestration.graphs.quality_review:graph",
+    "approval": "services.orchestration.graphs.approval:graph",
+    "scheduling": "services.orchestration.graphs.scheduling:graph",
+    "analytics": "services.orchestration.graphs.analytics:graph",
+    "strategy_insights": "services.orchestration.graphs.strategy_insights:graph"
+  },
+  "env": ".env"
+}
