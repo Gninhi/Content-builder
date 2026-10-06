@@ -7,6 +7,7 @@ from packages.contracts.schemas import (
     EvidenceItem,
 )
 from services.orchestration.graphs.idea_research import graph as idea_research_graph
+from packages.observability.tracing import ObservabilityTracer
 from apps.api.dependencies import get_repository, get_current_user, UserContext, require_roles
 from infra.db.repository import ContentOpsRepository
 
@@ -42,8 +43,10 @@ def research_ideas(
         "errors": []
     }
 
-    # Run LangGraph idea_research workflow
-    result = idea_research_graph.invoke(initial_state)
+    # Run LangGraph idea_research workflow with Langfuse tracing
+    callback = ObservabilityTracer.get_callback_handler()
+    config = {"callbacks": [callback]} if callback else {}
+    result = idea_research_graph.invoke(initial_state, config=config)
 
     generated = result.get("generated_ideas", [])
     run_id = result.get("run_id", "run_local")

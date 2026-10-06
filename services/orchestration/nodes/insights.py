@@ -1,12 +1,20 @@
 from typing import Dict, Any, List
+import logging
+from packages.prompts.registry import PromptRegistry
+from packages.observability.tracing import ObservabilityTracer
 from services.orchestration.state.base import StrategyInsightsState
+from services.orchestration.llm import get_gemini_model, GeneratedStrategyBatch
+
+logger = logging.getLogger(__name__)
 
 
 def generate_strategy_insights_node(state: StrategyInsightsState) -> Dict[str, Any]:
     """
     Synthesizes facts into hypotheses and strategic recommendations,
     strictly maintaining propositional boundaries (PRD Section 6 & ADR 6).
+    Powered by Google Gemini 3.8 with structured output validation.
     """
+    workspace_id = state.get("workspace_id", "default")
     pillars = state.get("pillars", ["IA générative", "Systèmes multi-agents"])
     snapshots = state.get("metric_snapshots", [])
 
@@ -14,6 +22,43 @@ def generate_strategy_insights_node(state: StrategyInsightsState) -> Dict[str, A
     total_engagements = sum(s.get("engagements", 0) for s in snapshots)
     avg_er = round((total_engagements / max(1, total_impressions)) * 100, 2)
 
+    trace_meta = ObservabilityTracer.get_run_metadata(
+        workspace_id=workspace_id,
+        graph_name="strategy_insights_graph",
+        node_name="generate_strategy_insights"
+    )
+
+    # 1. Try Gemini generation if configured
+    model = get_gemini_model(model_type="reasoning", temperature=0.2)
+    if model is not None:
+        try:
+            summary = (
+                f"Total impressions: {total_impressions}, Total engagements: {total_engagements}, "
+                f"Taux d'engagement moyen: {avg_er}%. Snapshots observés: {len(snapshots)}."
+            )
+            rendered_prompt = PromptRegistry.render(
+                "strategy_insights",
+                {
+                    "metrics_summary": summary,
+                    "pillars": ", ".join(pillars)
+                }
+            )
+            structured_llm = model.with_structured_output(GeneratedStrategyBatch)
+            callback = ObservabilityTracer.get_callback_handler()
+            callbacks = [callback] if callback else []
+            
+            res: GeneratedStrategyBatch = structured_llm.invoke(rendered_prompt, config={"callbacks": callbacks})
+            if res and res.hypotheses:
+                return {
+                    "hypotheses": [h.model_dump() for h in res.hypotheses],
+                    "recommendations": [r.model_dump() for r in res.recommendations],
+                    "status": "COMPLETED",
+                    "run_id": trace_meta["run_id"]
+                }
+        except Exception as e:
+            logger.warning(f"Gemini strategy insights generation failed: {e}")
+
+    # 2. Deterministic structured fallback (ensures tests and offline runs succeed)
     hypotheses = [
         {
             "pillar": pillars[0] if pillars else "Tech",
@@ -49,5 +94,6 @@ def generate_strategy_insights_node(state: StrategyInsightsState) -> Dict[str, A
     return {
         "hypotheses": hypotheses,
         "recommendations": recommendations,
-        "status": "COMPLETED"
+        "status": "COMPLETED",
+        "run_id": trace_meta["run_id"]
     }

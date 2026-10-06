@@ -9,6 +9,7 @@ from packages.contracts.schemas import (
 from packages.domain.state_machine import ContentStatus
 from services.orchestration.graphs.content_production import graph as content_production_graph
 from services.orchestration.graphs.quality_review import graph as quality_review_graph
+from packages.observability.tracing import ObservabilityTracer
 from apps.api.dependencies import get_repository, get_current_user, UserContext, require_roles
 from infra.db.repository import ContentOpsRepository
 from infra.db.models import ContentPackageModel, ContentVariantModel, ContentBriefModel
@@ -56,8 +57,10 @@ def generate_content_package(
         "errors": []
     }
 
-    # Run LangGraph content production and quality gate workflow
-    exec_result = content_production_graph.invoke(initial_state)
+    # Run LangGraph content production and quality gate workflow with Langfuse tracing
+    callback = ObservabilityTracer.get_callback_handler()
+    config = {"callbacks": [callback]} if callback else {}
+    exec_result = content_production_graph.invoke(initial_state, config=config)
 
     qa_info = exec_result.get("qa_results", {})
     package_status = exec_result.get("status", ContentStatus.DRAFT)
@@ -70,6 +73,14 @@ def generate_content_package(
     )
     package.status = package_status.value
     repo.db.commit()
+
+    # Record QA gate evaluation score in Langfuse
+    ObservabilityTracer.record_score(
+        name="qa_gate_score",
+        value=qa_info.get("overall_score", 90.0) / 100.0,
+        trace_id=package.id,
+        comment=f"Deterministic and semantic QA evaluation for package {package.id}"
+    )
 
     saved_variants = []
     for var in exec_result.get("generated_variants", []):
@@ -129,6 +140,16 @@ def approve_content_variant(
             edited_payload=req.edited_payload
         )
         variant = repo.db.query(ContentVariantModel).filter(ContentVariantModel.id == variant_id).first()
+        
+        # Record HITL human approval score in Langfuse
+        score_val = 1.0 if req.decision == "approve" else (0.5 if req.decision in ("rewrite", "edit") else 0.0)
+        ObservabilityTracer.record_score(
+            name="human_approval",
+            value=score_val,
+            trace_id=variant.package_id if variant else variant_id,
+            comment=f"Decision: {req.decision}. Feedback: {req.feedback or 'N/A'}"
+        )
+
         return ApprovalResponse(
             id=approval.id,
             variant_id=approval.variant_id,

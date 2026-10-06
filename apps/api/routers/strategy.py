@@ -3,6 +3,8 @@ from typing import Dict, Any
 from datetime import datetime
 from packages.contracts.schemas import StrategyInsightsResponse, StrategyInsight
 from services.orchestration.graphs.strategy_insights import graph as strategy_insights_graph
+from packages.observability.tracing import ObservabilityTracer
+from infra.db.models import MetricSnapshotModel
 from infra.db.repository import ContentOpsRepository
 from apps.api.dependencies import get_repository, get_current_user, UserContext, require_roles
 
@@ -19,7 +21,7 @@ def generate_strategy_insights(
     pillars = brand_profile.pillars if brand_profile else ["IA générative", "Systèmes multi-agents"]
 
     # Gather recent snapshots
-    snapshots_models = repo.db.query(repo.db.models.MetricSnapshotModel).all() if hasattr(repo.db, 'models') else []
+    snapshots_models = repo.db.query(MetricSnapshotModel).all()
     snapshots = [
         {"impressions": s.impressions, "engagements": s.engagements}
         for s in snapshots_models
@@ -35,7 +37,9 @@ def generate_strategy_insights(
         "status": "PENDING"
     }
 
-    result = strategy_insights_graph.invoke(initial_state)
+    callback = ObservabilityTracer.get_callback_handler()
+    config = {"callbacks": [callback]} if callback else {}
+    result = strategy_insights_graph.invoke(initial_state, config=config)
 
     insights = [
         StrategyInsight(

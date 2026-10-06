@@ -1,9 +1,12 @@
 from typing import Dict, Any, List
-import uuid
+import logging
 from packages.connectors.search.tavily import TavilySearchConnector
 from packages.observability.tracing import ObservabilityTracer
-from packages.observability.metrics import CostAndTokenEstimator
+from packages.prompts.registry import PromptRegistry
 from services.orchestration.state.base import IdeaResearchState
+from services.orchestration.llm import get_gemini_model, GeneratedIdeasBatch
+
+logger = logging.getLogger(__name__)
 
 
 def collect_sources_node(state: IdeaResearchState) -> Dict[str, Any]:
@@ -22,14 +25,21 @@ def collect_sources_node(state: IdeaResearchState) -> Dict[str, Any]:
 def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
     """
     Generates structured ideas (at least 10) with angle, format, novelty, relevance, effort, priority, and risks.
-    Complies with PRD Section 3.1 (FR-03) and Section 6.
+    Powered by Google Gemini 3.8 Flash with structured Pydantic schema validation.
     """
     topic = state.get("topic_or_brief", "Intelligence Artificielle & Automatisation")
     pillars = state.get("pillars", ["IA générative", "Systèmes multi-agents", "Automatisation d'entreprise"])
     target_count = max(10, state.get("target_count", 10))
     sources = state.get("raw_sources", [])
+    audience = state.get("audience", ["Tech Leads", "Entrepreneurs"])
 
-    # Curate standard evidence from sources
+    trace_meta = ObservabilityTracer.get_run_metadata(
+        workspace_id=state.get("workspace_id", "default"),
+        graph_name="idea_research_graph",
+        node_name="ideation_and_scoring"
+    )
+
+    # 1. Prepare evidence pool
     evidence_pool = []
     for idx, src in enumerate(sources):
         evidence_pool.append({
@@ -42,6 +52,35 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
             {"source_id": "src_default_2", "claim": "Retour d'expérience de déploiements en production"}
         ]
 
+    # 2. Try Gemini 3.8 Flash LLM invocation with structured outputs
+    model = get_gemini_model(model_type="fast", temperature=0.3)
+    if model is not None:
+        try:
+            rendered_prompt = PromptRegistry.render(
+                "idea_research",
+                {
+                    "pillars": ", ".join(pillars),
+                    "audience": ", ".join(audience),
+                    "topic_or_brief": topic,
+                    "sources": str(evidence_pool[:4]),
+                    "target_count": target_count
+                }
+            )
+            structured_llm = model.with_structured_output(GeneratedIdeasBatch)
+            callback = ObservabilityTracer.get_callback_handler()
+            callbacks = [callback] if callback else []
+            
+            result: GeneratedIdeasBatch = structured_llm.invoke(rendered_prompt, config={"callbacks": callbacks})
+            if result and result.ideas:
+                ideas_list = [idea.model_dump() for idea in result.ideas]
+                return {
+                    "generated_ideas": ideas_list,
+                    "run_id": trace_meta["run_id"]
+                }
+        except Exception as e:
+            logger.warning(f"Gemini LLM invocation failed, using deterministic fallback: {e}")
+
+    # 3. Deterministic structured fallback (ensures offline and test reliability)
     angles = [
         ("Retour d'expérience terrain", "high", 8.5, 9.0, 4.0),
         ("Analyse critique des limites actuelles", "high", 9.0, 8.5, 5.0),
@@ -61,11 +100,10 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
     for i in range(target_count):
         angle_title, priority, novelty, relevance, effort = angles[i % len(angles)]
         pillar = pillars[i % len(pillars)]
-        
         ideas.append({
             "title": f"{pillar} : {angle_title} ({topic})",
             "angle": f"Explorer {topic.lower()} sous l'angle : {angle_title.lower()}.",
-            "target_audience": state.get("audience", ["Tech Leads", "Entrepreneurs"])[0] if state.get("audience") else "Professionnels Tech",
+            "target_audience": audience[0] if audience else "Professionnels Tech",
             "recommended_formats": ["linkedin", "x"],
             "evidence": [evidence_pool[i % len(evidence_pool)]],
             "novelty_score": novelty,
@@ -74,12 +112,6 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
             "priority": priority,
             "risks": ["Vérifier la validité des chiffres récents", "Clarifier les prérequis techniques"] if effort > 4.5 else []
         })
-
-    trace_meta = ObservabilityTracer.get_run_metadata(
-        workspace_id=state.get("workspace_id", "default"),
-        graph_name="idea_research_graph",
-        node_name="ideation_and_scoring"
-    )
 
     return {
         "generated_ideas": ideas,
