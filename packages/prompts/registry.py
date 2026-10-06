@@ -21,7 +21,7 @@ RÈGLES IMPÉRATIVES :
    - angle: Angle éditorial unique et positionnement
    - target_audience: Segment précis ciblé
    - recommended_formats: ["linkedin", "x"]
-   - evidence: Liste des preuves [{"source_id": "...", "claim": "..."}]
+   - evidence: Liste des preuves [{{"source_id": "...", "claim": "..."}}]
    - novelty_score: 0.0 à 10.0 (degré de nouveauté)
    - relevance_score: 0.0 à 10.0 (alignement marque/audience)
    - effort_score: 0.0 à 10.0 (complexité de production)
