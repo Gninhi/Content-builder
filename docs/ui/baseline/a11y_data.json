@@ -1,0 +1,31 @@
+[
+  {
+    "type": "wcag-input-label-missing",
+    "selector": "input#input-research-topic",
+    "detail": "Form control lacks accessible label or associated <label for=\"...\"> tag"
+  },
+  {
+    "type": "wcag-input-label-missing",
+    "selector": "input#input-research-count",
+    "detail": "Form control lacks accessible label or associated <label for=\"...\"> tag"
+  },
+  {
+    "type": "wcag-button-name-missing",
+    "selector": "button",
+    "detail": "Button has no discernible text or aria-label (icon-only button without label)"
+  },
+  {
+    "type": "wcag-dialog-role-missing",
+    "selector": "#modal-research",
+    "detail": "Modal container lacks role=\"dialog\" or role=\"alertdialog\""
+  },
+  {
+    "type": "wcag-aria-modal-missing",
+    "selector": "#modal-research",
+    "detail": "Modal container lacks aria-modal=\"true\""
+  },
+  {
+    "type": "styling-unapplied",
+    "detail": "Body font-family: Inter, system-ui, -apple-system, sans-serif, Tailwind CDN script blocked by CSP."
+  }
+]

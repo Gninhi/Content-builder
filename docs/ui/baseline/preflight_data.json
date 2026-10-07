@@ -1,0 +1,306 @@
+{
+  "console_errors": [
+    {
+      "viewport": "375px",
+      "text": "Loading the stylesheet 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap' violates the following Content Security Policy directive: \"default-src 'self'\". Note that 'style-src-elem' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "375px",
+      "text": "Loading the script 'https://cdn.tailwindcss.com/' violates the following Content Security Policy directive: \"default-src 'self'\". Note that 'script-src-elem' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "375px",
+      "text": "Executing inline script violates the following Content Security Policy directive 'default-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-G3CqTwnB75AR81TrDWCOOxYE6s5tOvQc3m00t0DzeOM='), or a nonce ('nonce-...') is required to enable inline execution. Note also that 'script-src' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "375px",
+      "text": "Loading the script 'https://unpkg.com/lucide@latest' violates the following Content Security Policy directive: \"default-src 'self'\". Note that 'script-src-elem' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "375px",
+      "text": "Executing inline script violates the following Content Security Policy directive 'default-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-TiPh3fdQRZCG/RjIQXFP2TtQd5JA4QqG6b1Xr+0i+/8='), or a nonce ('nonce-...') is required to enable inline execution. Note also that 'script-src' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "375px",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "viewport": "375px",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "viewport": "375px",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "viewport": "375px",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "viewport": "375px",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "viewport": "375px",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "viewport": "768px",
+      "text": "Loading the stylesheet 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap' violates the following Content Security Policy directive: \"default-src 'self'\". Note that 'style-src-elem' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "768px",
+      "text": "Loading the script 'https://cdn.tailwindcss.com/' violates the following Content Security Policy directive: \"default-src 'self'\". Note that 'script-src-elem' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "768px",
+      "text": "Executing inline script violates the following Content Security Policy directive 'default-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-G3CqTwnB75AR81TrDWCOOxYE6s5tOvQc3m00t0DzeOM='), or a nonce ('nonce-...') is required to enable inline execution. Note also that 'script-src' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "768px",
+      "text": "Loading the script 'https://unpkg.com/lucide@latest' violates the following Content Security Policy directive: \"default-src 'self'\". Note that 'script-src-elem' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "768px",
+      "text": "Executing inline script violates the following Content Security Policy directive 'default-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-TiPh3fdQRZCG/RjIQXFP2TtQd5JA4QqG6b1Xr+0i+/8='), or a nonce ('nonce-...') is required to enable inline execution. Note also that 'script-src' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "768px",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "viewport": "768px",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "viewport": "768px",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "viewport": "768px",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "viewport": "768px",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "viewport": "1440px",
+      "text": "Loading the stylesheet 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap' violates the following Content Security Policy directive: \"default-src 'self'\". Note that 'style-src-elem' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "1440px",
+      "text": "Loading the script 'https://cdn.tailwindcss.com/' violates the following Content Security Policy directive: \"default-src 'self'\". Note that 'script-src-elem' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "1440px",
+      "text": "Executing inline script violates the following Content Security Policy directive 'default-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-G3CqTwnB75AR81TrDWCOOxYE6s5tOvQc3m00t0DzeOM='), or a nonce ('nonce-...') is required to enable inline execution. Note also that 'script-src' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "1440px",
+      "text": "Loading the script 'https://unpkg.com/lucide@latest' violates the following Content Security Policy directive: \"default-src 'self'\". Note that 'script-src-elem' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "1440px",
+      "text": "Executing inline script violates the following Content Security Policy directive 'default-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-TiPh3fdQRZCG/RjIQXFP2TtQd5JA4QqG6b1Xr+0i+/8='), or a nonce ('nonce-...') is required to enable inline execution. Note also that 'script-src' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "1440px",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "viewport": "1440px",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "viewport": "1440px",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "viewport": "1440px",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "viewport": "1440px",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    }
+  ],
+  "console_warnings": [],
+  "failed_requests": [
+    {
+      "viewport": "375px",
+      "url": "http://127.0.0.1:8000/v1/analytics/overview",
+      "status": 401,
+      "status_text": "Unauthorized"
+    },
+    {
+      "viewport": "375px",
+      "url": "http://127.0.0.1:8000/v1/inbox",
+      "status": 401,
+      "status_text": "Unauthorized"
+    },
+    {
+      "viewport": "375px",
+      "url": "http://127.0.0.1:8000/v1/calendar",
+      "status": 401,
+      "status_text": "Unauthorized"
+    },
+    {
+      "viewport": "375px",
+      "url": "http://127.0.0.1:8000/v1/brand-profiles/ws_default",
+      "status": 401,
+      "status_text": "Unauthorized"
+    },
+    {
+      "viewport": "375px",
+      "url": "http://127.0.0.1:8000/v1/strategy/insights",
+      "status": 401,
+      "status_text": "Unauthorized"
+    },
+    {
+      "viewport": "768px",
+      "url": "http://127.0.0.1:8000/v1/analytics/overview",
+      "status": 401,
+      "status_text": "Unauthorized"
+    },
+    {
+      "viewport": "768px",
+      "url": "http://127.0.0.1:8000/v1/inbox",
+      "status": 401,
+      "status_text": "Unauthorized"
+    },
+    {
+      "viewport": "768px",
+      "url": "http://127.0.0.1:8000/v1/calendar",
+      "status": 401,
+      "status_text": "Unauthorized"
+    },
+    {
+      "viewport": "768px",
+      "url": "http://127.0.0.1:8000/v1/brand-profiles/ws_default",
+      "status": 401,
+      "status_text": "Unauthorized"
+    },
+    {
+      "viewport": "768px",
+      "url": "http://127.0.0.1:8000/v1/strategy/insights",
+      "status": 401,
+      "status_text": "Unauthorized"
+    },
+    {
+      "viewport": "1440px",
+      "url": "http://127.0.0.1:8000/v1/analytics/overview",
+      "status": 401,
+      "status_text": "Unauthorized"
+    },
+    {
+      "viewport": "1440px",
+      "url": "http://127.0.0.1:8000/v1/inbox",
+      "status": 401,
+      "status_text": "Unauthorized"
+    },
+    {
+      "viewport": "1440px",
+      "url": "http://127.0.0.1:8000/v1/calendar",
+      "status": 401,
+      "status_text": "Unauthorized"
+    },
+    {
+      "viewport": "1440px",
+      "url": "http://127.0.0.1:8000/v1/brand-profiles/ws_default",
+      "status": 401,
+      "status_text": "Unauthorized"
+    },
+    {
+      "viewport": "1440px",
+      "url": "http://127.0.0.1:8000/v1/strategy/insights",
+      "status": 401,
+      "status_text": "Unauthorized"
+    }
+  ],
+  "csp_violations": [
+    {
+      "viewport": "375px",
+      "text": "Loading the stylesheet 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap' violates the following Content Security Policy directive: \"default-src 'self'\". Note that 'style-src-elem' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "375px",
+      "text": "Loading the script 'https://cdn.tailwindcss.com/' violates the following Content Security Policy directive: \"default-src 'self'\". Note that 'script-src-elem' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "375px",
+      "text": "Executing inline script violates the following Content Security Policy directive 'default-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-G3CqTwnB75AR81TrDWCOOxYE6s5tOvQc3m00t0DzeOM='), or a nonce ('nonce-...') is required to enable inline execution. Note also that 'script-src' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "375px",
+      "text": "Loading the script 'https://unpkg.com/lucide@latest' violates the following Content Security Policy directive: \"default-src 'self'\". Note that 'script-src-elem' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "375px",
+      "text": "Executing inline script violates the following Content Security Policy directive 'default-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-TiPh3fdQRZCG/RjIQXFP2TtQd5JA4QqG6b1Xr+0i+/8='), or a nonce ('nonce-...') is required to enable inline execution. Note also that 'script-src' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "768px",
+      "text": "Loading the stylesheet 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap' violates the following Content Security Policy directive: \"default-src 'self'\". Note that 'style-src-elem' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "768px",
+      "text": "Loading the script 'https://cdn.tailwindcss.com/' violates the following Content Security Policy directive: \"default-src 'self'\". Note that 'script-src-elem' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "768px",
+      "text": "Executing inline script violates the following Content Security Policy directive 'default-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-G3CqTwnB75AR81TrDWCOOxYE6s5tOvQc3m00t0DzeOM='), or a nonce ('nonce-...') is required to enable inline execution. Note also that 'script-src' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "768px",
+      "text": "Loading the script 'https://unpkg.com/lucide@latest' violates the following Content Security Policy directive: \"default-src 'self'\". Note that 'script-src-elem' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "768px",
+      "text": "Executing inline script violates the following Content Security Policy directive 'default-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-TiPh3fdQRZCG/RjIQXFP2TtQd5JA4QqG6b1Xr+0i+/8='), or a nonce ('nonce-...') is required to enable inline execution. Note also that 'script-src' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "1440px",
+      "text": "Loading the stylesheet 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap' violates the following Content Security Policy directive: \"default-src 'self'\". Note that 'style-src-elem' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "1440px",
+      "text": "Loading the script 'https://cdn.tailwindcss.com/' violates the following Content Security Policy directive: \"default-src 'self'\". Note that 'script-src-elem' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "1440px",
+      "text": "Executing inline script violates the following Content Security Policy directive 'default-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-G3CqTwnB75AR81TrDWCOOxYE6s5tOvQc3m00t0DzeOM='), or a nonce ('nonce-...') is required to enable inline execution. Note also that 'script-src' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "1440px",
+      "text": "Loading the script 'https://unpkg.com/lucide@latest' violates the following Content Security Policy directive: \"default-src 'self'\". Note that 'script-src-elem' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    },
+    {
+      "viewport": "1440px",
+      "text": "Executing inline script violates the following Content Security Policy directive 'default-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-TiPh3fdQRZCG/RjIQXFP2TtQd5JA4QqG6b1Xr+0i+/8='), or a nonce ('nonce-...') is required to enable inline execution. Note also that 'script-src' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked."
+    }
+  ],
+  "screenshots": [
+    "docs/ui/baseline/dashboard_375px.png",
+    "docs/ui/baseline/inbox_375px.png",
+    "docs/ui/baseline/calendar_375px.png",
+    "docs/ui/baseline/ideation_375px.png",
+    "docs/ui/baseline/insights_375px.png",
+    "docs/ui/baseline/brand_375px.png",
+    "docs/ui/baseline/modal_research_375px.png",
+    "docs/ui/baseline/dashboard_768px.png",
+    "docs/ui/baseline/inbox_768px.png",
+    "docs/ui/baseline/calendar_768px.png",
+    "docs/ui/baseline/ideation_768px.png",
+    "docs/ui/baseline/insights_768px.png",
+    "docs/ui/baseline/brand_768px.png",
+    "docs/ui/baseline/modal_research_768px.png",
+    "docs/ui/baseline/dashboard_1440px.png",
+    "docs/ui/baseline/inbox_1440px.png",
+    "docs/ui/baseline/calendar_1440px.png",
+    "docs/ui/baseline/ideation_1440px.png",
+    "docs/ui/baseline/insights_1440px.png",
+    "docs/ui/baseline/brand_1440px.png",
+    "docs/ui/baseline/modal_research_1440px.png"
+  ]
+}
