@@ -205,7 +205,7 @@ class PublishedPostResponse(BaseModel):
 # Analytics & Strategy Insights (PRD Section 3 & 6)
 class MetricSnapshotCreate(BaseModel):
     post_id: str
-    observed_at: datetime = Field(default_factory=datetime.utcnow)
+    observed_at: datetime = Field(default_factory=get_utc_now)
     impressions: int = 0
     engagements: int = 0
     clicks: int = 0

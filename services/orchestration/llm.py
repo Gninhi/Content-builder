@@ -2,6 +2,7 @@ import os
 import logging
 from typing import Dict, Any, List
 from pydantic import BaseModel, Field
+from packages.resilience.circuit_breaker import CircuitBreaker
 
 logger = logging.getLogger(__name__)
 
@@ -98,11 +99,24 @@ def get_gemini_model(model_type: str = "fast", temperature: float = 0.2):
 
     try:
         from langchain_google_genai import ChatGoogleGenerativeAI
+        timeout = float(os.getenv("LLM_TIMEOUT_SECONDS", "30.0"))
+        max_retries = int(os.getenv("LLM_MAX_RETRIES", "3"))
         return ChatGoogleGenerativeAI(
             model=model_name,
             google_api_key=api_key,
-            temperature=temperature
+            temperature=temperature,
+            timeout=timeout,
+            max_retries=max_retries
         )
     except Exception as e:
         logger.warning(f"Failed to instantiate ChatGoogleGenerativeAI: {e}")
         return None
+
+
+# Global resilient circuit breaker for LLM invocations
+llm_circuit_breaker = CircuitBreaker(
+    failure_threshold=int(os.getenv("LLM_CIRCUIT_BREAKER_THRESHOLD", "3")),
+    recovery_timeout=float(os.getenv("LLM_CIRCUIT_BREAKER_RECOVERY", "30.0")),
+    name="gemini_llm_circuit_breaker"
+)
+

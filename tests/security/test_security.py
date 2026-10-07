@@ -1,5 +1,5 @@
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 from packages.connectors.sources.web_extractor import WebExtractorConnector
 from packages.domain.state_machine import ContentStatus
 from packages.domain.idempotency import compute_payload_hash
@@ -48,7 +48,7 @@ def test_publisher_worker_blocks_tampered_payload():
         job = repo.schedule_publication(
             workspace_id=ws.id,
             variant_id=variant.id,
-            scheduled_at=datetime.utcnow()
+            scheduled_at=datetime.now(timezone.utc)
         )
 
         # TAMPER WITH VARIANT AFTER APPROVAL!

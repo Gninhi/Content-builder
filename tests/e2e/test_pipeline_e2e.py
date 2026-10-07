@@ -1,5 +1,4 @@
-import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from infra.db.database import SessionLocal, init_db
 from infra.db.repository import ContentOpsRepository
 from services.publisher.worker import PublisherWorker
@@ -139,7 +138,7 @@ def test_complete_contentops_pipeline_e2e():
         assert linkedin_variant.status == ContentStatus.APPROVED.value
 
         # 8. Scheduling with Idempotency Key
-        scheduled_time = datetime.utcnow() + timedelta(hours=2)
+        scheduled_time = datetime.now(timezone.utc) + timedelta(hours=2)
         job = repo.schedule_publication(
             workspace_id=ws.id,
             variant_id=linkedin_variant.id,

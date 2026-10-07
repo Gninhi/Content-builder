@@ -1,7 +1,17 @@
+import os
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any
 from sqlalchemy.orm import Session
 from infra.db.repository import ContentOpsRepository
-from infra.db.models import PublicationJobModel, ContentVariantModel, ApprovalModel
+from infra.db.models import (
+    PublicationJobModel,
+    ContentVariantModel,
+    ApprovalModel,
+    PublishedPostModel,
+    ContentPackageModel,
+    ContentBriefModel,
+    WorkspaceModel
+)
 from packages.domain.state_machine import ContentStatus, ContentStateMachine
 from packages.domain.idempotency import compute_payload_hash
 from packages.connectors.social.linkedin import LinkedInConnector
@@ -86,6 +96,47 @@ class PublisherWorker:
             if reviewer in ("system", "auto", "automated", ""):
                 job.status = ContentStatus.PUBLISH_FAILED.value
                 job.error_message = "Degraded mode safety lock: Content generated via fallback requires explicit human reviewer approval before publication."
+                self.db.commit()
+                raise ValueError(job.error_message)
+
+        # Check global & workspace kill switch
+        kill_switch = (
+            os.getenv("KILL_SWITCH_ENABLED", "false").lower() in ("true", "1", "yes")
+            or os.getenv("GLOBAL_KILL_SWITCH", "false").lower() in ("true", "1", "yes")
+        )
+        workspace = None
+        if variant.package and variant.package.brief:
+            ws_id = variant.package.brief.workspace_id
+            workspace = self.db.query(WorkspaceModel).filter(WorkspaceModel.id == ws_id).first()
+
+        if workspace and getattr(workspace, "kill_switch_enabled", False):
+            kill_switch = True
+
+        if kill_switch:
+            job.status = ContentStatus.PUBLISH_FAILED.value
+            job.error_message = "Emergency Kill Switch is ACTIVE: All automated publications are halted."
+            self.db.commit()
+            raise ValueError(job.error_message)
+
+        # Enforce workspace publication rate ceiling
+        if workspace:
+            max_hourly = int(os.getenv("MAX_HOURLY_PUBLICATIONS", "10"))
+            one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+            recent_count = (
+                self.db.query(PublishedPostModel)
+                .join(PublicationJobModel, PublishedPostModel.job_id == PublicationJobModel.id)
+                .join(ContentVariantModel, PublicationJobModel.variant_id == ContentVariantModel.id)
+                .join(ContentPackageModel, ContentVariantModel.package_id == ContentPackageModel.id)
+                .join(ContentBriefModel, ContentPackageModel.brief_id == ContentBriefModel.id)
+                .filter(
+                    ContentBriefModel.workspace_id == workspace.id,
+                    PublishedPostModel.published_at >= one_hour_ago
+                )
+                .count()
+            )
+            if recent_count >= max_hourly:
+                job.status = ContentStatus.PUBLISH_FAILED.value
+                job.error_message = f"Publication rate limit reached for workspace '{workspace.id}': {recent_count}/{max_hourly} posts published in the last hour."
                 self.db.commit()
                 raise ValueError(job.error_message)
 

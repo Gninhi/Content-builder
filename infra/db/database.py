@@ -53,6 +53,11 @@ def init_db():
             if "degraded" not in columns:
                 with engine.begin() as conn:
                     conn.execute(text("ALTER TABLE content_variants ADD COLUMN degraded BOOLEAN DEFAULT 0"))
+        if "workspaces" in inspector.get_table_names():
+            columns = [c["name"] for c in inspector.get_columns("workspaces")]
+            if "kill_switch_enabled" not in columns:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE workspaces ADD COLUMN kill_switch_enabled BOOLEAN DEFAULT 0"))
     except Exception:
         pass
 

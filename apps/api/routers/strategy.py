@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Body
-from datetime import datetime
+from datetime import datetime, timezone
 from packages.contracts.schemas import StrategyInsightsResponse, StrategyInsight
 from services.orchestration.graphs.strategy_insights import graph as strategy_insights_graph
 from packages.observability.tracing import ObservabilityTracer
@@ -53,6 +53,6 @@ def generate_strategy_insights(
 
     return StrategyInsightsResponse(
         workspace_id=workspace_id,
-        generated_at=datetime.utcnow(),
+        generated_at=datetime.now(timezone.utc),
         insights=insights
     )

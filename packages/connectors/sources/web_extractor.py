@@ -1,7 +1,7 @@
 import re
 import hashlib
 from typing import Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class WebExtractorConnector:
@@ -83,7 +83,7 @@ class WebExtractorConnector:
             "provenance": {
                 "hash": content_hash,
                 "author": author or "Unknown",
-                "extracted_at": datetime.utcnow().isoformat(),
+                "extracted_at": datetime.now(timezone.utc).isoformat(),
                 "url": url,
                 "untrusted_sanitized": True
             },

@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import uuid
 
 from infra.db.models import (
@@ -320,7 +320,7 @@ class ContentOpsRepository:
             reviewer_id=reviewer_id,
             feedback=feedback,
             payload_hash=variant.payload_hash,
-            reviewed_at=datetime.utcnow()
+            reviewed_at=datetime.now(timezone.utc)
         )
         self.db.add(approval)
         self.db.commit()
@@ -349,6 +349,12 @@ class ContentOpsRepository:
         if variant.status not in (ContentStatus.APPROVED.value, ContentStatus.SCHEDULED.value):
             raise ValueError(f"Cannot schedule variant with status '{variant.status}'. Must be APPROVED.")
 
+        # Normalize scheduled_at to timezone-aware UTC
+        if scheduled_at.tzinfo is None:
+            scheduled_at = scheduled_at.replace(tzinfo=timezone.utc)
+        else:
+            scheduled_at = scheduled_at.astimezone(timezone.utc)
+
         # Verify an approval exists with the exact payload hash
         latest_approval = (
             self.db.query(ApprovalModel)
@@ -370,10 +376,35 @@ class ContentOpsRepository:
             version=1
         )
 
-        # Check existing job
+        # Check existing job (idempotent)
         existing_job = self.db.query(PublicationJobModel).filter(PublicationJobModel.idempotency_key == idempotency_key).first()
         if existing_job:
             return existing_job
+
+        # Slot collision detection: check other jobs in same workspace and platform within 15 minutes
+        collision_buffer = timedelta(minutes=15)
+        existing_scheduled = (
+            self.db.query(PublicationJobModel)
+            .join(ContentVariantModel, PublicationJobModel.variant_id == ContentVariantModel.id)
+            .join(ContentPackageModel, ContentVariantModel.package_id == ContentPackageModel.id)
+            .join(ContentBriefModel, ContentPackageModel.brief_id == ContentBriefModel.id)
+            .filter(
+                ContentBriefModel.workspace_id == workspace_id,
+                PublicationJobModel.platform == variant.platform,
+                PublicationJobModel.status.in_([ContentStatus.SCHEDULED.value, ContentStatus.PUBLISHING.value])
+            )
+            .all()
+        )
+        for prev_job in existing_scheduled:
+            if prev_job.idempotency_key == idempotency_key or prev_job.variant_id == variant.id:
+                continue
+            prev_dt = prev_job.scheduled_at
+            if prev_dt.tzinfo is None:
+                prev_dt = prev_dt.replace(tzinfo=timezone.utc)
+            if abs((scheduled_at - prev_dt).total_seconds()) < collision_buffer.total_seconds():
+                raise ValueError(
+                    f"Publication slot collision: Another post is already scheduled for platform '{variant.platform}' at {prev_dt} (collision buffer: 15 minutes)."
+                )
 
         variant.status = ContentStatus.SCHEDULED.value
 
@@ -410,7 +441,7 @@ class ContentOpsRepository:
             external_post_id=external_post_id,
             final_payload=final_payload,
             platform=platform,
-            published_at=datetime.utcnow(),
+            published_at=datetime.now(timezone.utc),
             permalink=permalink
         )
         self.db.add(post)
@@ -432,7 +463,7 @@ class ContentOpsRepository:
         metric = MetricSnapshotModel(
             id=f"met_{uuid.uuid4().hex[:12]}",
             post_id=post_id,
-            observed_at=datetime.utcnow(),
+            observed_at=datetime.now(timezone.utc),
             impressions=impressions,
             engagements=engagements,
             clicks=clicks,

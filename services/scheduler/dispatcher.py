@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from infra.db.models import PublicationJobModel
@@ -16,7 +16,7 @@ class SchedulerDispatcher:
         self.worker = PublisherWorker(db_session)
 
     def process_due_jobs(self) -> List[Dict[str, Any]]:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         due_jobs = (
             self.db.query(PublicationJobModel)
             .filter(

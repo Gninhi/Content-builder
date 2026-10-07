@@ -1,7 +1,12 @@
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, Float, DateTime, Text, JSON, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
-from datetime import datetime
 from infra.db.database import Base
+
+
+def utc_now() -> datetime:
+    """Returns current timezone-aware UTC datetime."""
+    return datetime.now(timezone.utc)
 
 
 class WorkspaceModel(Base):
@@ -11,7 +16,8 @@ class WorkspaceModel(Base):
     name = Column(String(255), nullable=False)
     timezone = Column(String(64), default="UTC")
     owner_id = Column(String(64), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    kill_switch_enabled = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=utc_now)
 
     brand_profiles = relationship("BrandProfileModel", back_populates="workspace", cascade="all, delete-orphan")
     sources = relationship("ContentSourceModel", back_populates="workspace", cascade="all, delete-orphan")
@@ -29,7 +35,7 @@ class BrandProfileModel(Base):
     pillars = Column(JSON, default=list, nullable=False)
     prohibited_topics = Column(JSON, default=list, nullable=False)
     cta_policy = Column(JSON, default=dict, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     workspace = relationship("WorkspaceModel", back_populates="brand_profiles")
 
@@ -45,7 +51,7 @@ class ContentSourceModel(Base):
     extracted_facts = Column(JSON, default=list, nullable=False)
     provenance = Column(JSON, default=dict, nullable=False)
     status = Column(String(32), default="ingested")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     workspace = relationship("WorkspaceModel", back_populates="sources")
 
@@ -67,7 +73,7 @@ class IdeaModel(Base):
     priority = Column(String(16), default="high")
     risks = Column(JSON, default=list, nullable=False)
     status = Column(String(32), default="IDEA")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     workspace = relationship("WorkspaceModel", back_populates="ideas")
 
@@ -83,7 +89,7 @@ class ContentBriefModel(Base):
     platform_targets = Column(JSON, default=lambda: ["linkedin", "x"], nullable=False)
     requirements = Column(JSON, default=dict, nullable=False)
     status = Column(String(32), default="BRIEFED")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     packages = relationship("ContentPackageModel", back_populates="brief", cascade="all, delete-orphan")
 
@@ -97,7 +103,7 @@ class ContentPackageModel(Base):
     model_metadata = Column(JSON, default=dict, nullable=False)
     qa_score = Column(Float, default=0.0)
     status = Column(String(32), default="DRAFT")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     brief = relationship("ContentBriefModel", back_populates="packages")
     variants = relationship("ContentVariantModel", back_populates="package", cascade="all, delete-orphan")
@@ -118,7 +124,7 @@ class ContentVariantModel(Base):
     payload_hash = Column(String(64), nullable=False)
     degraded = Column(Boolean, default=False, nullable=False)
     status = Column(String(32), default="DRAFT")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     package = relationship("ContentPackageModel", back_populates="variants")
     approvals = relationship("ApprovalModel", back_populates="variant", cascade="all, delete-orphan")
@@ -134,7 +140,7 @@ class ApprovalModel(Base):
     reviewer_id = Column(String(64), nullable=False)
     feedback = Column(Text, nullable=True)
     payload_hash = Column(String(64), nullable=False)
-    reviewed_at = Column(DateTime, default=datetime.utcnow)
+    reviewed_at = Column(DateTime, default=utc_now)
 
     variant = relationship("ContentVariantModel", back_populates="approvals")
 
@@ -151,7 +157,7 @@ class PublicationJobModel(Base):
     attempt_count = Column(Integer, default=0)
     max_retries = Column(Integer, default=3)
     error_message = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     variant = relationship("ContentVariantModel", back_populates="jobs")
     published_post = relationship("PublishedPostModel", uselist=False, back_populates="job", cascade="all, delete-orphan")
@@ -167,7 +173,7 @@ class PublishedPostModel(Base):
     platform = Column(String(32), nullable=False)
     published_at = Column(DateTime, nullable=False)
     permalink = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     job = relationship("PublicationJobModel", back_populates="published_post")
     metrics = relationship("MetricSnapshotModel", back_populates="post", cascade="all, delete-orphan")
@@ -178,7 +184,7 @@ class MetricSnapshotModel(Base):
 
     id = Column(String(64), primary_key=True)
     post_id = Column(String(64), ForeignKey("published_posts.id", ondelete="CASCADE"), nullable=False)
-    observed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    observed_at = Column(DateTime, default=utc_now, nullable=False)
     impressions = Column(Integer, default=0)
     engagements = Column(Integer, default=0)
     clicks = Column(Integer, default=0)
@@ -203,4 +209,4 @@ class AgentRunModel(Base):
     model = Column(String(64), nullable=True)
     cost = Column(Float, default=0.0)
     status = Column(String(32), default="completed")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
