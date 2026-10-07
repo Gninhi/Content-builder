@@ -15,7 +15,7 @@ def record_metric(
     user: UserContext = Depends(require_roles("Owner", "Editor", "ServiceAgent"))
 ):
     post = repo.db.query(PublishedPostModel).filter(PublishedPostModel.id == req.post_id).first()
-    if not post or (post.workspace_id != user.workspace_id and user.role.lower() != "owner"):
+    if not post or post.workspace_id != user.workspace_id:
         raise HTTPException(status_code=403, detail="Post not found or access denied for this workspace.")
     snapshot = repo.record_metric_snapshot(
         post_id=req.post_id,

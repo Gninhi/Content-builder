@@ -33,8 +33,10 @@ def create_or_update_brand_profile(
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor"))
 ):
+    if req.workspace_id and req.workspace_id != user.workspace_id:
+        raise HTTPException(status_code=403, detail="Cannot create or update brand profile for another workspace.")
     bp = repo.create_or_version_brand_profile(
-        workspace_id=req.workspace_id,
+        workspace_id=user.workspace_id,
         audience=req.audience,
         voice=req.voice,
         pillars=req.pillars,
@@ -60,7 +62,7 @@ def get_brand_profile(
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer", "ServiceAgent"))
 ):
-    if user.workspace_id != workspace_id and user.role.lower() != "owner":
+    if user.workspace_id != workspace_id:
         raise HTTPException(status_code=403, detail="Access to other workspace's brand profile is forbidden.")
     bp = repo.get_latest_brand_profile(workspace_id)
     if not bp:

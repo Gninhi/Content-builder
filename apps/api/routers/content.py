@@ -23,7 +23,7 @@ def generate_content_package(
     brief = repo.db.query(ContentBriefModel).filter(ContentBriefModel.id == brief_id).first()
     if not brief:
         raise HTTPException(status_code=404, detail="Brief not found.")
-    if brief.workspace_id != user.workspace_id and user.role.lower() != "owner":
+    if brief.workspace_id != user.workspace_id:
         raise HTTPException(status_code=403, detail="Access to brief belonging to another workspace is forbidden.")
 
     workspace_id = brief.workspace_id
