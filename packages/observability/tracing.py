@@ -142,10 +142,13 @@ class ObservabilityTracer:
         """
         Generates correlation metadata for Langfuse traces and local audit logs.
         """
-        resolved_trace_id = trace_id or str(uuid.uuid4())
+        from packages.observability.correlation import get_correlation_id
+        active_cid = get_correlation_id()
+        resolved_trace_id = trace_id or (active_cid if active_cid and active_cid != "system" else str(uuid.uuid4()))
         return {
             "run_id": resolved_trace_id,
             "trace_id": resolved_trace_id,
+            "correlation_id": resolved_trace_id,
             "workspace_id": workspace_id,
             "graph": graph_name,
             "node": node_name,

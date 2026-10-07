@@ -3,6 +3,7 @@ import logging
 from packages.connectors.search.tavily import TavilySearchConnector
 from packages.observability.tracing import ObservabilityTracer
 from packages.prompts.registry import PromptRegistry
+from packages.cache.factory import get_llm_cache, compute_cache_key
 from services.orchestration.state.base import IdeaResearchState
 from services.orchestration.llm import get_gemini_model, GeneratedIdeasBatch
 
@@ -25,6 +26,7 @@ def collect_sources_node(state: IdeaResearchState) -> Dict[str, Any]:
 def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
     """
     Generates structured ideas (at least 10) with angle, format, novelty, relevance, effort, priority, and risks.
+    Backed by a deterministic LLM cache (SQLite/Redis) to prevent redundant API expenditure.
     Powered by Google Gemini 3.8 Flash with structured Pydantic schema validation.
     """
     topic = state.get("topic_or_brief", "Intelligence Artificielle & Automatisation")
@@ -39,7 +41,26 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
         node_name="ideation_and_scoring"
     )
 
-    # 1. Prepare evidence pool
+    # 1. Check deterministic LLM cache
+    cache = get_llm_cache()
+    cache_payload = {
+        "topic": topic.strip().lower(),
+        "pillars": sorted([p.strip().lower() for p in pillars]),
+        "audience": sorted([a.strip().lower() for a in audience]),
+        "target_count": target_count
+    }
+    cache_key = compute_cache_key("idea_research", cache_payload)
+    cached_result = cache.get(cache_key)
+    if cached_result is not None:
+        logger.info(f"LLM Cache Hit for topic '{topic}' (key: {cache_key})")
+        ObservabilityTracer.tag_trace(trace_meta["run_id"], ["cache_hit"])
+        return {
+            "generated_ideas": cached_result.get("generated_ideas", []),
+            "run_id": trace_meta["run_id"],
+            "cached": True
+        }
+
+    # 2. Prepare evidence pool
     evidence_pool = []
     for idx, src in enumerate(sources):
         evidence_pool.append({
@@ -52,7 +73,7 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
             {"source_id": "src_default_2", "claim": "Retour d'expérience de déploiements en production"}
         ]
 
-    # 2. Try Gemini 3.8 Flash LLM invocation with structured outputs
+    # 3. Try Gemini 3.8 Flash LLM invocation with structured outputs
     model = get_gemini_model(model_type="fast", temperature=0.3)
     if model is not None:
         try:
@@ -69,18 +90,21 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
             structured_llm = model.with_structured_output(GeneratedIdeasBatch)
             callback = ObservabilityTracer.get_callback_handler()
             callbacks = [callback] if callback else []
-            
+
             result: GeneratedIdeasBatch = structured_llm.invoke(rendered_prompt, config={"callbacks": callbacks})
             if result and result.ideas:
                 ideas_list = [idea.model_dump() for idea in result.ideas]
-                return {
+                res = {
                     "generated_ideas": ideas_list,
                     "run_id": trace_meta["run_id"]
                 }
+                cache.set(cache_key, res)
+                ObservabilityTracer.tag_trace(trace_meta["run_id"], ["cache_miss"])
+                return res
         except Exception as e:
             logger.warning(f"Gemini LLM invocation failed, using deterministic fallback: {e}")
 
-    # 3. Deterministic structured fallback (ensures offline and test reliability)
+    # 4. Deterministic structured fallback (ensures offline and test reliability)
     angles = [
         ("Retour d'expérience terrain", "high", 8.5, 9.0, 4.0),
         ("Analyse critique des limites actuelles", "high", 9.0, 8.5, 5.0),
@@ -113,7 +137,11 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
             "risks": ["Vérifier la validité des chiffres récents", "Clarifier les prérequis techniques"] if effort > 4.5 else []
         })
 
-    return {
+    res = {
         "generated_ideas": ideas,
         "run_id": trace_meta["run_id"]
     }
+    # Store fallback response in cache as well
+    cache.set(cache_key, res)
+    ObservabilityTracer.tag_trace(trace_meta["run_id"], ["cache_miss"])
+    return res

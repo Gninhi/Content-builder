@@ -1,3 +1,4 @@
+import os
 import time
 import random
 import logging
@@ -150,3 +151,26 @@ class CycleBudget:
             raise BudgetExceededException(
                 f"Cycle exceeded maximum token budget ({self.used_tokens} > {self.max_tokens})"
             )
+
+    def track_in_langfuse(self, trace_id: Optional[str] = None) -> bool:
+        """
+        Records cycle tokens, execution duration, and estimated USD cost as scores in Langfuse.
+        """
+        if not trace_id:
+            return False
+
+        try:
+            from packages.observability.tracing import ObservabilityTracer
+            from packages.observability.metrics import CostAndTokenEstimator
+
+            elapsed = round(time.time() - self.start_time, 2)
+            ObservabilityTracer.record_score("cycle_tokens", float(self.used_tokens), trace_id=trace_id)
+            ObservabilityTracer.record_score("cycle_duration_seconds", float(elapsed), trace_id=trace_id)
+
+            rates = CostAndTokenEstimator.get_rates_for_model(os.getenv("GEMINI_MODEL", "gemini-3.8-flash"))
+            cost = (self.used_tokens / 1000.0) * rates["input_per_1k"]
+            ObservabilityTracer.record_score("cycle_cost_usd", float(round(cost, 6)), trace_id=trace_id)
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to track cycle budget metrics in Langfuse: {e}")
+            return False

@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 from packages.resilience.circuit_breaker import CircuitBreaker
 
@@ -110,6 +110,38 @@ def get_gemini_model(model_type: str = "fast", temperature: float = 0.2):
         )
     except Exception as e:
         logger.warning(f"Failed to instantiate ChatGoogleGenerativeAI: {e}")
+        return None
+
+
+def get_gemini_model_for_task(task_name: str, temperature: Optional[float] = None):
+    """
+    Returns configured Gemini model for a specific pipeline task:
+    - 'ideation' (env: LLM_MODEL_FOR_IDEATION, default: gemini-3.8-flash)
+    - 'production' (env: LLM_MODEL_FOR_PRODUCTION, default: gemini-3.8-flash)
+    - 'qa_judge' (env: LLM_MODEL_FOR_QA_JUDGE, default: gemini-3.8-flash)
+    - 'strategy' (env: LLM_MODEL_FOR_STRATEGY, default: gemini-3.8-flash)
+    """
+    env_var_key = f"LLM_MODEL_FOR_{task_name.upper()}"
+    model_name = os.getenv(env_var_key, os.getenv("GEMINI_MODEL", "gemini-3.8-flash"))
+    temp = temperature if temperature is not None else 0.2
+
+    if not is_gemini_available():
+        return None
+
+    api_key = os.getenv("GOOGLE_API_KEY")
+    try:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        timeout = float(os.getenv("LLM_TIMEOUT_SECONDS", "30.0"))
+        max_retries = int(os.getenv("LLM_MAX_RETRIES", "3"))
+        return ChatGoogleGenerativeAI(
+            model=model_name,
+            google_api_key=api_key,
+            temperature=temp,
+            timeout=timeout,
+            max_retries=max_retries
+        )
+    except Exception as e:
+        logger.warning(f"Failed to instantiate ChatGoogleGenerativeAI for task {task_name}: {e}")
         return None
 
 

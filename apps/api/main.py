@@ -13,6 +13,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from infra.db.database import init_db, SessionLocal
 from infra.db.repository import ContentOpsRepository
 from packages.security.limiter import limiter
+from packages.observability.correlation import set_correlation_id
 from apps.api.routers import (
     workspaces,
     sources,
@@ -106,10 +107,12 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
-
-
 @app.middleware("http")
 async def security_and_size_middleware(request: Request, call_next):
+    # Extract or generate correlation ID
+    incoming_cid = request.headers.get("x-correlation-id") or request.headers.get("x-trace-id")
+    corr_id = set_correlation_id(incoming_cid)
+
     # Enforce request payload size limit
     content_length = request.headers.get("content-length")
     if content_length:
@@ -120,14 +123,16 @@ async def security_and_size_middleware(request: Request, call_next):
                     content={
                         "error": "payload_too_large",
                         "detail": f"La taille de la requête ({int(content_length)} octets) dépasse la limite autorisée ({MAX_REQUEST_BODY_SIZE} octets)."
-                    }
+                    },
+                    headers={"X-Correlation-ID": corr_id}
                 )
         except ValueError:
             pass
 
     response = await call_next(request)
 
-    # Invert/inject robust security headers
+    # Invert/inject robust security headers and correlation ID
+    response.headers["X-Correlation-ID"] = corr_id
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
