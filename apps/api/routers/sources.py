@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException
+from typing import List, Optional
 from packages.contracts.schemas import SourceIngestRequest, SourceResponse
 from packages.connectors.sources.web_extractor import WebExtractorConnector
 from apps.api.dependencies import get_repository, UserContext, require_roles
@@ -14,17 +14,20 @@ def ingest_source(
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor"))
 ):
+    if req.workspace_id and req.workspace_id != user.workspace_id:
+        raise HTTPException(status_code=403, detail="Cannot ingest source for another workspace.")
+    ws_id = user.workspace_id
     content = req.raw_text or f"Contenu automatique extrait depuis {req.url}"
     processed = WebExtractorConnector.process_source(
         source_type=req.type,
         content=content,
         url=req.url,
         author=req.author,
-        workspace_id=req.workspace_id
+        workspace_id=ws_id
     )
 
     source = repo.add_source(
-        workspace_id=req.workspace_id,
+        workspace_id=ws_id,
         source_type=processed["type"],
         raw_content_ref=processed["raw_content_ref"],
         extracted_facts=processed["extracted_facts"],
@@ -47,10 +50,13 @@ def ingest_source(
 
 @router.get("/v1/sources", response_model=List[SourceResponse])
 def list_sources(
-    workspace_id: str = "ws_default",
-    repo: ContentOpsRepository = Depends(get_repository)
+    workspace_id: Optional[str] = None,
+    repo: ContentOpsRepository = Depends(get_repository),
+    user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer", "ServiceAgent"))
 ):
-    sources = repo.list_sources(workspace_id)
+    if workspace_id and workspace_id != user.workspace_id:
+        raise HTTPException(status_code=403, detail="Access to other workspace sources is forbidden.")
+    sources = repo.list_sources(user.workspace_id)
     return [
         SourceResponse(
             id=s.id,

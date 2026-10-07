@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from packages.contracts.schemas import (
     IdeaResearchRequest,
     IdeaResearchResponse,
@@ -19,19 +19,22 @@ def research_ideas(
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor", "ServiceAgent"))
 ):
-    brand_profile = repo.get_latest_brand_profile(req.workspace_id)
+    if req.workspace_id and req.workspace_id != user.workspace_id:
+        raise HTTPException(status_code=403, detail="Cannot research ideas for another workspace.")
+    ws_id = user.workspace_id
+    brand_profile = repo.get_latest_brand_profile(ws_id)
     pillars = req.pillars or (brand_profile.pillars if brand_profile else ["IA générative", "Automatisation"])
     audience = brand_profile.audience if brand_profile else ["Tech Leaders"]
 
     # Retrieve existing sources in workspace
-    sources = repo.list_sources(req.workspace_id)
+    sources = repo.list_sources(ws_id)
     raw_sources = [
         {"url": s.canonical_url, "content": " ".join([f["claim"] for f in s.extracted_facts])}
         for s in sources
     ]
 
     initial_state = {
-        "workspace_id": req.workspace_id,
+        "workspace_id": ws_id,
         "topic_or_brief": req.topic_or_brief,
         "pillars": pillars,
         "audience": audience,
@@ -54,7 +57,7 @@ def research_ideas(
     persisted_ideas = []
     for idea in generated:
         repo.save_idea(
-            workspace_id=req.workspace_id,
+            workspace_id=ws_id,
             title=idea["title"],
             angle=idea["angle"],
             pillar=idea["title"].split(":")[0].strip() if ":" in idea["title"] else "General",
@@ -83,7 +86,7 @@ def research_ideas(
 
     # Log agent run for full auditability (PRD FR-10)
     repo.log_agent_run(
-        workspace_id=req.workspace_id,
+        workspace_id=ws_id,
         graph="idea_research_graph",
         node="ideate_and_score",
         trace_id=run_id,

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from packages.contracts.schemas import ContentBriefCreate
 from apps.api.dependencies import get_repository, UserContext, require_roles
 from infra.db.repository import ContentOpsRepository
@@ -12,8 +12,10 @@ def create_brief(
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor"))
 ):
+    if req.workspace_id and req.workspace_id != user.workspace_id:
+        raise HTTPException(status_code=403, detail="Cannot create brief for another workspace.")
     brief = repo.create_brief(
-        workspace_id=req.workspace_id,
+        workspace_id=user.workspace_id,
         objective=req.objective,
         idea_id=req.idea_id,
         campaign_id=req.campaign_id,
