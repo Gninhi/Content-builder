@@ -1,0 +1,39 @@
+# Environment and secret files
+.env
+.env.*
+*.env
+*.pem
+*.key
+
+# Version control
+.git
+.gitignore
+
+# Python caches and virtualenvs
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Testing and typing caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+tests/
+
+# Storage and temporary data
+storage/
+artifacts/
+scratch/
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE and OS
+.DS_Store
+.vscode/
+.idea/

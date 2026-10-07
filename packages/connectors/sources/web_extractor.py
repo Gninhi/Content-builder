@@ -14,19 +14,32 @@ class WebExtractorConnector:
         re.compile(r"ignore\s+(all\s+)?(previous|prior)\s+instructions", re.IGNORECASE),
         re.compile(r"system\s*:\s*you\s+are", re.IGNORECASE),
         re.compile(r"you\s+must\s+now\s+act\s+as", re.IGNORECASE),
+        re.compile(r"</?untrusted(?:_external_data|_content)?>", re.IGNORECASE),
         re.compile(r"<script.*?>.*?</script>", re.IGNORECASE),
         re.compile(r"\{\{.*?\}\}", re.IGNORECASE),  # template injections
+        re.compile(r"(?:call\s+tool|execute\s+command|eval\s*\()", re.IGNORECASE),
     ]
 
     @classmethod
     def sanitize_untrusted_input(cls, text: str) -> str:
         """
-        Neutralizes potential prompt injection markers and tags in untrusted content.
+        Neutralizes potential prompt injection markers, control tags, and commands in untrusted content.
         """
         sanitized = text
         for pattern in cls.SUSPICIOUS_PATTERNS:
             sanitized = pattern.sub("[FILTERED_UNTRUSTED_INSTRUCTION]", sanitized)
+        # Neutralize any residual XML tag delimiters that could break encapsulation
+        sanitized = sanitized.replace("<", "&lt;").replace(">", "&gt;")
         return sanitized
+
+    @classmethod
+    def wrap_untrusted_content(cls, content: str, source_id: str = "unknown") -> str:
+        """
+        Encapsulates untrusted external text in strict boundary delimiters
+        ensuring it is treated strictly as passive data and never as instructions.
+        """
+        sanitized = cls.sanitize_untrusted_input(content)
+        return f'<untrusted_external_data source_id="{source_id}" role="passive_data_only">\n{sanitized}\n</untrusted_external_data>'
 
     @classmethod
     def extract_facts(cls, text: str) -> List[Dict[str, Any]]:
