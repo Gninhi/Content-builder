@@ -47,6 +47,7 @@ def generate_content_package(
         "brand_voice": voice,
         "prohibited_topics": prohibited,
         "cta_policy": cta_policy,
+        "require_ai_disclosure": bool(cta_policy.get("require_ai_disclosure", False)),
         "sources": raw_sources,
         "requirements": brief.requirements,
         "generated_variants": [],

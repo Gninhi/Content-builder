@@ -63,3 +63,48 @@ def test_quality_gate_fails_on_x_length_exceeded():
     result = quality_gate_node(state)
     assert result["qa_results"]["overall_passed"] is False
     assert result["status"] == ContentStatus.QA_FAILED
+
+
+def test_quality_gate_enforces_ai_transparency_when_configured():
+    """Verifies that EU AI Act transparency rule is enforced when require_ai_disclosure is True."""
+    # 1. Variant without disclosure when required -> fails QA
+    state_without = {
+        "generated_variants": [
+            {
+                "platform": "linkedin",
+                "hook": "Super accroche sur le machine learning",
+                "body": "Super accroche sur le machine learning avec du contenu technique détaillé et vérifié.",
+                "cta": "Laissez un commentaire ci-dessous",
+                "hashtags": ["#Tech"],
+                "claims": [{"claim": "ML fact", "source_id": "src_1", "verified": True}],
+                "media_spec": {}
+            }
+        ],
+        "prohibited_topics": [],
+        "require_ai_disclosure": True
+    }
+    res_without = quality_gate_node(state_without)
+    assert res_without["qa_results"]["overall_passed"] is False
+    assert res_without["generated_variants"][0]["qa_passed"] is False
+    checks = res_without["generated_variants"][0]["checks"]
+    assert any(c["rule_id"] == "AI_ACT_TRANSPARENCY" and not c["passed"] for c in checks)
+
+    # 2. Variant with disclosure -> passes QA
+    state_with = {
+        "generated_variants": [
+            {
+                "platform": "linkedin",
+                "hook": "Super accroche sur le machine learning",
+                "body": "Super accroche sur le machine learning avec du contenu technique détaillé et vérifié. Co-écrit avec IA.",
+                "cta": "Laissez un commentaire ci-dessous",
+                "hashtags": ["#Tech"],
+                "claims": [{"claim": "ML fact", "source_id": "src_1", "verified": True}],
+                "media_spec": {}
+            }
+        ],
+        "prohibited_topics": [],
+        "require_ai_disclosure": True
+    }
+    res_with = quality_gate_node(state_with)
+    assert res_with["qa_results"]["overall_passed"] is True
+    assert res_with["generated_variants"][0]["qa_passed"] is True

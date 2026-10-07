@@ -95,6 +95,18 @@ def quality_gate_node(state: ContentProductionState) -> Dict[str, Any]:
             "details": "Content is clean" if not suspicious else "Suspicious prompt injection pattern found"
         })
 
+        # 6. EU AI Act Transparency (configurable per brand policy according to decision Q6)
+        require_ai_disclosure = state.get("require_ai_disclosure", False)
+        if require_ai_disclosure:
+            from evals.evaluators.quality_evaluator import DeterministicQualityRules
+            ai_ok, ai_msg = DeterministicQualityRules.check_ai_transparency(body, required=True)
+            checks.append({
+                "rule_id": "AI_ACT_TRANSPARENCY",
+                "name": "AI Transparency Disclosure",
+                "passed": ai_ok,
+                "details": ai_msg
+            })
+
         passed_count = sum(1 for c in checks if c["passed"])
         variant_score = round((passed_count / len(checks)) * 100, 1)
         is_variant_passed = passed_count == len(checks)
