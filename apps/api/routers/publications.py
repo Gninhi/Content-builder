@@ -44,6 +44,13 @@ def publish_now(
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner"))
 ):
+    job = repo.db.query(PublicationJobModel).filter(PublicationJobModel.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Publication job not found.")
+    job_ws = job.variant.package.brief.workspace_id if (job.variant and job.variant.package and job.variant.package.brief) else None
+    if job_ws != user.workspace_id and user.role.lower() != "owner":
+        raise HTTPException(status_code=403, detail="Access to publication job in another workspace is forbidden.")
+
     worker = PublisherWorker(repo.db)
     try:
         result = worker.execute_job(job_id)
@@ -61,6 +68,9 @@ def cancel_publication_job(
     job = repo.db.query(PublicationJobModel).filter(PublicationJobModel.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Publication job not found.")
+    job_ws = job.variant.package.brief.workspace_id if (job.variant and job.variant.package and job.variant.package.brief) else None
+    if job_ws != user.workspace_id and user.role.lower() != "owner":
+        raise HTTPException(status_code=403, detail="Access to publication job in another workspace is forbidden.")
 
     if job.status == ContentStatus.PUBLISHED.value:
         raise HTTPException(status_code=400, detail="Cannot cancel an already published post.")

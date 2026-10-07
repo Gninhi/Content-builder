@@ -23,7 +23,10 @@ def generate_content_package(
     brief = repo.db.query(ContentBriefModel).filter(ContentBriefModel.id == brief_id).first()
     if not brief:
         raise HTTPException(status_code=404, detail="Brief not found.")
+    if brief.workspace_id != user.workspace_id and user.role.lower() != "owner":
+        raise HTTPException(status_code=403, detail="Access to brief belonging to another workspace is forbidden.")
 
+    workspace_id = brief.workspace_id
     brand_profile = repo.get_latest_brand_profile(workspace_id)
     voice = brand_profile.voice if brand_profile else "Expert et direct"
     prohibited = brand_profile.prohibited_topics if brand_profile else []
@@ -132,6 +135,7 @@ def approve_content_variant(
             variant_id=variant_id,
             decision=req.decision,
             reviewer_id=user.user_id,
+            workspace_id=user.workspace_id,
             feedback=req.feedback,
             edited_payload=req.edited_payload
         )
@@ -155,21 +159,21 @@ def approve_content_variant(
             status_result=ContentStatus(variant.status if variant else ContentStatus.APPROVED),
             reviewed_at=approval.reviewed_at
         )
+    except ValueError as e:
+        if "access denied" in str(e).lower() or "not found" in str(e).lower():
+            raise HTTPException(status_code=403, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/v1/inbox")
 def get_review_inbox(
-    workspace_id: str = "ws_default",
-    repo: ContentOpsRepository = Depends(get_repository)
+    repo: ContentOpsRepository = Depends(get_repository),
+    user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer", "ServiceAgent"))
 ):
-    """Fetches all items awaiting human review (IN_REVIEW status)."""
-    pending = (
-        repo.db.query(ContentVariantModel)
-        .filter(ContentVariantModel.status == ContentStatus.IN_REVIEW.value)
-        .all()
-    )
+    """Fetches all items awaiting human review in caller's workspace (IN_REVIEW status)."""
+    pending = repo.get_inbox_variants(user.workspace_id)
     return [
         {
             "id": v.id,

@@ -254,18 +254,25 @@ class ContentOpsRepository:
         self.db.refresh(variant)
         return variant
 
-    # ----------------- Approvals (HITL) -----------------
     def record_approval(
         self,
         variant_id: str,
         decision: str,
         reviewer_id: str,
+        workspace_id: Optional[str] = None,
         feedback: Optional[str] = None,
         edited_payload: Optional[Dict[str, Any]] = None
     ) -> ApprovalModel:
-        variant = self.db.query(ContentVariantModel).filter(ContentVariantModel.id == variant_id).first()
+        query = self.db.query(ContentVariantModel)
+        if workspace_id:
+            query = (
+                query.join(ContentPackageModel)
+                .join(ContentBriefModel)
+                .filter(ContentBriefModel.workspace_id == workspace_id)
+            )
+        variant = query.filter(ContentVariantModel.id == variant_id).first()
         if not variant:
-            raise ValueError(f"Content variant '{variant_id}' not found.")
+            raise ValueError(f"Content variant '{variant_id}' not found or access denied for workspace.")
 
         current_status = ContentStatus(variant.status)
 
@@ -314,16 +321,24 @@ class ContentOpsRepository:
         self.db.refresh(approval)
         return approval
 
-    # ----------------- Publication Jobs -----------------
     def schedule_publication(
         self,
         workspace_id: str,
         variant_id: str,
         scheduled_at: datetime
     ) -> PublicationJobModel:
-        variant = self.db.query(ContentVariantModel).filter(ContentVariantModel.id == variant_id).first()
+        variant = (
+            self.db.query(ContentVariantModel)
+            .join(ContentPackageModel)
+            .join(ContentBriefModel)
+            .filter(
+                ContentVariantModel.id == variant_id,
+                ContentBriefModel.workspace_id == workspace_id
+            )
+            .first()
+        )
         if not variant:
-            raise ValueError(f"Variant '{variant_id}' not found.")
+            raise ValueError(f"Variant '{variant_id}' not found or access denied for workspace '{workspace_id}'.")
 
         if variant.status not in (ContentStatus.APPROVED.value, ContentStatus.SCHEDULED.value):
             raise ValueError(f"Cannot schedule variant with status '{variant.status}'. Must be APPROVED.")
@@ -455,3 +470,64 @@ class ContentOpsRepository:
         self.db.commit()
         self.db.refresh(run)
         return run
+
+    # ----------------- Workspace Isolated Queries -----------------
+    def get_inbox_variants(self, workspace_id: str) -> List[ContentVariantModel]:
+        return (
+            self.db.query(ContentVariantModel)
+            .join(ContentPackageModel)
+            .join(ContentBriefModel)
+            .filter(
+                ContentBriefModel.workspace_id == workspace_id,
+                ContentVariantModel.status == ContentStatus.IN_REVIEW.value
+            )
+            .all()
+        )
+
+    def get_editorial_calendar(self, workspace_id: str) -> Dict[str, Any]:
+        scheduled_jobs = (
+            self.db.query(PublicationJobModel)
+            .join(ContentVariantModel)
+            .join(ContentPackageModel)
+            .join(ContentBriefModel)
+            .filter(ContentBriefModel.workspace_id == workspace_id)
+            .order_by(PublicationJobModel.scheduled_at.asc())
+            .all()
+        )
+        published_posts = (
+            self.db.query(PublishedPostModel)
+            .join(PublicationJobModel)
+            .join(ContentVariantModel)
+            .join(ContentPackageModel)
+            .join(ContentBriefModel)
+            .filter(ContentBriefModel.workspace_id == workspace_id)
+            .order_by(PublishedPostModel.published_at.desc())
+            .all()
+        )
+        return {
+            "scheduled": [
+                {
+                    "job_id": j.id,
+                    "variant_id": j.variant_id,
+                    "workspace_id": workspace_id,
+                    "platform": j.platform,
+                    "scheduled_at": j.scheduled_at,
+                    "status": j.status,
+                    "body_snippet": j.variant.body[:80] + "..." if j.variant else ""
+                }
+                for j in scheduled_jobs
+            ],
+            "published": [
+                {
+                    "post_id": p.id,
+                    "job_id": p.job_id,
+                    "workspace_id": workspace_id,
+                    "platform": p.platform,
+                    "published_at": p.published_at,
+                    "external_post_id": p.external_post_id,
+                    "url": p.permalink
+                }
+                for p in published_posts
+            ]
+        }
+

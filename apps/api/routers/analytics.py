@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict, Any
 from packages.contracts.schemas import MetricSnapshotCreate
 from infra.db.repository import ContentOpsRepository
 from infra.db.models import MetricSnapshotModel, PublishedPostModel
-from apps.api.dependencies import get_repository
+from apps.api.dependencies import get_repository, UserContext, require_roles
 
 router = APIRouter(tags=["Analytics & Metrics"])
 
@@ -11,8 +11,12 @@ router = APIRouter(tags=["Analytics & Metrics"])
 @router.post("/v1/analytics/snapshots")
 def record_metric(
     req: MetricSnapshotCreate,
-    repo: ContentOpsRepository = Depends(get_repository)
+    repo: ContentOpsRepository = Depends(get_repository),
+    user: UserContext = Depends(require_roles("Owner", "Editor", "ServiceAgent"))
 ):
+    post = repo.db.query(PublishedPostModel).filter(PublishedPostModel.id == req.post_id).first()
+    if not post or (post.workspace_id != user.workspace_id and user.role.lower() != "owner"):
+        raise HTTPException(status_code=403, detail="Post not found or access denied for this workspace.")
     snapshot = repo.record_metric_snapshot(
         post_id=req.post_id,
         impressions=req.impressions,
@@ -27,10 +31,17 @@ def record_metric(
 
 @router.get("/v1/analytics/overview")
 def get_analytics_overview(
-    repo: ContentOpsRepository = Depends(get_repository)
+    repo: ContentOpsRepository = Depends(get_repository),
+    user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer", "ServiceAgent"))
 ) -> Dict[str, Any]:
-    snapshots = repo.db.query(MetricSnapshotModel).all()
-    posts = repo.db.query(PublishedPostModel).all()
+    posts = repo.db.query(PublishedPostModel).filter(PublishedPostModel.workspace_id == user.workspace_id).all()
+    post_ids = [p.id for p in posts]
+    snapshots = (
+        repo.db.query(MetricSnapshotModel)
+        .filter(MetricSnapshotModel.post_id.in_(post_ids))
+        .all()
+        if post_ids else []
+    )
 
     total_impressions = sum(s.impressions for s in snapshots)
     total_engagements = sum(s.engagements for s in snapshots)
