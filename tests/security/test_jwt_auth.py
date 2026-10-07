@@ -114,3 +114,40 @@ def test_dev_token_endpoint_behavior():
     )
     assert res_prod.status_code in [403, 404]
     os.environ["ENV"] = "dev"
+
+
+def test_jwt_key_rotation_with_kid(monkeypatch):
+    """Verifies that kid header allows validating tokens signed with rotated keys."""
+    from packages.security.auth import _KEY_RING, validate_jwt_configuration
+    _KEY_RING["key_v1"] = "primary-secret-key-32-bytes-minimum-length!"
+    _KEY_RING["key_v2"] = "rotated-secondary-secret-32-bytes-length!!"
+
+    token_v1 = create_access_token(user_id="user_1", role=Role.EDITOR, workspace_id="ws_1", key_id="key_v1")
+    token_v2 = create_access_token(user_id="user_2", role=Role.EDITOR, workspace_id="ws_1", key_id="key_v2")
+
+    claims_1 = decode_access_token(token_v1)
+    claims_2 = decode_access_token(token_v2)
+
+    assert claims_1["sub"] == "user_1"
+    assert claims_2["sub"] == "user_2"
+
+
+def test_jwt_production_validation_fail_closed(monkeypatch):
+    """Enforces fail-closed refusal when production starts with weak or default JWT secret."""
+    from packages.security.auth import validate_jwt_configuration, DEFAULT_DEV_JWT_SECRET
+    import pytest
+
+    monkeypatch.setenv("ENV", "production")
+    monkeypatch.setenv("JWT_SECRET_KEY", DEFAULT_DEV_JWT_SECRET)
+    with pytest.raises(RuntimeError) as exc:
+        validate_jwt_configuration()
+    assert "Production Startup Denied" in str(exc.value)
+
+    monkeypatch.setenv("JWT_SECRET_KEY", "too-short")
+    with pytest.raises(RuntimeError) as exc2:
+        validate_jwt_configuration()
+    assert "Production Startup Denied" in str(exc2.value)
+
+    monkeypatch.setenv("JWT_SECRET_KEY", "a-very-strong-production-secret-key-for-contentops-2026-strict")
+    validate_jwt_configuration()  # Must not raise
+

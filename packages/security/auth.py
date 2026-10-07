@@ -20,21 +20,49 @@ ROLE_PERMISSIONS: Dict[Role, Set[str]] = {
 }
 
 
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "contentops-hardened-jwt-secret-key-must-be-rotated-in-production-2026")
+DEFAULT_DEV_JWT_SECRET = "contentops-hardened-jwt-secret-key-must-be-rotated-in-production-2026"
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", DEFAULT_DEV_JWT_SECRET)
+JWT_KEY_ID = os.getenv("JWT_KEY_ID", "key_v1")
 JWT_ALGORITHM = "HS256"
 JWT_ISSUER = "contentops-auth"
 JWT_AUDIENCE = "contentops-api"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+
+# Key ring for key rotation support: kid -> secret_key
+_KEY_RING: Dict[str, str] = {
+    JWT_KEY_ID: JWT_SECRET_KEY,
+}
+if os.getenv("JWT_ROTATION_KEYS"):
+    for pair in os.getenv("JWT_ROTATION_KEYS", "").split(","):
+        if ":" in pair:
+            kid, ksecret = pair.split(":", 1)
+            _KEY_RING[kid.strip()] = ksecret.strip()
+
+
+def validate_jwt_configuration() -> None:
+    """
+    Enforces fail-closed validation of JWT keys in production.
+    Raises RuntimeError if insecure defaults or weak keys are used.
+    """
+    env = (os.getenv("ENV") or "production").strip().lower()
+    if env == "production":
+        secret = os.getenv("JWT_SECRET_KEY", "")
+        if not secret or secret == DEFAULT_DEV_JWT_SECRET or len(secret) < 32:
+            raise RuntimeError(
+                "Production Startup Denied: JWT_SECRET_KEY must be configured with a dedicated strong secret "
+                "of at least 32 characters in production. Default development keys are strictly rejected."
+            )
 
 
 def create_access_token(
     user_id: str,
     role: Union[str, Role],
     workspace_id: str,
-    expires_delta: Optional[timedelta] = None
+    expires_delta: Optional[timedelta] = None,
+    key_id: Optional[str] = None
 ) -> str:
     """
-    Mints a signed JWT access token with verified claims.
+    Mints a signed JWT access token with verified claims and key id (kid) header.
     """
     now = datetime.now(timezone.utc)
     if expires_delta:
@@ -53,16 +81,27 @@ def create_access_token(
         "exp": expire.timestamp(),
     }
 
-    return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    kid = key_id or JWT_KEY_ID
+    secret = _KEY_RING.get(kid, JWT_SECRET_KEY)
+    headers = {"kid": kid}
+
+    return jwt.encode(payload, secret, algorithm=JWT_ALGORITHM, headers=headers)
 
 
 def decode_access_token(token: str) -> Dict[str, Any]:
     """
-    Verifies signature, expiration, issuer, audience, and algorithms strictly.
+    Verifies signature using matching kid, expiration, issuer, audience, and algorithms strictly.
     """
+    try:
+        unverified_headers = jwt.get_unverified_header(token)
+        kid = unverified_headers.get("kid", JWT_KEY_ID)
+    except Exception:
+        kid = JWT_KEY_ID
+
+    secret = _KEY_RING.get(kid, JWT_SECRET_KEY)
     payload = jwt.decode(
         token,
-        JWT_SECRET_KEY,
+        secret,
         algorithms=[JWT_ALGORITHM],
         issuer=JWT_ISSUER,
         audience=JWT_AUDIENCE,

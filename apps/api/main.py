@@ -35,6 +35,10 @@ MAX_REQUEST_BODY_SIZE = int(os.getenv("MAX_REQUEST_BODY_SIZE_BYTES", str(1024 * 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Enforce fail-closed security configuration in production
+    from packages.security.auth import validate_jwt_configuration
+    validate_jwt_configuration()
+
     # Initialize DB schemas
     init_db()
 
