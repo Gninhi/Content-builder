@@ -25,6 +25,7 @@ from apps.api.routers import (
     analytics,
     strategy,
     auth,
+    oauth,
 )
 
 logger = logging.getLogger("apps.api.main")
@@ -178,6 +179,7 @@ app.include_router(calendar.router)
 app.include_router(analytics.router)
 app.include_router(strategy.router)
 app.include_router(auth.router)
+app.include_router(oauth.router)
 
 web_dir = Path(__file__).resolve().parent.parent / "web"
 if web_dir.exists():
