@@ -1,5 +1,4 @@
 import os
-import re
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -31,20 +30,26 @@ REQUIRED_VARS = [
     "TAVILY_API_KEY",
     # Platform / Governance
     "SOCIAL_SANDBOX_MODE",
+    "LIVE_PUBLISHING_ENABLED",
+    "LIVE_TESTS",
     "KILL_SWITCH_GLOBAL",
     "MAX_PUBLICATIONS_PER_HOUR",
+    "REDIS_URL",
+    "AI_TRANSPARENCY_MODE",
     # LinkedIn Connectors
     "LINKEDIN_CLIENT_ID",
     "LINKEDIN_CLIENT_SECRET",
     "LINKEDIN_ACCESS_TOKEN",
     "LINKEDIN_REDIRECT_URI",
+    "LINKEDIN_API_VERSION",
     # X Connectors
     "X_API_KEY",
     "X_API_SECRET",
     "X_ACCESS_TOKEN",
     "X_CLIENT_ID",
     "X_CLIENT_SECRET",
-    "X_REDIRECT_URI"
+    "X_REDIRECT_URI",
+    "X_MONTHLY_PUBLICATION_LIMIT"
 ]
 
 

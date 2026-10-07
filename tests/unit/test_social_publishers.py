@@ -4,7 +4,6 @@ import httpx
 import pytest
 
 from packages.connectors.social.models import (
-    SocialProvider,
     PublicationStatus,
 )
 from packages.connectors.social.linkedin import LinkedInSocialPublisher
@@ -226,3 +225,133 @@ class TestXSocialPublisherLiveMocked:
             pub_429.publish(content="Testing 429 rate limit reset header.")
         assert exc_429.value.retry_after is not None
         assert exc_429.value.retry_after <= 60
+
+    def test_x_delete_and_status(self):
+        def handler(request: httpx.Request):
+            if request.method == "DELETE" and "tweets/tweet_123" in str(request.url):
+                return httpx.Response(200, json={"data": {"deleted": True}})
+            elif request.method == "GET" and "tweets/tweet_123" in str(request.url):
+                return httpx.Response(200, json={"data": {"id": "tweet_123", "text": "Live"}})
+            elif request.method == "GET" and "tweets/tweet_404" in str(request.url):
+                return httpx.Response(404, json={"errors": [{"title": "Not Found"}]})
+            return httpx.Response(500)
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        pub = XSocialPublisher(access_token="tok", sandbox_mode=False, http_client=client)
+
+        assert pub.delete("tweet_123") is True
+        assert pub.get_status("tweet_123") == PublicationStatus.PUBLISHED
+        assert pub.get_status("tweet_404") == PublicationStatus.DELETED
+        assert pub.get_status("tweet_unknown") == PublicationStatus.FAILED
+
+    def test_x_content_validation_and_scheduling(self):
+        pub = XSocialPublisher(access_token="tok", sandbox_mode=True)
+        # Content too short (< 5 chars)
+        with pytest.raises(ValueError) as exc_short:
+            pub.publish("Hi")
+        assert "under 5 characters" in str(exc_short.value)
+
+        # Content too long (> 280 chars)
+        with pytest.raises(ValueError) as exc_long:
+            pub.publish("a" * 281)
+        assert "280 characters limit" in str(exc_long.value)
+
+        # Schedule
+        target = datetime.now(timezone.utc) + timedelta(hours=2)
+        sched_res = pub.schedule("Valid tweet content to be scheduled", scheduled_at=target)
+        assert sched_res.status == PublicationStatus.SCHEDULED
+        assert sched_res.scheduled_at == target
+
+    def test_x_refresh_token_failure(self):
+        client_fail = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(400, json={"error": "invalid_grant"})))
+        pub = XSocialPublisher(
+            access_token="tok",
+            refresh_token="bad_refresh",
+            token_expires_at=datetime.now(timezone.utc) - timedelta(minutes=10),
+            client_id="cid",
+            client_secret="csec",
+            sandbox_mode=False,
+            http_client=client_fail
+        )
+        with pytest.raises(SocialAuthenticationError):
+            pub.ensure_valid_token()
+
+
+class TestLinkedInEdgeCasesAndStatus:
+    """Verifies LinkedIn status, deletion, content validation and legacy wrapper."""
+
+    def test_linkedin_delete_and_status(self):
+        def handler(request: httpx.Request):
+            if request.method == "DELETE" and "posts/urn" in str(request.url):
+                return httpx.Response(204)
+            elif request.method == "GET" and "posts/urn%3Ali%3Ashare%3Aok" in str(request.url):
+                return httpx.Response(200, json={"id": "urn:li:share:ok"})
+            elif request.method == "GET" and "posts/urn%3Ali%3Ashare%3A404" in str(request.url):
+                return httpx.Response(404)
+            return httpx.Response(500)
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        pub = LinkedInSocialPublisher(access_token="tok", author_urn="urn:li:person:1", sandbox_mode=False, http_client=client)
+
+        assert pub.delete("urn:li:share:ok") is True
+        assert pub.get_status("urn:li:share:ok") == PublicationStatus.PUBLISHED
+        assert pub.get_status("urn:li:share:404") == PublicationStatus.DELETED
+        assert pub.get_status("urn:li:share:err") == PublicationStatus.FAILED
+
+    def test_linkedin_content_validation_and_scheduling(self):
+        pub = LinkedInSocialPublisher(access_token="tok", sandbox_mode=True)
+        # Content too short (< 10 chars)
+        with pytest.raises(ValueError) as exc_short:
+            pub.publish("Too short")
+        assert "under 10 characters" in str(exc_short.value)
+
+        # Content too long (> 3000 chars)
+        with pytest.raises(ValueError) as exc_long:
+            pub.publish("a" * 3001)
+        assert "3,000 character limit" in str(exc_long.value)
+
+        # Scheduling
+        target = datetime.now(timezone.utc) + timedelta(hours=3)
+        sched_res = pub.schedule("Valid LinkedIn professional article post content.", scheduled_at=target)
+        assert sched_res.status == PublicationStatus.SCHEDULED
+        assert sched_res.scheduled_at == target
+
+    def test_linkedin_check_token_liveness_valid(self):
+        valid_exp = datetime.now(timezone.utc) + timedelta(days=20)
+        pub = LinkedInSocialPublisher(access_token="tok", token_expires_at=valid_exp, sandbox_mode=False)
+        # Should not raise
+        pub.check_token_liveness()
+
+
+    def test_linkedin_author_resolution_error(self):
+        client_err = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(401, json={"message": "Unauthorized"})))
+        pub = LinkedInSocialPublisher(access_token="invalid_token", sandbox_mode=False, http_client=client_err)
+        with pytest.raises(SocialAuthenticationError):
+            pub.publish("Valid professional content for LinkedIn publication test.")
+
+
+class TestLegacyConnectorWrappers:
+    """Verifies that legacy LinkedInConnector and XTwitterConnector wrappers still function."""
+
+    def test_legacy_linkedin_connector(self):
+        from packages.connectors.social.linkedin import LinkedInConnector
+        conn = LinkedInConnector(sandbox_mode=True)
+        valid, err = conn.validate_payload({"body": "Valid long post for legacy connector test"})
+        assert valid is True
+        assert err == ""
+
+        receipt = conn.publish({"body": "Valid long post for legacy connector test"}, idempotency_key="idemp_1")
+        assert receipt["platform"] == "linkedin"
+        assert receipt["idempotency_key"] == "idemp_1"
+
+    def test_legacy_x_connector(self):
+        from packages.connectors.social.x_twitter import XTwitterConnector
+        conn = XTwitterConnector(sandbox_mode=True)
+        valid, err = conn.validate_payload({"body": "Valid tweet"})
+        assert valid is True
+        assert err == ""
+
+        receipt = conn.publish({"body": "Valid tweet for legacy wrapper"}, idempotency_key="idemp_2")
+        assert receipt["platform"] == "x"
+        assert receipt["idempotency_key"] == "idemp_2"
+

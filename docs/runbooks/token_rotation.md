@@ -12,21 +12,33 @@
 
 ## Procédure
 
-### 1. Rotation de la clé maîtresse OAuth Vault (`SECRET_VAULT_KEY`)
+### 1. Rotation de la clé maîtresse OAuth Vault (`SECRET_VAULT_KEY`) avec Key ID (`kid`)
 1. Générer une nouvelle clé aléatoire de 32 octets minimum :
    ```bash
    openssl rand -hex 32
    ```
-2. Mettre à jour la variable `SECRET_VAULT_KEY` dans le gestionnaire de secrets sécurisé (Vault / AWS Secrets Manager).
-3. Exécuter la rotation des jetons via la méthode `vault.rotate_token(...)`.
+2. Définir le porte-clé dans l'environnement avec le nouveau `ACTIVE_VAULT_KEY_ID` (ex: `v2`) et l'ancien conservé pour le déchiffrement transparent :
+   ```bash
+   export ACTIVE_VAULT_KEY_ID=v2
+   export SECRET_VAULT_KEY_RING='{"v1": "<ancienne_cle>", "v2": "<nouvelle_cle>"}'
+   ```
+3. Ré-encrypter les enregistrements vers la clé active via le script de maintenance ou la méthode `vault.reencrypt_all(target_key_id="v2")`.
+4. Une fois tous les comptes migrés vers `v2`, l'ancienne clé `v1` peut être révoquée du porte-clé.
 
-### 2. Rotation du JWT Secret (`JWT_SECRET_KEY`)
-1. Générer une nouvelle chaîne aléatoire :
+### 2. Rotation du JWT Secret (`JWT_SECRET_KEY`) sans coupure
+1. Générer un nouveau secret fort (>= 32 caractères) :
    ```bash
    openssl rand -base64 32
    ```
-2. Remplacer `JWT_SECRET_KEY` dans l'environnement.
-3. Les tokens précédents seront invalidés après leur période d'expiration naturelle (60 min).
+2. Configurer le porte-clé de transition dans `JWT_ROTATION_KEYS` :
+   ```bash
+   export JWT_KEY_ID=jwt_v2
+   export JWT_SECRET_KEY="<nouveau_secret_jwt>"
+   export JWT_ROTATION_KEYS="jwt_v1:<ancien_secret_jwt>"
+   ```
+3. Les nouveaux jetons sont signés avec l'en-tête `{"kid": "jwt_v2"}`. Les jetons émis avec `jwt_v1` continuent d'être validés sans interruption jusqu'à leur expiration (60 min).
+4. Après 60 minutes, supprimer `JWT_ROTATION_KEYS`.
+
 
 ### 3. Clés d'API Tiers (Google Gemini, Langfuse, Tavily)
 1. Générer le nouveau secret sur la console plateforme (Google AI Studio, Langfuse, Tavily).

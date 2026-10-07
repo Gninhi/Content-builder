@@ -20,6 +20,19 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: contentops_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redisdata:/data
+
   api:
     build:
       context: ../..
@@ -28,14 +41,21 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://postgres:postgrespassword@db:5432/contentops
+      REDIS_URL: redis://redis:6379/0
+      ENV: production
       ENVIRONMENT: production
       SOCIAL_SANDBOX_MODE: "true"
+      LIVE_PUBLISHING_ENABLED: "false"
     volumes:
       - ../../storage:/app/storage
 
 volumes:
   pgdata:
+  redisdata:
+

@@ -5,7 +5,7 @@ import pytest
 
 from infra.db.database import get_db_session
 from infra.db.repository import ContentOpsRepository
-from infra.db.models import PublicationJobModel, ContentVariantModel, PublishedPostModel
+from infra.db.models import PublishedPostModel
 from packages.domain.state_machine import ContentStatus
 from packages.connectors.social.exceptions import SocialPublishUnknownError
 from packages.observability.tracing import ObservabilityTracer
@@ -243,3 +243,101 @@ def test_multi_platform_partial_failure_isolation():
         # X failed independently
         assert job_x.status == ContentStatus.PUBLISH_FAILED.value
         assert var_x.status == ContentStatus.PUBLISH_FAILED.value
+
+
+def test_resolve_publisher_live_credentials_and_errors(monkeypatch):
+    """Verifies that resolve_publisher loads live credentials and fails closed when missing."""
+    from packages.connectors.social.exceptions import SocialAuthenticationError
+    from packages.connectors.social.linkedin import LinkedInSocialPublisher
+    from packages.connectors.social.x_twitter import XSocialPublisher
+
+    monkeypatch.setenv("LIVE_PUBLISHING_ENABLED", "true")
+    monkeypatch.setenv("SOCIAL_SANDBOX_MODE", "false")
+
+    with get_db_session() as db:
+        repo = ContentOpsRepository(db)
+        ws = repo.create_workspace("Worker Live WS", "UTC", "owner_live")
+        worker = PublisherWorker(db)
+
+        # 1. Missing account -> raises SocialAuthenticationError
+        with pytest.raises(SocialAuthenticationError) as exc_missing:
+            worker.resolve_publisher("linkedin", ws.id)
+        assert "No active connected social account" in str(exc_missing.value)
+
+        # 2. Store account and token for LinkedIn
+        worker.vault.store_token(
+            workspace_id=ws.id,
+            provider="linkedin",
+            account_id="urn:li:person:sub_live_li",
+            access_token="li_live_access_token_123",
+            account_name="LinkedIn User"
+        )
+        # Now resolve_publisher succeeds
+        li_pub = worker.resolve_publisher("linkedin", ws.id)
+        assert isinstance(li_pub, LinkedInSocialPublisher)
+        assert li_pub.sandbox_mode is False
+        assert li_pub.access_token == "li_live_access_token_123"
+
+        # 3. Store account and token for X
+        worker.vault.store_token(
+            workspace_id=ws.id,
+            provider="x",
+            account_id="@twitter_live_user",
+            access_token="x_live_access_token_456",
+            refresh_token="x_live_refresh_token_789",
+            account_name="X Live User"
+        )
+        x_pub = worker.resolve_publisher("x", ws.id)
+        assert isinstance(x_pub, XSocialPublisher)
+        assert x_pub.sandbox_mode is False
+        assert x_pub.access_token == "x_live_access_token_456"
+
+        # 4. In live mode without account, tiktok raises SocialAuthenticationError
+        with pytest.raises(SocialAuthenticationError):
+            worker.resolve_publisher("tiktok", ws.id)
+
+        # 5. Unsupported platform in sandbox mode raises ValueError
+        monkeypatch.setenv("SOCIAL_SANDBOX_MODE", "true")
+        with pytest.raises(ValueError) as exc_unsupported:
+            worker.resolve_publisher("tiktok", ws.id)
+        assert "Unsupported platform" in str(exc_unsupported.value)
+
+
+
+
+def test_job_idempotent_return_and_reconciliation_guards():
+    """Verifies that already published jobs return receipt, and reconciliation guards invalid status."""
+    with get_db_session() as db:
+        repo = ContentOpsRepository(db)
+        ws = repo.create_workspace("Guard WS", "UTC", "owner_guard")
+        brief = repo.create_brief(workspace_id=ws.id, objective="Obj", platform_targets=["linkedin"])
+        pkg = repo.create_content_package(brief.id, 1)
+        var = repo.add_variant(
+            package_id=pkg.id,
+            platform="linkedin",
+            hook="Hook Guard",
+            body="Post for idempotent publication check with sufficient length.",
+            cta="CTA",
+            hashtags=["#Guard"],
+            media_spec={}
+        )
+        var.status = ContentStatus.IN_REVIEW.value
+        db.commit()
+
+        repo.record_approval(variant_id=var.id, decision="approve", reviewer_id="human_editor_1", workspace_id=ws.id)
+        job = repo.schedule_publication(workspace_id=ws.id, variant_id=var.id, scheduled_at=datetime.now(timezone.utc))
+
+        worker = PublisherWorker(db)
+        # First execution -> Published
+        res1 = worker.execute_job(job.id)
+        assert res1["status"] == "SUCCESS"
+
+        # Second execution on already published job -> returns existing receipt without republishing
+        res2 = worker.execute_job(job.id)
+        assert res2["status"] == "ALREADY_PUBLISHED"
+
+        # Reconcile on non-PUBLISH_UNKNOWN job raises ValueError
+        with pytest.raises(ValueError) as exc_recon:
+            worker.reconcile_job(job.id, "PUBLISHED", "post_id")
+        assert "PUBLISH_UNKNOWN" in str(exc_recon.value)
+

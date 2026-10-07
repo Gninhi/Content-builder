@@ -1,11 +1,10 @@
-import pytest
 import concurrent.futures
 from datetime import datetime, timezone
 from infra.db.database import get_db_session, SessionLocal
 from infra.db.repository import ContentOpsRepository
 from services.publisher.worker import PublisherWorker
 from packages.domain.state_machine import ContentStatus
-from infra.db.models import PublicationJobModel, PublishedPostModel
+from infra.db.models import PublishedPostModel
 
 
 def test_concurrent_workers_atomic_lock_prevents_double_publishing():

@@ -1,5 +1,4 @@
 import pytest
-import os
 import json
 from pathlib import Path
 from fastapi.testclient import TestClient
@@ -7,10 +6,6 @@ from apps.api.main import app
 from packages.security.auth import create_access_token, Role
 from infra.db.database import init_db, SessionLocal
 from infra.db.repository import ContentOpsRepository
-from services.publisher.worker import PublisherWorker
-from packages.domain.state_machine import ContentStatus
-from packages.domain.idempotency import compute_payload_hash
-from infra.db.models import PublicationJobModel, ContentVariantModel, ApprovalModel
 from services.orchestration.nodes.research import ideation_and_scoring_node, get_llm_cache, compute_cache_key
 
 client = TestClient(app)
@@ -119,16 +114,6 @@ def test_reproduce_sec_v2_05_cross_tenant_cache_leak():
     pillars = ["finance"]
     audience = ["executives"]
     
-    # Victim queries the research node and populates cache
-    victim_state = {
-        "workspace_id": "ws_victim",
-        "topic_or_brief": topic,
-        "pillars": pillars,
-        "audience": audience,
-        "target_count": 2,
-        "raw_sources": [],
-        "errors": []
-    }
     # Direct cache injection representing victim's proprietary generated ideas
     victim_cache_payload = {
         "topic": topic.strip().lower(),

@@ -118,7 +118,7 @@ def test_dev_token_endpoint_behavior():
 
 def test_jwt_key_rotation_with_kid(monkeypatch):
     """Verifies that kid header allows validating tokens signed with rotated keys."""
-    from packages.security.auth import _KEY_RING, validate_jwt_configuration
+    from packages.security.auth import _KEY_RING
     _KEY_RING["key_v1"] = "primary-secret-key-32-bytes-minimum-length!"
     _KEY_RING["key_v2"] = "rotated-secondary-secret-32-bytes-length!!"
 

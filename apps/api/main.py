@@ -44,8 +44,28 @@ async def lifespan(app: FastAPI):
     init_db()
 
     # Seed default workspace & initial brand profile for zero-friction start
+    # and reconcile any orphan PUBLISHING jobs left over from unexpected process stops
     db = SessionLocal()
     try:
+        from infra.db.models import PublicationJobModel, ContentVariantModel
+        from packages.domain.state_machine import ContentStatus
+        orphan_jobs = (
+            db.query(PublicationJobModel)
+            .filter(PublicationJobModel.status == ContentStatus.PUBLISHING.value)
+            .all()
+        )
+        for job in orphan_jobs:
+            logger.warning(
+                f"Startup reconciliation: publication job '{job.id}' was in PUBLISHING state. "
+                "Transitioning to PUBLISH_UNKNOWN for safe at-most-once reconciliation."
+            )
+            job.status = ContentStatus.PUBLISH_UNKNOWN.value  # type: ignore[assignment]
+            variant = db.query(ContentVariantModel).filter(ContentVariantModel.id == job.variant_id).first()
+            if variant:
+                variant.status = ContentStatus.PUBLISH_UNKNOWN.value  # type: ignore[assignment]
+        if orphan_jobs:
+            db.commit()
+
         repo = ContentOpsRepository(db)
         default_ws = repo.get_workspace("ws_default")
         if not default_ws:
@@ -81,6 +101,11 @@ async def lifespan(app: FastAPI):
         db.close()
 
     yield
+
+    # Graceful shutdown: flush pending observability traces to Langfuse
+    from packages.observability.tracing import ObservabilityTracer
+    ObservabilityTracer.flush()
+
 
 
 app = FastAPI(

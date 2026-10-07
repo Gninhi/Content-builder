@@ -60,6 +60,18 @@ class ObservabilityTracer:
             return None
 
     @classmethod
+    def flush(cls) -> None:
+        """
+        Flushes pending traces and scores to Langfuse backend before shutdown.
+        """
+        if cls._client:
+            try:
+                cls._client.flush()
+            except Exception as e:
+                logger.warning(f"Error flushing Langfuse client: {e}")
+
+
+    @classmethod
     def get_callback_handler(
         cls,
         session_id: Optional[str] = None,

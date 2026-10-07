@@ -1,5 +1,4 @@
 import os
-import pytest
 
 # Configure global test environment defaults ensuring fail-closed tests pass securely
 os.environ.setdefault("ENV", "production")
