@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, Float, DateTime, Text, JSON, ForeignKey, Boolean
+from sqlalchemy import Column, String, Integer, Float, DateTime, Text, JSON, ForeignKey, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from infra.db.database import Base
 
@@ -22,6 +22,7 @@ class WorkspaceModel(Base):
     brand_profiles = relationship("BrandProfileModel", back_populates="workspace", cascade="all, delete-orphan")
     sources = relationship("ContentSourceModel", back_populates="workspace", cascade="all, delete-orphan")
     ideas = relationship("IdeaModel", back_populates="workspace", cascade="all, delete-orphan")
+    social_accounts = relationship("ConnectedSocialAccountModel", back_populates="workspace", cascade="all, delete-orphan")
 
 
 class BrandProfileModel(Base):
@@ -210,3 +211,26 @@ class AgentRunModel(Base):
     cost = Column(Float, default=0.0)
     status = Column(String(32), default="completed")
     created_at = Column(DateTime, default=utc_now)
+
+
+class ConnectedSocialAccountModel(Base):
+    __tablename__ = "connected_social_accounts"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "provider", "account_id", name="uq_workspace_provider_account"),
+    )
+
+    id = Column(String(64), primary_key=True)
+    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    provider = Column(String(32), nullable=False)
+    account_id = Column(String(128), nullable=False)
+    account_name = Column(String(255), nullable=True)
+    encrypted_token_blob = Column(Text, nullable=False)
+    key_id = Column(String(64), nullable=False, default="v1")
+    scopes = Column(JSON, default=list, nullable=False)
+    expires_at = Column(DateTime, nullable=True)
+    status = Column(String(32), default="ACTIVE", nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+    workspace = relationship("WorkspaceModel", back_populates="social_accounts")
+

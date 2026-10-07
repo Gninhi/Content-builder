@@ -16,6 +16,7 @@ from infra.db.models import (
     PublishedPostModel,
     MetricSnapshotModel,
     AgentRunModel,
+    ConnectedSocialAccountModel,
 )
 from packages.domain.state_machine import ContentStatus, ContentStateMachine
 from packages.domain.idempotency import compute_payload_hash, compute_idempotency_key
@@ -567,4 +568,107 @@ class ContentOpsRepository:
                 for p in published_posts
             ]
         }
+
+    # ----------------- Connected Social Accounts -----------------
+    def store_connected_social_account(
+        self,
+        workspace_id: str,
+        provider: str,
+        account_id: str,
+        account_name: str,
+        encrypted_blob: str,
+        key_id: str = "v1",
+        scopes: Optional[List[str]] = None,
+        expires_at: Optional[datetime] = None,
+        status: str = "ACTIVE"
+    ) -> ConnectedSocialAccountModel:
+        account = (
+            self.db.query(ConnectedSocialAccountModel)
+            .filter(
+                ConnectedSocialAccountModel.workspace_id == workspace_id,
+                ConnectedSocialAccountModel.provider == provider.lower(),
+                ConnectedSocialAccountModel.account_id == account_id
+            )
+            .first()
+        )
+        if not account:
+            account = ConnectedSocialAccountModel(
+                id=f"csa_{uuid.uuid4().hex[:12]}",
+                workspace_id=workspace_id,
+                provider=provider.lower(),
+                account_id=account_id,
+                account_name=account_name,
+                encrypted_token_blob=encrypted_blob,
+                key_id=key_id,
+                scopes=scopes or [],
+                expires_at=expires_at,
+                status=status
+            )
+            self.db.add(account)
+        else:
+            account.account_name = account_name
+            account.encrypted_token_blob = encrypted_blob
+            account.key_id = key_id
+            account.scopes = scopes or []
+            account.expires_at = expires_at
+            account.status = status
+        self.db.commit()
+        self.db.refresh(account)
+        return account
+
+    def get_connected_social_account(
+        self,
+        workspace_id: str,
+        provider: str,
+        account_id: str
+    ) -> Optional[ConnectedSocialAccountModel]:
+        return (
+            self.db.query(ConnectedSocialAccountModel)
+            .filter(
+                ConnectedSocialAccountModel.workspace_id == workspace_id,
+                ConnectedSocialAccountModel.provider == provider.lower(),
+                ConnectedSocialAccountModel.account_id == account_id
+            )
+            .first()
+        )
+
+    def list_connected_social_accounts(
+        self,
+        workspace_id: str,
+        provider: Optional[str] = None
+    ) -> List[ConnectedSocialAccountModel]:
+        q = self.db.query(ConnectedSocialAccountModel).filter(
+            ConnectedSocialAccountModel.workspace_id == workspace_id
+        )
+        if provider:
+            q = q.filter(ConnectedSocialAccountModel.provider == provider.lower())
+        return q.all()
+
+    def update_social_account_status(
+        self,
+        workspace_id: str,
+        provider: str,
+        account_id: str,
+        status: str
+    ) -> bool:
+        account = self.get_connected_social_account(workspace_id, provider, account_id)
+        if not account:
+            return False
+        account.status = status
+        self.db.commit()
+        return True
+
+    def delete_connected_social_account(
+        self,
+        workspace_id: str,
+        provider: str,
+        account_id: str
+    ) -> bool:
+        account = self.get_connected_social_account(workspace_id, provider, account_id)
+        if not account:
+            return False
+        self.db.delete(account)
+        self.db.commit()
+        return True
+
 

@@ -19,10 +19,10 @@ def test_pricing_config_file_exists_and_valid():
     assert "gemini-3.8-flash" in data["models"]
 
     flash = data["models"]["gemini-3.8-flash"]
-    assert flash["input_per_1m"] == 0.075
-    assert flash["output_per_1m"] == 0.30
-    assert flash["input_per_1k"] == 0.000075
-    assert flash["output_per_1k"] == 0.000300
+    assert flash["input_per_1m"] == 0.75
+    assert flash["output_per_1m"] == 3.75
+    assert flash["input_per_1k"] == 0.00075
+    assert flash["output_per_1k"] == 0.00375
 
 
 def test_cost_estimator_uses_external_pricing():
@@ -36,8 +36,8 @@ def test_cost_estimator_uses_external_pricing():
     assert res["model"] == "gemini-3.8-flash"
     assert res["input_tokens"] == 1000
     assert res["output_tokens"] == 1000
-    # Expected: 1.0 * 0.000075 + 1.0 * 0.000300 = 0.000375
-    assert round(res["estimated_cost_usd"], 6) == 0.000375
+    # Expected: 1.0 * 0.00075 + 1.0 * 0.00375 = 0.004500
+    assert round(res["estimated_cost_usd"], 6) == 0.0045
 
 
 def test_cost_estimator_custom_model_and_fallback():
