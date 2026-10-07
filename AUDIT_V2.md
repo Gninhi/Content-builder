@@ -83,9 +83,29 @@
 
 ---
 
-## 4. Conclusion de l'Audit V2
+## 4. Tests de Reproduction des Failles Critiques et Élevées (Phase 2 Portal)
 
-L'audit préliminaire confirme que plusieurs composants critiques nécessitent une remédiation immédiate avant tout raccordement aux API réelles de LinkedIn et de X. En particulier :
+Une suite dédiée de tests d'attaque (`tests/security/test_reproduction_attacks.py`) a été exécutée pour valider empiriquement la présence de chaque vulnérabilité avant tout correctif.
+
+```bash
+pytest tests/security/test_reproduction_attacks.py -v
+```
+
+### Résultats d'Exécution :
+- `test_reproduce_sec_v2_01_dev_token_default_env` : **ÉCHEC CONFIRMÉ** (`AssertionError: 200 == 403`). L'absence de variable `ENV` a permis la génération sans restriction d'un jeton JWT pour `user_id='attacker'` sur `ws_victim`.
+- `test_reproduce_sec_v2_02_owner_cross_tenant_bola` : **ÉCHEC CONFIRMÉ** (`AssertionError: 200 == 403`). L'attaquant avec le rôle `Owner` dans son propre workspace a accédé au profil de marque confidentiel de `ws_victim` en raison de la clause permissive `user.role.lower() != 'owner'`.
+- `test_reproduce_sec_v2_06_mass_assignment_brief_creation` : **ÉCHEC CONFIRMÉ** (`AssertionError: 200 == 403`). L'attaquant authentifié sur `ws_attacker` a pu injecter un brief éditorial directement dans `ws_victim` via le corps JSON non validé.
+- `test_reproduce_sec_v2_07_unauthenticated_sources_leak` : **ÉCHEC CONFIRMÉ** (`AssertionError: 200 in (401, 403)`). La route `GET /v1/sources` a renvoyé les données sans exiger de jeton d'authentification.
+- `test_reproduce_sec_v2_05_cross_tenant_cache_leak` : **ÉCHEC CONFIRMÉ** (`AssertionError: Cross-tenant cache leak detected in idea_research_node!`). Des idées confidentielles générées pour `ws_victim` ont été servies directement à `ws_attacker` depuis le cache sans isolation.
+- `test_reproduce_fin_v2_01_pricing_underestimation` : **ÉCHEC CONFIRMÉ** (`AssertionError: 0.075 == 0.75`). Le fichier `config/pricing.json` configure `gemini-3.8-flash` à 10x moins que son tarif officiel réel.
+
+**Portail Phase 2 : VALIDÉ (100% des tests de reproduction ciblés échouent contre le code non remédié).**
+
+---
+
+## 5. Conclusion de l'Audit V2
+
+L'audit préliminaire et le contrôle approfondi confirment que plusieurs composants critiques nécessitent une remédiation immédiate avant tout raccordement aux API réelles de LinkedIn et de X. En particulier :
 1. Les verrous de publication et de rafraîchissement doivent être déplacés en base de données relationnelle (`SELECT ... FOR UPDATE`).
 2. L'isolation inter-workspaces (BOLA/IDOR) doit être sanctuarisée en supprimant le bypass d'autorité réservé au rôle `Owner`.
 3. Le stockage des jetons OAuth doit être persisté en base de données de manière chiffrée (AES-GCM 256 bits avec AAD lié au workspace et identifiant de clé `kid`).
