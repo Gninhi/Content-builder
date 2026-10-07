@@ -8,6 +8,7 @@ class ContentStatus(str, Enum):
     DRAFT = "DRAFT"
     QA_FAILED = "QA_FAILED"
     IN_REVIEW = "IN_REVIEW"
+    PENDING_REVIEW = "IN_REVIEW"  # Standard lifecycle alias
     REWRITE_REQUESTED = "REWRITE_REQUESTED"
     REJECTED = "REJECTED"
     APPROVED = "APPROVED"
@@ -15,8 +16,20 @@ class ContentStatus(str, Enum):
     PUBLISHING = "PUBLISHING"
     PUBLISHED = "PUBLISHED"
     PUBLISH_FAILED = "PUBLISH_FAILED"
+    FAILED = "PUBLISH_FAILED"  # Standard failure alias
     MEASURED = "MEASURED"
     ARCHIVED = "ARCHIVED"
+
+    @classmethod
+    def parse(cls, value: "str | ContentStatus") -> "ContentStatus":
+        if isinstance(value, ContentStatus):
+            return value
+        cleaned = value.strip().upper()
+        if cleaned in ("PENDING_REVIEW", "PENDING"):
+            return cls.IN_REVIEW
+        if cleaned == "FAILED":
+            return cls.PUBLISH_FAILED
+        return cls(cleaned)
 
 
 class InvalidStateTransitionError(Exception):

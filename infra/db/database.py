@@ -1,4 +1,5 @@
 import os
+from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker, scoped_session
 
@@ -22,6 +23,16 @@ SessionLocal = scoped_session(sessionmaker(autocommit=False, autoflush=False, bi
 Base = declarative_base()
 
 
+@contextmanager
+def get_db_session():
+    """Context manager for obtaining a database session."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
 def get_db():
     """Dependency for obtaining a database session."""
     db = SessionLocal()
@@ -34,3 +45,4 @@ def get_db():
 def init_db():
     """Initializes tables in database."""
     Base.metadata.create_all(bind=engine)
+

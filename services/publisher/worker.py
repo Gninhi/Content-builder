@@ -1,9 +1,8 @@
-from typing import Dict, Any, Optional
-from datetime import datetime
+from typing import Dict, Any
 from sqlalchemy.orm import Session
 from infra.db.repository import ContentOpsRepository
 from infra.db.models import PublicationJobModel, ContentVariantModel, ApprovalModel
-from packages.domain.state_machine import ContentStatus
+from packages.domain.state_machine import ContentStatus, ContentStateMachine
 from packages.domain.idempotency import compute_payload_hash
 from packages.connectors.social.linkedin import LinkedInConnector
 from packages.connectors.social.x_twitter import XTwitterConnector
@@ -38,6 +37,10 @@ class PublisherWorker:
                 "external_post_id": existing_post.external_post_id if existing_post else None,
                 "permalink": existing_post.permalink if existing_post else None
             }
+
+        # Concurrency locking guard: avoid double processing of in-flight jobs
+        if job.status == ContentStatus.PUBLISHING.value:
+            raise RuntimeError(f"Concurrent execution detected: Job '{job_id}' is already in PUBLISHING status.")
 
         variant: ContentVariantModel = job.variant
         if not variant:
@@ -76,8 +79,11 @@ class PublisherWorker:
             self.db.commit()
             raise ValueError(job.error_message)
 
-        # 3. Transition to PUBLISHING
+        # 3. Transition to PUBLISHING using validated state machine
+        ContentStateMachine.transition(ContentStatus(job.status), ContentStatus.PUBLISHING)
+        ContentStateMachine.transition(ContentStatus(variant.status), ContentStatus.PUBLISHING)
         job.status = ContentStatus.PUBLISHING.value
+        variant.status = ContentStatus.PUBLISHING.value
         job.attempt_count += 1
         self.db.commit()
 
@@ -99,6 +105,7 @@ class PublisherWorker:
                 permalink=receipt["permalink"]
             )
 
+            ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISHED)
             job.status = ContentStatus.PUBLISHED.value
             variant.status = ContentStatus.PUBLISHED.value
             self.db.commit()
@@ -112,6 +119,7 @@ class PublisherWorker:
             }
 
         except Exception as exc:
+            ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISH_FAILED)
             job.status = ContentStatus.PUBLISH_FAILED.value
             job.error_message = str(exc)
             variant.status = ContentStatus.PUBLISH_FAILED.value
