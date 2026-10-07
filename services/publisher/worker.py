@@ -23,7 +23,6 @@ from packages.connectors.social.vault import EncryptedOAuthTokenVault
 from packages.connectors.social.exceptions import (
     SocialPublishUnknownError,
     SocialAuthenticationError,
-    SocialConnectorError,
 )
 from packages.observability.tracing import ObservabilityTracer
 

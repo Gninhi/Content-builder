@@ -36,23 +36,38 @@
   - Typage Mypy : 0 erreur sur 106 fichiers source.
   - Suite de tests : 94 tests unitaires, d'intégration et de sécurité au vert.
   - Matrice livrée : `REMEDIATION_V2.md`.
-- [ ] **Phase 4 — LinkedIn Social Publisher** : En cours.
-  - Implémentation de `LinkedInSocialPublisher` héritant de `SocialPublisher`.
+- [x] **Phase 4 — LinkedIn Social Publisher** : Terminée.
+  - Implémentation de `LinkedInSocialPublisher` héritant de `SocialPublisher` dans `packages/connectors/social/linkedin.py`.
   - Profil personnel (`urn:li:person:{sub}` via OpenID `userinfo`).
-  - Scopes : `openid profile w_member_social`.
-  - Publication via `POST https://api.linkedin.com/rest/posts` avec `LinkedIn-Version` et `X-Restli-Protocol-Version: 2.0.0`.
-  - Alerte expiration J-7 et statut reconnexion requise.
-- [ ] **Phase 5 — X Social Publisher** : À venir.
-  - Implémentation de `XSocialPublisher` héritant de `SocialPublisher`.
-  - OAuth 2.0 PKCE, scopes `tweet.read tweet.write users.read offline.access`.
-  - Publication `POST https://api.x.com/2/tweets`, rafraîchissement atomique des jetons, plafonds stricts.
-- [ ] **Phase 6 — OAuth 2.0 Flow (PKCE, State, Vault DB Persist)** : À venir.
-  - Routes `/v1/oauth/start/{provider}` et `/v1/oauth/callback/{provider}`.
-- [ ] **Phase 7 — Publishing Pipeline (At-Most-Once, Kill Switch, Reconciliation)** : À venir.
-  - Transition `PUBLISHING` -> `PUBLISHED` / `PUBLISH_UNKNOWN`.
-- [ ] **Phase 8 — Comprehensive Tests Suite (Respx, Redis/Postgres Integration)** : À venir.
-- [ ] **Phase 9 — Production Readiness & Runbooks** : À venir.
-- [ ] **Phase 10 — Live Smoke Validation** : À venir (guidée avec l'utilisateur).
+  - Scopes vérifiés : `openid profile w_member_social`.
+  - Publication via `POST https://api.linkedin.com/rest/posts` avec `LinkedIn-Version: 202601` et `X-Restli-Protocol-Version: 2.0.0`.
+  - Alerte expiration J-7 (`TokenExpiringSoonError`) et blocage préventif des publications.
+- [x] **Phase 5 — X Social Publisher** : Terminée.
+  - Implémentation de `XSocialPublisher` héritant de `SocialPublisher` dans `packages/connectors/social/x_twitter.py`.
+  - OAuth 2.0 PKCE confidentiel, scopes `tweet.read tweet.write users.read offline.access`.
+  - Publication `POST https://api.x.com/2/tweets`, suppression (`DELETE`) et lecture du statut.
+  - Rafraîchissement atomique des jetons avec verrou anti-concurrence (`refresh_lock`).
+  - Plafonds stricts (longueur 5-280 chars, plafond mensuel de coût, gestion 402/403/429).
+- [x] **Phase 6 — OAuth 2.0 Flow (PKCE, State, Vault DB Persist)** : Terminée.
+  - Routes `/v1/oauth/start/{provider}`, `/v1/oauth/callback/{provider}`, `/v1/oauth/accounts`, `/v1/oauth/disconnect/{provider}`.
+  - `OAuthStateManager` avec `code_verifier`/`code_challenge` PKCE et state à usage unique.
+  - Chiffrement immédiat dans `EncryptedOAuthTokenVault` et persistance en base.
+- [x] **Phase 7 — Publishing Pipeline (At-Most-Once, Kill Switch, Reconciliation)** : Terminée.
+  - Protocole "Au plus une fois" déterministe avec transition préalable atomique `PUBLISHING`.
+  - Bascule en `PUBLISH_UNKNOWN` sur tout incident réseau après envoi sans retry aveugle.
+  - Réconciliation automatisée et humaine via `worker.reconcile_job(...)`.
+  - Télémétrie et scores Langfuse corrélés par `trace_id`.
+- [x] **Phase 8 — Comprehensive Tests Suite & Live Smoke Script** : Terminée.
+  - 133 tests automatisés passés (0 échec). Couverture globale : 88% (>= 85%).
+  - Script manuel de smoke test live : `scripts/smoke_test_live.py` (verrouillé sous `LIVE_TESTS=1`).
+- [x] **Phase 9 — Production Readiness & Runbooks** : Terminée.
+  - Mypy propre : 0 erreur sur 115 fichiers source.
+  - Ruff propre : 0 avertissement.
+  - pip-audit : 0 vulnérabilité sur les dépendances du projet.
+  - Stack Docker Compose avec conteneur Redis sain.
+  - CI durcie avec PostgreSQL, Redis et tests de migrations Alembic.
+  - 5 Runbooks de production dans `docs/runbooks/`.
+- [ ] **Phase 10 — Live Smoke Validation** : Prête pour exécution guidée avec l'utilisateur.
 
 ---
 
