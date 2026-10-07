@@ -116,3 +116,28 @@ def test_rate_limit_key_workspace_isolation():
     })
     assert get_rate_limit_key(req_auth) == "ws:ws_tenant_alpha"
 
+
+def test_rate_limit_trusted_proxy_resolution(monkeypatch):
+    """Verify trusted proxy handles X-Forwarded-For while untrusted proxy ignores spoofed headers."""
+    from fastapi import Request
+    from packages.security.limiter import get_rate_limit_key
+
+    # Untrusted proxy attempting spoofing: request from 10.0.0.1 claiming to be 8.8.8.8
+    monkeypatch.setenv("TRUSTED_PROXIES", "127.0.0.1")
+    req_spoof = Request({
+        "type": "http",
+        "headers": [(b"x-forwarded-for", b"8.8.8.8")],
+        "client": ("10.0.0.1", 12345)
+    })
+    # Should use direct IP 10.0.0.1, rejecting spoofed 8.8.8.8
+    assert get_rate_limit_key(req_spoof) == "10.0.0.1"
+
+    # Trusted proxy: request from 127.0.0.1 with forwarded client 8.8.8.8
+    req_trusted = Request({
+        "type": "http",
+        "headers": [(b"x-forwarded-for", b"8.8.8.8, 127.0.0.1")],
+        "client": ("127.0.0.1", 12345)
+    })
+    assert get_rate_limit_key(req_trusted) == "8.8.8.8"
+
+
