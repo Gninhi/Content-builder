@@ -116,12 +116,21 @@ def test_gemini_cost_estimator_and_pii_redactor():
     assert cost_info["input_tokens"] >= 900
     assert cost_info["estimated_cost_usd"] > 0
 
-    # Test PII redactor for Google and Langfuse keys
-    sensitive_text = "API keys: AIzaSyFakeSecret12345678901234567890 and pk-lf-abcdef1234567890 and test@example.com"
+    # Test PII redactor for Google, Langfuse, LinkedIn, X and PKCE
+    sensitive_text = (
+        "API keys: AIzaSyFakeSecret12345678901234567890 and pk-lf-abcdef1234567890 and test@example.com "
+        "LinkedIn: AQU_FakeLinkedInAccessTokenLongString1234567890abcdef123456 "
+        "PKCE: code_verifier: super_secret_pkce_verifier_string_of_sufficient_length_43_chars "
+        "Query: https://example.com/callback?code=oauth_auth_code_secret_12345&state=state_secret_123456"
+    )
     redacted = PIIRedactor.redact(sensitive_text)
     assert "[REDACTED_GOOGLE_KEY]" in redacted
     assert "[REDACTED_LANGFUSE_PUBLIC_KEY]" in redacted
     assert "[REDACTED_EMAIL]" in redacted
+    assert "[REDACTED_LINKEDIN_TOKEN]" in redacted
+    assert "[REDACTED_PKCE_VERIFIER]" in redacted
+    assert "[REDACTED_OAUTH_CODE]" in redacted
+    assert "[REDACTED_OAUTH_STATE]" in redacted
 
 
 def test_strategy_query_metric_snapshot_model_fixed():
