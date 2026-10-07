@@ -26,3 +26,7 @@ htmlcov/
 *.sqlite3
 contentops.db*
 artifacts/
+
+# Node / Frontend
+node_modules/
+.vite/
