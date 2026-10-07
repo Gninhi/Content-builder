@@ -1,10 +1,8 @@
-import pytest
 from packages.contracts.schemas import (
     WorkspaceCreate,
     BrandProfileCreate,
     IdeaItem,
-    EvidenceItem,
-    QAReviewResult
+    EvidenceItem
 )
 from packages.contracts.events import create_domain_event, DomainEvent
 

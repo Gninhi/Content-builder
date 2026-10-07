@@ -2,17 +2,15 @@ import os
 import sys
 import uuid
 import time
-import httpx
 from dotenv import load_dotenv
 
 # Load real environment variables from .env
 load_dotenv(".env")
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from packages.observability.tracing import ObservabilityTracer
-from packages.observability.metrics import CostAndTokenEstimator
-from services.orchestration.graphs.idea_research import graph as idea_research_graph
-from services.orchestration.graphs.content_production import graph as content_production_graph
+from packages.observability.tracing import ObservabilityTracer  # noqa: E402
+from packages.observability.metrics import CostAndTokenEstimator  # noqa: E402
+from services.orchestration.graphs.idea_research import graph as idea_research_graph  # noqa: E402
 
 def run_verification():
     print("=== ÉTAPE 1 : Vérification de la configuration Langfuse & Gemini ===")

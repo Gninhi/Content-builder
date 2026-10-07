@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends
 from typing import Dict, Any
 from infra.db.repository import ContentOpsRepository
-from infra.db.models import PublicationJobModel, PublishedPostModel
 from apps.api.dependencies import get_repository, UserContext, require_roles
 
 router = APIRouter(tags=["Editorial Calendar"])

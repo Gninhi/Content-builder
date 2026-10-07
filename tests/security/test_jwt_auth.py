@@ -1,5 +1,4 @@
 import os
-import pytest
 from datetime import datetime, timezone, timedelta
 from fastapi.testclient import TestClient
 import jwt
@@ -10,8 +9,6 @@ from packages.security.auth import (
     decode_access_token,
     JWT_ALGORITHM,
     JWT_SECRET_KEY,
-    JWT_ISSUER,
-    JWT_AUDIENCE,
     Role
 )
 

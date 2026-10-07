@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Set, Union
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 import jwt
@@ -12,6 +12,14 @@ class Role(str, Enum):
     SERVICE_AGENT = "ServiceAgent"
 
 
+ROLE_PERMISSIONS: Dict[Role, Set[str]] = {
+    Role.OWNER: {"read", "write", "approve_variant", "publish", "delete", "admin"},
+    Role.EDITOR: {"read", "write", "approve_variant", "publish"},
+    Role.VIEWER: {"read"},
+    Role.SERVICE_AGENT: {"read", "write", "publish"},
+}
+
+
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "contentops-hardened-jwt-secret-key-must-be-rotated-in-production-2026")
 JWT_ALGORITHM = "HS256"
 JWT_ISSUER = "contentops-auth"
@@ -21,7 +29,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
 
 def create_access_token(
     user_id: str,
-    role: str,
+    role: Union[str, Role],
     workspace_id: str,
     expires_delta: Optional[timedelta] = None
 ) -> str:
@@ -36,7 +44,7 @@ def create_access_token(
 
     payload = {
         "sub": user_id,
-        "role": role if isinstance(role, str) else role.value,
+        "role": role.value if isinstance(role, Role) else str(role),
         "workspace_id": workspace_id,
         "iss": JWT_ISSUER,
         "aud": JWT_AUDIENCE,

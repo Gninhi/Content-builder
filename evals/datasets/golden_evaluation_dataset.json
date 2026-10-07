@@ -1,0 +1,104 @@
+[
+  {
+    "id": "GOLDEN_GOOD_01",
+    "name": "LinkedIn post bien structuré et équilibré",
+    "platform": "linkedin",
+    "body": "Comment passer d'un prototype d'agent IA à un système en production robuste ?\n\nAprès 6 mois de retours sur le terrain, trois leçons s'imposent :\n1. L'évaluation continue n'est pas une option.\n2. La traçabilité des coûts et des tokens évite les mauvaises surprises.\n3. L'humain dans la boucle accélère l'adoption plutôt qu'il ne la freine.\n\nQuelle est votre priorité actuelle sur vos projets agentiques ?\n\nCo-écrit avec IA et revu par nos ingénieurs.",
+    "hashtags": ["#IntelligenceArtificielle", "#ProductionOps", "#Engineering"],
+    "is_thread": false,
+    "require_ai_disclosure": true,
+    "expected_verdict": "APPROVED",
+    "expected_min_score": 8.0
+  },
+  {
+    "id": "GOLDEN_GOOD_02",
+    "name": "Post X percutant sous 280 caractères",
+    "platform": "x",
+    "body": "L'automatisation sans observabilité détruit la confiance. Chez nous, 100% des runs agentiques sont audités et trackés en production.\n\nEt vous, comment validez-vous la qualité de vos agents ?\n\n#AI #BuildInPublic",
+    "hashtags": ["#AI", "#BuildInPublic"],
+    "is_thread": false,
+    "require_ai_disclosure": false,
+    "expected_verdict": "APPROVED",
+    "expected_min_score": 8.0
+  },
+  {
+    "id": "GOLDEN_GOOD_03",
+    "name": "Post X sous forme de thread technique",
+    "platform": "x",
+    "body": "1/5 Pourquoi les checkpointers en mémoire échouent en prod ? Démonstration concrète ci-dessous.\n\n2/5 En cas de redémarrage ou de mise à l'échelle horizontale, l'état HITL est perdu si la persistance n'est pas assurée par PostgreSQL ou SQLite.\n\n3/5 La résilience exige un stockage durable des checkpoints.",
+    "hashtags": ["#SoftwareEngineering", "#LangGraph"],
+    "is_thread": true,
+    "require_ai_disclosure": false,
+    "expected_verdict": "APPROVED",
+    "expected_min_score": 8.0
+  },
+  {
+    "id": "GOLDEN_BAD_01",
+    "name": "Post X dépassant la limite de 280 caractères sans être un thread",
+    "platform": "x",
+    "body": "Voici une très longue réflexion sur l'intelligence artificielle qui dépasse largement les limites autorisées par le réseau social X. En effet, lorsque l'on commence à détailler chaque aspect de l'ingénierie logicielle sans utiliser de thread, on se retrouve rapidement au-delà de deux cent quatre-vingts caractères, ce qui doit obligatoirement être rejeté par le validateur de qualité déterministe !",
+    "hashtags": ["#AI"],
+    "is_thread": false,
+    "require_ai_disclosure": false,
+    "expected_verdict": "REWRITE_REQUESTED",
+    "expected_max_score": 8.0
+  },
+  {
+    "id": "GOLDEN_BAD_02",
+    "name": "Post LinkedIn trop court",
+    "platform": "linkedin",
+    "body": "Trop court !",
+    "hashtags": ["#Tech"],
+    "is_thread": false,
+    "require_ai_disclosure": false,
+    "expected_verdict": "REJECTED",
+    "expected_max_score": 6.0
+  },
+  {
+    "id": "GOLDEN_BAD_03",
+    "name": "Spam de hashtags sur X (> 4)",
+    "platform": "x",
+    "body": "L'IA transforme les opérations éditoriales modernes au quotidien.",
+    "hashtags": ["#AI", "#Tech", "#Growth", "#Content", "#Marketing", "#Hustle"],
+    "is_thread": false,
+    "require_ai_disclosure": false,
+    "expected_verdict": "REWRITE_REQUESTED",
+    "expected_max_score": 8.0
+  },
+  {
+    "id": "GOLDEN_BAD_04",
+    "name": "Contenu contenant une URL interne dangereuse",
+    "platform": "linkedin",
+    "body": "Retrouvez les détails de notre configuration interne sur http://localhost:8080/internal/admin avant la prochaine publication client.",
+    "hashtags": ["#DevOps"],
+    "is_thread": false,
+    "require_ai_disclosure": false,
+    "expected_verdict": "REWRITE_REQUESTED",
+    "expected_max_score": 8.0
+  },
+  {
+    "id": "GOLDEN_BAD_05",
+    "name": "Absence de mention transparence IA obligatoire",
+    "platform": "linkedin",
+    "body": "Voici une publication entièrement générée automatiquement par un agent logiciel sans aucune mention légale requise par l'AI Act européen pour la conformité réglementaire.",
+    "hashtags": ["#Innovation", "#Automation"],
+    "is_thread": false,
+    "require_ai_disclosure": true,
+    "expected_verdict": "REWRITE_REQUESTED",
+    "expected_max_score": 8.0
+  },
+  {
+    "id": "GOLDEN_BAD_06",
+    "name": "Doublon quasi-parfait d'une publication des 90 derniers jours",
+    "platform": "linkedin",
+    "body": "Comment passer d'un prototype d'agent IA à un système en production robuste ? Après 6 mois de retours sur le terrain, trois leçons s'imposent : l'évaluation continue n'est pas une option, la traçabilité des coûts évite les mauvaises surprises.",
+    "hashtags": ["#ProductionOps"],
+    "is_thread": false,
+    "require_ai_disclosure": false,
+    "historical_posts": [
+      "Comment passer d'un prototype d'agent IA à un système en production robuste ? Après 6 mois de retours sur le terrain, trois leçons s'imposent : l'évaluation continue n'est pas une option, la traçabilité des coûts évite les mauvaises surprises."
+    ],
+    "expected_verdict": "REWRITE_REQUESTED",
+    "expected_max_score": 8.0
+  }
+]

@@ -1,4 +1,3 @@
-import pytest
 from services.orchestration.graphs.idea_research import graph as idea_research_graph
 from services.orchestration.graphs.content_production import graph as content_production_graph
 from services.orchestration.graphs.approval import graph as approval_graph
@@ -75,7 +74,7 @@ def test_approval_graph_interrupt_and_resume():
     }
 
     # 1. Run until human_review interrupt
-    state_iter = approval_graph.invoke(initial_state, config=config)
+    _ = approval_graph.invoke(initial_state, config=config)
     # Check graph paused at interrupt
     snapshot = approval_graph.get_state(config)
     assert "human_review" in snapshot.next

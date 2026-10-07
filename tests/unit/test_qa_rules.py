@@ -1,4 +1,3 @@
-import pytest
 from services.orchestration.nodes.quality import quality_gate_node
 from packages.domain.state_machine import ContentStatus
 

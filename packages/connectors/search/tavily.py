@@ -52,7 +52,7 @@ class TavilySearchConnector:
             {
                 "title": f"Retour d'expérience et déploiement en production : {query}",
                 "url": f"https://engineering-insights.example.com/case-studies/{query.replace(' ', '-')}",
-                "content": f"Étude de cas détaillée : retour sur la mise en œuvre de systèmes agentiques fiables avec validation humaine obligatoire et observabilité complète.",
+                "content": "Étude de cas détaillée : retour sur la mise en œuvre de systèmes agentiques fiables avec validation humaine obligatoire et observabilité complète.",
                 "score": 0.88,
                 "provenance": {
                     "engine": "sandbox_feed",
