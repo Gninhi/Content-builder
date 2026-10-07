@@ -2,10 +2,10 @@ import os
 import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-# Automatically load environment variables from .env before importing application modules
-load_dotenv()
+# Prioritize values from .env file unconditionally over inherited shell values
+load_dotenv(find_dotenv(usecwd=True), override=True)
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware

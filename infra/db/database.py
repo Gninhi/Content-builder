@@ -1,10 +1,11 @@
 import os
 from contextlib import contextmanager
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker, scoped_session
 
-load_dotenv()
+# Prioritize values from .env file unconditionally over inherited shell values
+load_dotenv(find_dotenv(usecwd=True), override=True)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./contentops.db")
 

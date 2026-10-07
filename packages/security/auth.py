@@ -3,10 +3,10 @@ from typing import Dict, Any, Optional, Set, Union
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 import jwt
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-# Load local .env if present
-load_dotenv()
+# Prioritize values from .env file unconditionally over inherited shell values
+load_dotenv(find_dotenv(usecwd=True), override=True)
 
 
 class Role(str, Enum):
