@@ -119,8 +119,39 @@ jobs:
           python -m pip install --upgrade pip pip-audit
           pip-audit --desc auto || echo "Audit complete - review any non-critical advisory"
 
+  frontend-pipeline:
+    name: Frontend Quality & Tests (Vite, TypeScript, Vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: apps/web
+        run: npm ci
+
+      - name: TypeScript Typecheck & Production Build
+        working-directory: apps/web
+        run: npm run build
+
+      - name: Run Component & Unit Tests (Vitest)
+        working-directory: apps/web
+        run: npm run test
+
+      - name: Audit Frontend Dependencies
+        working-directory: apps/web
+        run: npm audit --audit-level=high || echo "Advisory logged"
+
   docker-build:
     name: Container Build & Healthcheck Verification
+    needs: [lint-and-style, test-suite, frontend-pipeline]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -129,6 +160,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Hardened Docker Image
+      - name: Build Hardened Docker Image (Multi-stage)
         run: |
           docker build -f infra/docker/Dockerfile.api -t contentops-api:ci .
