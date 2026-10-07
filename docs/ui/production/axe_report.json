@@ -1,0 +1,93 @@
+{
+  "timestamp": "2026-10-07T23:10:57Z",
+  "standard": "WCAG 2.2 AA",
+  "screens_tested": [
+    "0_auth",
+    "1_dashboard",
+    "2_inbox",
+    "3_calendar",
+    "4_ideation",
+    "5_insights",
+    "6_brand",
+    "7_connections",
+    "8_settings"
+  ],
+  "total_critical": 0,
+  "total_serious": 0,
+  "total_moderate": 0,
+  "total_minor": 0,
+  "details_by_screen": {
+    "0_auth": {
+      "violations_count": 0,
+      "critical": 0,
+      "serious": 0,
+      "moderate": 0,
+      "minor": 0,
+      "violations": []
+    },
+    "1_dashboard": {
+      "violations_count": 0,
+      "critical": 0,
+      "serious": 0,
+      "moderate": 0,
+      "minor": 0,
+      "violations": []
+    },
+    "2_inbox": {
+      "violations_count": 0,
+      "critical": 0,
+      "serious": 0,
+      "moderate": 0,
+      "minor": 0,
+      "violations": []
+    },
+    "3_calendar": {
+      "violations_count": 0,
+      "critical": 0,
+      "serious": 0,
+      "moderate": 0,
+      "minor": 0,
+      "violations": []
+    },
+    "4_ideation": {
+      "violations_count": 0,
+      "critical": 0,
+      "serious": 0,
+      "moderate": 0,
+      "minor": 0,
+      "violations": []
+    },
+    "5_insights": {
+      "violations_count": 0,
+      "critical": 0,
+      "serious": 0,
+      "moderate": 0,
+      "minor": 0,
+      "violations": []
+    },
+    "6_brand": {
+      "violations_count": 0,
+      "critical": 0,
+      "serious": 0,
+      "moderate": 0,
+      "minor": 0,
+      "violations": []
+    },
+    "7_connections": {
+      "violations_count": 0,
+      "critical": 0,
+      "serious": 0,
+      "moderate": 0,
+      "minor": 0,
+      "violations": []
+    },
+    "8_settings": {
+      "violations_count": 0,
+      "critical": 0,
+      "serious": 0,
+      "moderate": 0,
+      "minor": 0,
+      "violations": []
+    }
+  }
+}
