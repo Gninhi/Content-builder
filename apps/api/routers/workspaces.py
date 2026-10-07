@@ -57,8 +57,11 @@ def create_or_update_brand_profile(
 @router.get("/v1/brand-profiles/{workspace_id}", response_model=BrandProfileResponse)
 def get_brand_profile(
     workspace_id: str,
-    repo: ContentOpsRepository = Depends(get_repository)
+    repo: ContentOpsRepository = Depends(get_repository),
+    user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer", "ServiceAgent"))
 ):
+    if user.workspace_id != workspace_id and user.role.lower() != "owner":
+        raise HTTPException(status_code=403, detail="Access to other workspace's brand profile is forbidden.")
     bp = repo.get_latest_brand_profile(workspace_id)
     if not bp:
         raise HTTPException(status_code=404, detail="Brand profile not found for workspace.")

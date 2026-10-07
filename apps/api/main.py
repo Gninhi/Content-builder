@@ -14,6 +14,7 @@ from apps.api.routers import (
     calendar,
     analytics,
     strategy,
+    auth,
 )
 
 
@@ -88,6 +89,7 @@ app.include_router(publications.router)
 app.include_router(calendar.router)
 app.include_router(analytics.router)
 app.include_router(strategy.router)
+app.include_router(auth.router)
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
