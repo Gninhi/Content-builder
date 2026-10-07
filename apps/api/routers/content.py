@@ -1,3 +1,6 @@
+from typing import cast, Dict, Any
+from datetime import datetime
+from langchain_core.runnables import RunnableConfig
 from fastapi import APIRouter, Depends, HTTPException, Body
 from packages.contracts.schemas import (
     ApprovalRequest,
@@ -26,11 +29,11 @@ def generate_content_package(
     if brief.workspace_id != user.workspace_id:
         raise HTTPException(status_code=403, detail="Access to brief belonging to another workspace is forbidden.")
 
-    workspace_id = brief.workspace_id
+    workspace_id = str(brief.workspace_id)
     brand_profile = repo.get_latest_brand_profile(workspace_id)
-    voice = brand_profile.voice if brand_profile else "Expert et direct"
-    prohibited = brand_profile.prohibited_topics if brand_profile else []
-    cta_policy = brand_profile.cta_policy if brand_profile else {}
+    voice = str(brand_profile.voice) if brand_profile else "Expert et direct"
+    prohibited = list(brand_profile.prohibited_topics) if brand_profile else []
+    cta_policy = dict(brand_profile.cta_policy) if brand_profile and brand_profile.cta_policy else {}
 
     sources = repo.list_sources(workspace_id)
     raw_sources = [
@@ -40,16 +43,16 @@ def generate_content_package(
 
     initial_state = {
         "workspace_id": workspace_id,
-        "brief_id": brief.id,
-        "objective": brief.objective,
+        "brief_id": str(brief.id),
+        "objective": str(brief.objective),
         "angle": "Perspective d'expert et retour terrain",
-        "target_platforms": brief.platform_targets,
+        "target_platforms": list(brief.platform_targets) if brief.platform_targets else ["linkedin", "x"],
         "brand_voice": voice,
         "prohibited_topics": prohibited,
         "cta_policy": cta_policy,
         "require_ai_disclosure": bool(cta_policy.get("require_ai_disclosure", False)),
         "sources": raw_sources,
-        "requirements": brief.requirements,
+        "requirements": dict(brief.requirements) if brief.requirements else {},
         "generated_variants": [],
         "qa_results": {},
         "status": ContentStatus.DRAFT,
@@ -59,33 +62,33 @@ def generate_content_package(
 
     # Run LangGraph content production and quality gate workflow with Langfuse tracing
     callback = ObservabilityTracer.get_callback_handler()
-    config = {"callbacks": [callback]} if callback else {}
-    exec_result = content_production_graph.invoke(initial_state, config=config)
+    config: RunnableConfig = cast(RunnableConfig, {"callbacks": [callback]} if callback else {})
+    exec_result = cast(Dict[str, Any], content_production_graph.invoke(cast(Any, initial_state), config=config))
 
     qa_info = exec_result.get("qa_results", {})
     package_status = exec_result.get("status", ContentStatus.DRAFT)
 
     package = repo.create_content_package(
-        brief_id=brief.id,
+        brief_id=str(brief.id),
         version=1,
         model_metadata={"orchestrator": "LangGraph", "voice": voice},
-        qa_score=qa_info.get("overall_score", 90.0)
+        qa_score=float(qa_info.get("overall_score", 90.0))
     )
-    package.status = package_status.value
+    setattr(package, "status", package_status.value)
     repo.db.commit()
 
     # Record QA gate evaluation score in Langfuse
     ObservabilityTracer.record_score(
         name="qa_gate_score",
-        value=qa_info.get("overall_score", 90.0) / 100.0,
-        trace_id=package.id,
+        value=float(qa_info.get("overall_score", 90.0)) / 100.0,
+        trace_id=str(package.id),
         comment=f"Deterministic and semantic QA evaluation for package {package.id}"
     )
 
     saved_variants = []
     for var in exec_result.get("generated_variants", []):
         variant_model = repo.add_variant(
-            package_id=package.id,
+            package_id=str(package.id),
             platform=var["platform"],
             hook=var["hook"],
             body=var["body"],
@@ -147,18 +150,18 @@ def approve_content_variant(
         ObservabilityTracer.record_score(
             name="human_approval",
             value=score_val,
-            trace_id=variant.package_id if variant else variant_id,
+            trace_id=str(variant.package_id) if variant else str(variant_id),
             comment=f"Decision: {req.decision}. Feedback: {req.feedback or 'N/A'}"
         )
 
         return ApprovalResponse(
-            id=approval.id,
-            variant_id=approval.variant_id,
-            decision=approval.decision,
-            reviewer_id=approval.reviewer_id,
-            payload_hash=approval.payload_hash,
-            status_result=ContentStatus(variant.status if variant else ContentStatus.APPROVED),
-            reviewed_at=approval.reviewed_at
+            id=str(approval.id),
+            variant_id=str(approval.variant_id),
+            decision=str(approval.decision),
+            reviewer_id=str(approval.reviewer_id),
+            payload_hash=str(approval.payload_hash),
+            status_result=ContentStatus(str(variant.status) if variant else ContentStatus.APPROVED.value),
+            reviewed_at=cast(datetime, approval.reviewed_at)
         )
     except ValueError as e:
         if "access denied" in str(e).lower() or "not found" in str(e).lower():

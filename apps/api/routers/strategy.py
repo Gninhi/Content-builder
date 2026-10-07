@@ -1,9 +1,18 @@
 from fastapi import APIRouter, Depends, Body, HTTPException
 from datetime import datetime, timezone
+from typing import cast, Dict, Any
+from langchain_core.runnables import RunnableConfig
 from packages.contracts.schemas import StrategyInsightsResponse, StrategyInsight
 from services.orchestration.graphs.strategy_insights import graph as strategy_insights_graph
 from packages.observability.tracing import ObservabilityTracer
-from infra.db.models import MetricSnapshotModel, PublishedPostModel
+from infra.db.models import (
+    MetricSnapshotModel,
+    PublishedPostModel,
+    PublicationJobModel,
+    ContentVariantModel,
+    ContentPackageModel,
+    ContentBriefModel
+)
 from infra.db.repository import ContentOpsRepository
 from apps.api.dependencies import get_repository, UserContext, require_roles
 
@@ -26,7 +35,11 @@ def generate_strategy_insights(
     snapshots_models = (
         repo.db.query(MetricSnapshotModel)
         .join(PublishedPostModel, MetricSnapshotModel.post_id == PublishedPostModel.id)
-        .filter(PublishedPostModel.workspace_id == ws_id)
+        .join(PublicationJobModel, PublishedPostModel.job_id == PublicationJobModel.id)
+        .join(ContentVariantModel, PublicationJobModel.variant_id == ContentVariantModel.id)
+        .join(ContentPackageModel, ContentVariantModel.package_id == ContentPackageModel.id)
+        .join(ContentBriefModel, ContentPackageModel.brief_id == ContentBriefModel.id)
+        .filter(ContentBriefModel.workspace_id == ws_id)
         .all()
     )
     snapshots = [
@@ -34,7 +47,7 @@ def generate_strategy_insights(
         for s in snapshots_models
     ]
 
-    initial_state = {
+    initial_state: Dict[str, Any] = {
         "workspace_id": workspace_id,
         "pillars": pillars,
         "metric_snapshots": snapshots,
@@ -45,8 +58,9 @@ def generate_strategy_insights(
     }
 
     callback = ObservabilityTracer.get_callback_handler()
-    config = {"callbacks": [callback]} if callback else {}
-    result = strategy_insights_graph.invoke(initial_state, config=config)
+    config: RunnableConfig = cast(RunnableConfig, {"callbacks": [callback]} if callback else {})
+    result = cast(Dict[str, Any], strategy_insights_graph.invoke(cast(Any, initial_state), config=config))
+
 
     insights = [
         StrategyInsight(

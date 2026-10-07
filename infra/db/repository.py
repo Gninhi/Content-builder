@@ -179,7 +179,7 @@ class ContentOpsRepository:
         if idea_id:
             idea = self.db.query(IdeaModel).filter(IdeaModel.id == idea_id).first()
             if idea:
-                idea.status = ContentStatus.BRIEFED.value
+                setattr(idea, "status", ContentStatus.BRIEFED.value)
 
         brief = ContentBriefModel(
             id=f"brief_{uuid.uuid4().hex[:12]}",
@@ -298,7 +298,7 @@ class ContentOpsRepository:
                 "hashtags": variant.hashtags,
                 "media_spec": variant.media_spec
             }
-            variant.payload_hash = compute_payload_hash(raw)
+            setattr(variant, "payload_hash", compute_payload_hash(raw))
             # Edited draft goes to IN_REVIEW or APPROVED
             decision = "approve"
 
@@ -312,7 +312,7 @@ class ContentOpsRepository:
         else:
             raise ValueError(f"Unknown approval decision '{decision}'")
 
-        variant.status = next_status.value
+        setattr(variant, "status", next_status.value)
 
         approval = ApprovalModel(
             id=f"appr_{uuid.uuid4().hex[:12]}",
@@ -371,8 +371,8 @@ class ContentOpsRepository:
 
         idempotency_key = compute_idempotency_key(
             workspace_id=workspace_id,
-            variant_id=variant.id,
-            platform=variant.platform,
+            variant_id=str(variant.id),
+            platform=str(variant.platform),
             scheduled_at=scheduled_at.isoformat(),
             version=1
         )
@@ -407,7 +407,7 @@ class ContentOpsRepository:
                     f"Publication slot collision: Another post is already scheduled for platform '{variant.platform}' at {prev_dt} (collision buffer: 15 minutes)."
                 )
 
-        variant.status = ContentStatus.SCHEDULED.value
+        setattr(variant, "status", ContentStatus.SCHEDULED.value)
 
         job = PublicationJobModel(
             id=f"job_{uuid.uuid4().hex[:12]}",
@@ -432,9 +432,9 @@ class ContentOpsRepository:
     ) -> PublishedPostModel:
         job = self.db.query(PublicationJobModel).filter(PublicationJobModel.id == job_id).first()
         if job:
-            job.status = ContentStatus.PUBLISHED.value
+            setattr(job, "status", ContentStatus.PUBLISHED.value)
             if job.variant:
-                job.variant.status = ContentStatus.PUBLISHED.value
+                setattr(job.variant, "status", ContentStatus.PUBLISHED.value)
 
         post = PublishedPostModel(
             id=f"post_{uuid.uuid4().hex[:12]}",
@@ -606,12 +606,12 @@ class ContentOpsRepository:
             )
             self.db.add(account)
         else:
-            account.account_name = account_name
-            account.encrypted_token_blob = encrypted_blob
-            account.key_id = key_id
-            account.scopes = scopes or []
-            account.expires_at = expires_at
-            account.status = status
+            setattr(account, "account_name", account_name)
+            setattr(account, "encrypted_token_blob", encrypted_blob)
+            setattr(account, "key_id", key_id)
+            setattr(account, "scopes", scopes or [])
+            setattr(account, "expires_at", expires_at)
+            setattr(account, "status", status)
         self.db.commit()
         self.db.refresh(account)
         return account
@@ -654,7 +654,7 @@ class ContentOpsRepository:
         account = self.get_connected_social_account(workspace_id, provider, account_id)
         if not account:
             return False
-        account.status = status
+        setattr(account, "status", status)
         self.db.commit()
         return True
 

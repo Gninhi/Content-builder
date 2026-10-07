@@ -2,7 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict, Any
 from packages.contracts.schemas import MetricSnapshotCreate
 from infra.db.repository import ContentOpsRepository
-from infra.db.models import MetricSnapshotModel, PublishedPostModel
+from infra.db.models import (
+    MetricSnapshotModel,
+    PublishedPostModel,
+    PublicationJobModel,
+    ContentVariantModel,
+    ContentPackageModel,
+    ContentBriefModel
+)
 from apps.api.dependencies import get_repository, UserContext, require_roles
 
 router = APIRouter(tags=["Analytics & Metrics"])
@@ -14,8 +21,19 @@ def record_metric(
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor", "ServiceAgent"))
 ):
-    post = repo.db.query(PublishedPostModel).filter(PublishedPostModel.id == req.post_id).first()
-    if not post or post.workspace_id != user.workspace_id:
+    post = (
+        repo.db.query(PublishedPostModel)
+        .join(PublicationJobModel, PublishedPostModel.job_id == PublicationJobModel.id)
+        .join(ContentVariantModel, PublicationJobModel.variant_id == ContentVariantModel.id)
+        .join(ContentPackageModel, ContentVariantModel.package_id == ContentPackageModel.id)
+        .join(ContentBriefModel, ContentPackageModel.brief_id == ContentBriefModel.id)
+        .filter(
+            PublishedPostModel.id == req.post_id,
+            ContentBriefModel.workspace_id == user.workspace_id
+        )
+        .first()
+    )
+    if not post:
         raise HTTPException(status_code=403, detail="Post not found or access denied for this workspace.")
     snapshot = repo.record_metric_snapshot(
         post_id=req.post_id,
@@ -34,7 +52,15 @@ def get_analytics_overview(
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer", "ServiceAgent"))
 ) -> Dict[str, Any]:
-    posts = repo.db.query(PublishedPostModel).filter(PublishedPostModel.workspace_id == user.workspace_id).all()
+    posts = (
+        repo.db.query(PublishedPostModel)
+        .join(PublicationJobModel, PublishedPostModel.job_id == PublicationJobModel.id)
+        .join(ContentVariantModel, PublicationJobModel.variant_id == ContentVariantModel.id)
+        .join(ContentPackageModel, ContentVariantModel.package_id == ContentPackageModel.id)
+        .join(ContentBriefModel, ContentPackageModel.brief_id == ContentBriefModel.id)
+        .filter(ContentBriefModel.workspace_id == user.workspace_id)
+        .all()
+    )
     post_ids = [p.id for p in posts]
     snapshots = (
         repo.db.query(MetricSnapshotModel)
@@ -43,11 +69,11 @@ def get_analytics_overview(
         if post_ids else []
     )
 
-    total_impressions = sum(s.impressions for s in snapshots)
-    total_engagements = sum(s.engagements for s in snapshots)
-    total_clicks = sum(s.clicks for s in snapshots)
-    total_comments = sum(s.comments for s in snapshots)
-    total_shares = sum(s.shares for s in snapshots)
+    total_impressions = sum(int(s.impressions or 0) for s in snapshots)
+    total_engagements = sum(int(s.engagements or 0) for s in snapshots)
+    total_clicks = sum(int(s.clicks or 0) for s in snapshots)
+    total_comments = sum(int(s.comments or 0) for s in snapshots)
+    total_shares = sum(int(s.shares or 0) for s in snapshots)
 
     avg_engagement_rate = (
         round((total_engagements / max(1, total_impressions)) * 100, 2)

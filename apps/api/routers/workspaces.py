@@ -1,3 +1,5 @@
+from typing import cast
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from packages.contracts.schemas import (
     WorkspaceCreate,
@@ -19,11 +21,11 @@ def create_workspace(
 ):
     ws = repo.create_workspace(name=req.name, timezone=req.timezone, owner_id=req.owner_id)
     return WorkspaceResponse(
-        id=ws.id,
-        name=ws.name,
-        timezone=ws.timezone,
-        owner_id=ws.owner_id,
-        created_at=ws.created_at
+        id=str(ws.id),
+        name=str(ws.name),
+        timezone=str(ws.timezone),
+        owner_id=str(ws.owner_id),
+        created_at=cast(datetime, ws.created_at)
     )
 
 
@@ -44,15 +46,15 @@ def create_or_update_brand_profile(
         cta_policy=req.cta_policy
     )
     return BrandProfileResponse(
-        id=bp.id,
-        workspace_id=bp.workspace_id,
-        version=bp.version,
-        audience=bp.audience,
-        voice=bp.voice,
-        pillars=bp.pillars,
-        prohibited_topics=bp.prohibited_topics,
-        cta_policy=bp.cta_policy,
-        created_at=bp.created_at
+        id=str(bp.id),
+        workspace_id=str(bp.workspace_id),
+        version=int(bp.version),
+        audience=list(bp.audience),
+        voice=str(bp.voice),
+        pillars=list(bp.pillars),
+        prohibited_topics=list(bp.prohibited_topics),
+        cta_policy=dict(bp.cta_policy),
+        created_at=cast(datetime, bp.created_at)
     )
 
 
@@ -68,13 +70,13 @@ def get_brand_profile(
     if not bp:
         raise HTTPException(status_code=404, detail="Brand profile not found for workspace.")
     return BrandProfileResponse(
-        id=bp.id,
-        workspace_id=bp.workspace_id,
-        version=bp.version,
-        audience=bp.audience,
-        voice=bp.voice,
-        pillars=bp.pillars,
-        prohibited_topics=bp.prohibited_topics,
-        cta_policy=bp.cta_policy,
-        created_at=bp.created_at
+        id=str(bp.id),
+        workspace_id=str(bp.workspace_id),
+        version=int(bp.version),
+        audience=list(bp.audience),
+        voice=str(bp.voice),
+        pillars=list(bp.pillars),
+        prohibited_topics=list(bp.prohibited_topics),
+        cta_policy=dict(bp.cta_policy),
+        created_at=cast(datetime, bp.created_at)
     )

@@ -235,8 +235,8 @@ class EncryptedOAuthTokenVault(BaseOAuthTokenVault):
                         )
                         .first()
                     )
-                    if account and account.status != "REVOKED":
-                        stored_value = account.encrypted_token_blob
+                    if account and account.status != "REVOKED" and account.encrypted_token_blob:
+                        stored_value = str(account.encrypted_token_blob)
                         self._storage[storage_key] = stored_value
                 except Exception:
                     pass

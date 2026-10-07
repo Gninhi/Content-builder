@@ -30,11 +30,11 @@ class SchedulerDispatcher:
         results = []
         for job in due_jobs:
             try:
-                res = self.worker.execute_job(job.id)
+                res = self.worker.execute_job(str(job.id))
                 results.append(res)
             except Exception as e:
                 results.append({
-                    "job_id": job.id,
+                    "job_id": str(job.id),
                     "status": "FAILED",
                     "error": str(e)
                 })

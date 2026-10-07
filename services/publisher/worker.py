@@ -58,8 +58,8 @@ class PublisherWorker:
 
         # 1. Verify exact status
         if variant.status not in (ContentStatus.APPROVED.value, ContentStatus.SCHEDULED.value):
-            job.status = ContentStatus.PUBLISH_FAILED.value
-            job.error_message = f"Precondition failed: Variant status is {variant.status}, expected APPROVED/SCHEDULED."
+            setattr(job, "status", ContentStatus.PUBLISH_FAILED.value)
+            setattr(job, "error_message", f"Precondition failed: Variant status is {variant.status}, expected APPROVED/SCHEDULED.")
             self.db.commit()
             raise ValueError(job.error_message)
 
@@ -84,8 +84,8 @@ class PublisherWorker:
             .first()
         )
         if not valid_approval:
-            job.status = ContentStatus.PUBLISH_FAILED.value
-            job.error_message = "Security verification failed: Current payload hash does not match an approved record."
+            setattr(job, "status", ContentStatus.PUBLISH_FAILED.value)
+            setattr(job, "error_message", "Security verification failed: Current payload hash does not match an approved record.")
             self.db.commit()
             raise ValueError(job.error_message)
 
@@ -94,8 +94,8 @@ class PublisherWorker:
         if is_degraded:
             reviewer = (valid_approval.reviewer_id or "").strip().lower()
             if reviewer in ("system", "auto", "automated", ""):
-                job.status = ContentStatus.PUBLISH_FAILED.value
-                job.error_message = "Degraded mode safety lock: Content generated via fallback requires explicit human reviewer approval before publication."
+                setattr(job, "status", ContentStatus.PUBLISH_FAILED.value)
+                setattr(job, "error_message", "Degraded mode safety lock: Content generated via fallback requires explicit human reviewer approval before publication.")
                 self.db.commit()
                 raise ValueError(job.error_message)
 
@@ -113,8 +113,8 @@ class PublisherWorker:
             kill_switch = True
 
         if kill_switch:
-            job.status = ContentStatus.PUBLISH_FAILED.value
-            job.error_message = "Emergency Kill Switch is ACTIVE: All automated publications are halted."
+            setattr(job, "status", ContentStatus.PUBLISH_FAILED.value)
+            setattr(job, "error_message", "Emergency Kill Switch is ACTIVE: All automated publications are halted.")
             self.db.commit()
             raise ValueError(job.error_message)
 
@@ -135,8 +135,8 @@ class PublisherWorker:
                 .count()
             )
             if recent_count >= max_hourly:
-                job.status = ContentStatus.PUBLISH_FAILED.value
-                job.error_message = f"Publication rate limit reached for workspace '{workspace.id}': {recent_count}/{max_hourly} posts published in the last hour."
+                setattr(job, "status", ContentStatus.PUBLISH_FAILED.value)
+                setattr(job, "error_message", f"Publication rate limit reached for workspace '{workspace.id}': {recent_count}/{max_hourly} posts published in the last hour.")
                 self.db.commit()
                 raise ValueError(job.error_message)
 
@@ -170,44 +170,44 @@ class PublisherWorker:
             raise RuntimeError(f"Concurrent execution detected: Job '{job_id}' is already in {job.status} status.")
 
         ContentStateMachine.transition(ContentStatus(variant.status), ContentStatus.PUBLISHING)
-        variant.status = ContentStatus.PUBLISHING.value
+        setattr(variant, "status", ContentStatus.PUBLISHING.value)
         self.db.commit()
 
         # 4. Delegate to platform connector
         try:
             if variant.platform == "linkedin":
-                receipt = self.linkedin_connector.publish(current_payload, job.idempotency_key)
+                receipt = self.linkedin_connector.publish(current_payload, str(job.idempotency_key))
             elif variant.platform == "x":
-                receipt = self.x_connector.publish(current_payload, job.idempotency_key)
+                receipt = self.x_connector.publish(current_payload, str(job.idempotency_key))
             else:
                 raise ValueError(f"Unsupported platform: {variant.platform}")
 
             # 5. Record published post and mark SUCCESS
             post = self.repo.record_published_post(
-                job_id=job.id,
-                external_post_id=receipt["external_id"],
+                job_id=str(job.id),
+                external_post_id=str(receipt["external_id"]),
                 final_payload=current_payload,
-                platform=variant.platform,
-                permalink=receipt["permalink"]
+                platform=str(variant.platform),
+                permalink=str(receipt["permalink"])
             )
 
             ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISHED)
-            job.status = ContentStatus.PUBLISHED.value
-            variant.status = ContentStatus.PUBLISHED.value
+            setattr(job, "status", ContentStatus.PUBLISHED.value)
+            setattr(variant, "status", ContentStatus.PUBLISHED.value)
             self.db.commit()
 
             return {
                 "status": "SUCCESS",
-                "post_id": post.id,
-                "external_id": post.external_post_id,
-                "permalink": post.permalink,
+                "post_id": str(post.id),
+                "external_id": str(post.external_post_id),
+                "permalink": str(post.permalink),
                 "receipt": receipt
             }
 
         except Exception as exc:
             ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISH_FAILED)
-            job.status = ContentStatus.PUBLISH_FAILED.value
-            job.error_message = str(exc)
-            variant.status = ContentStatus.PUBLISH_FAILED.value
+            setattr(job, "status", ContentStatus.PUBLISH_FAILED.value)
+            setattr(job, "error_message", str(exc))
+            setattr(variant, "status", ContentStatus.PUBLISH_FAILED.value)
             self.db.commit()
             raise exc

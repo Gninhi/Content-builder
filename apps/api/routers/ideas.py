@@ -1,3 +1,5 @@
+from typing import cast, Dict, Any
+from langchain_core.runnables import RunnableConfig
 from fastapi import APIRouter, Depends, HTTPException
 from packages.contracts.schemas import (
     IdeaResearchRequest,
@@ -28,10 +30,11 @@ def research_ideas(
 
     # Retrieve existing sources in workspace
     sources = repo.list_sources(ws_id)
-    raw_sources = [
-        {"url": s.canonical_url, "content": " ".join([f["claim"] for f in s.extracted_facts])}
-        for s in sources
-    ]
+    raw_sources = []
+    for s in sources:
+        facts = list(s.extracted_facts) if s.extracted_facts else []
+        content_str = " ".join([str(f.get("claim", "")) for f in facts if isinstance(f, dict)])
+        raw_sources.append({"url": str(s.canonical_url) if s.canonical_url else "", "content": content_str})
 
     initial_state = {
         "workspace_id": ws_id,
@@ -47,8 +50,8 @@ def research_ideas(
 
     # Run LangGraph idea_research workflow with Langfuse tracing
     callback = ObservabilityTracer.get_callback_handler()
-    config = {"callbacks": [callback]} if callback else {}
-    result = idea_research_graph.invoke(initial_state, config=config)
+    config: RunnableConfig = cast(RunnableConfig, {"callbacks": [callback]} if callback else {})
+    result = cast(Dict[str, Any], idea_research_graph.invoke(cast(Any, initial_state), config=config))
 
     generated = result.get("generated_ideas", [])
     run_id = result.get("run_id", "run_local")
@@ -97,8 +100,8 @@ def research_ideas(
 
     return IdeaResearchResponse(
         ideas=persisted_ideas,
-        sources_used=[s.get("url") for s in raw_sources if s.get("url")],
-        run_id=run_id
+        sources_used=[str(s["url"]) for s in raw_sources if s.get("url")],
+        run_id=str(run_id)
     )
 
 

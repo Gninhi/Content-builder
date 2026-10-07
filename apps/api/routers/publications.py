@@ -1,3 +1,5 @@
+from typing import cast
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from packages.contracts.schemas import (
     PublicationScheduleRequest,
@@ -25,14 +27,14 @@ def schedule_publication(
             scheduled_at=req.scheduled_at
         )
         return PublicationJobResponse(
-            id=job.id,
-            variant_id=job.variant_id,
-            platform=job.platform,
-            scheduled_at=job.scheduled_at,
-            idempotency_key=job.idempotency_key,
-            status=ContentStatus(job.status),
-            attempt_count=job.attempt_count,
-            error_message=job.error_message
+            id=str(job.id),
+            variant_id=str(job.variant_id),
+            platform=str(job.platform),
+            scheduled_at=cast(datetime, job.scheduled_at),
+            idempotency_key=str(job.idempotency_key),
+            status=ContentStatus(str(job.status)),
+            attempt_count=int(job.attempt_count) if job.attempt_count is not None else 0,
+            error_message=str(job.error_message) if job.error_message else None
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -72,12 +74,12 @@ def cancel_publication_job(
     if job_ws != user.workspace_id:
         raise HTTPException(status_code=403, detail="Access to publication job in another workspace is forbidden.")
 
-    if job.status == ContentStatus.PUBLISHED.value:
+    if str(job.status) == ContentStatus.PUBLISHED.value:
         raise HTTPException(status_code=400, detail="Cannot cancel an already published post.")
 
-    job.status = ContentStatus.ARCHIVED.value
+    setattr(job, "status", ContentStatus.ARCHIVED.value)
     if job.variant:
-        job.variant.status = ContentStatus.APPROVED.value
+        setattr(job.variant, "status", ContentStatus.APPROVED.value)
     repo.db.commit()
 
-    return {"message": "Job successfully cancelled and reset to APPROVED state.", "job_id": job.id}
+    return {"message": "Job successfully cancelled and reset to APPROVED state.", "job_id": str(job.id)}

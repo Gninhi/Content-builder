@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List, Optional
+from typing import List, Optional, cast
+from datetime import datetime
 from packages.contracts.schemas import SourceIngestRequest, SourceResponse
 from packages.connectors.sources.web_extractor import WebExtractorConnector
 from apps.api.dependencies import get_repository, UserContext, require_roles
@@ -36,15 +37,15 @@ def ingest_source(
     )
 
     return SourceResponse(
-        id=source.id,
-        workspace_id=source.workspace_id,
-        type=source.type,
-        canonical_url=source.canonical_url,
-        raw_content_ref=source.raw_content_ref,
-        extracted_facts=source.extracted_facts,
-        provenance=source.provenance,
-        status=source.status,
-        created_at=source.created_at
+        id=str(source.id),
+        workspace_id=str(source.workspace_id),
+        type=str(source.type),
+        canonical_url=str(source.canonical_url) if source.canonical_url else None,
+        raw_content_ref=str(source.raw_content_ref),
+        extracted_facts=list(source.extracted_facts),
+        provenance=dict(source.provenance),
+        status=str(source.status),
+        created_at=cast(datetime, source.created_at)
     )
 
 
@@ -59,14 +60,14 @@ def list_sources(
     sources = repo.list_sources(user.workspace_id)
     return [
         SourceResponse(
-            id=s.id,
-            workspace_id=s.workspace_id,
-            type=s.type,
-            canonical_url=s.canonical_url,
-            raw_content_ref=s.raw_content_ref,
-            extracted_facts=s.extracted_facts,
-            provenance=s.provenance,
-            status=s.status,
-            created_at=s.created_at
+            id=str(s.id),
+            workspace_id=str(s.workspace_id),
+            type=str(s.type),
+            canonical_url=str(s.canonical_url) if s.canonical_url else None,
+            raw_content_ref=str(s.raw_content_ref),
+            extracted_facts=list(s.extracted_facts),
+            provenance=dict(s.provenance),
+            status=str(s.status),
+            created_at=cast(datetime, s.created_at)
         ) for s in sources
     ]
