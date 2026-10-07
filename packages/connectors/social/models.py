@@ -16,6 +16,7 @@ class SocialAccountStatus(str, Enum):
     EXPIRED = "EXPIRED"
     REVOKED = "REVOKED"
     PENDING_OAUTH = "PENDING_OAUTH"
+    RECONNECTION_REQUIRED = "RECONNECTION_REQUIRED"
 
 
 class PublicationStatus(str, Enum):
@@ -23,6 +24,7 @@ class PublicationStatus(str, Enum):
     SCHEDULED = "SCHEDULED"
     PUBLISHING = "PUBLISHING"
     PUBLISHED = "PUBLISHED"
+    PUBLISH_UNKNOWN = "PUBLISH_UNKNOWN"
     FAILED = "FAILED"
     DELETED = "DELETED"
 

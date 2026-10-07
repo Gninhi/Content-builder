@@ -5,9 +5,23 @@ from packages.connectors.social.models import (
     SocialAccountStatus,
     SocialProvider,
 )
-from packages.connectors.social.base import SocialPublisher
+from packages.connectors.social.base import SocialPublisher, BaseSocialConnector
 from packages.connectors.social.sandbox import SandboxSocialPublisher
+from packages.connectors.social.linkedin import LinkedInSocialPublisher, LinkedInConnector
+from packages.connectors.social.x_twitter import XSocialPublisher, XTwitterConnector
 from packages.connectors.social.vault import BaseOAuthTokenVault, EncryptedOAuthTokenVault
+from packages.connectors.social.exceptions import (
+    SocialConnectorError,
+    SocialAuthenticationError,
+    SocialPermissionError,
+    SocialRateLimitError,
+    SocialBillingError,
+    SocialDuplicateError,
+    SocialNetworkError,
+    SocialPublishUnknownError,
+    TokenExpiringSoonError,
+    TokenRefreshError,
+)
 
 __all__ = [
     "ConnectedSocialAccount",
@@ -16,7 +30,22 @@ __all__ = [
     "SocialAccountStatus",
     "SocialProvider",
     "SocialPublisher",
+    "BaseSocialConnector",
     "SandboxSocialPublisher",
+    "LinkedInSocialPublisher",
+    "LinkedInConnector",
+    "XSocialPublisher",
+    "XTwitterConnector",
     "BaseOAuthTokenVault",
-    "EncryptedOAuthTokenVault"
+    "EncryptedOAuthTokenVault",
+    "SocialConnectorError",
+    "SocialAuthenticationError",
+    "SocialPermissionError",
+    "SocialRateLimitError",
+    "SocialBillingError",
+    "SocialDuplicateError",
+    "SocialNetworkError",
+    "SocialPublishUnknownError",
+    "TokenExpiringSoonError",
+    "TokenRefreshError",
 ]

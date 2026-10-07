@@ -15,6 +15,7 @@ class ContentStatus(str, Enum):
     SCHEDULED = "SCHEDULED"
     PUBLISHING = "PUBLISHING"
     PUBLISHED = "PUBLISHED"
+    PUBLISH_UNKNOWN = "PUBLISH_UNKNOWN"
     PUBLISH_FAILED = "PUBLISH_FAILED"
     FAILED = "PUBLISH_FAILED"  # Standard failure alias
     MEASURED = "MEASURED"
@@ -71,7 +72,8 @@ class ContentStateMachine:
         ContentStatus.REJECTED: {ContentStatus.ARCHIVED},
         ContentStatus.APPROVED: {ContentStatus.SCHEDULED, ContentStatus.ARCHIVED},
         ContentStatus.SCHEDULED: {ContentStatus.PUBLISHING, ContentStatus.APPROVED, ContentStatus.ARCHIVED},
-        ContentStatus.PUBLISHING: {ContentStatus.PUBLISHED, ContentStatus.PUBLISH_FAILED},
+        ContentStatus.PUBLISHING: {ContentStatus.PUBLISHED, ContentStatus.PUBLISH_FAILED, ContentStatus.PUBLISH_UNKNOWN},
+        ContentStatus.PUBLISH_UNKNOWN: {ContentStatus.PUBLISHED, ContentStatus.PUBLISH_FAILED, ContentStatus.ARCHIVED},
         ContentStatus.PUBLISH_FAILED: {ContentStatus.SCHEDULED, ContentStatus.ARCHIVED},
         ContentStatus.PUBLISHED: {ContentStatus.MEASURED, ContentStatus.ARCHIVED},
         ContentStatus.MEASURED: {ContentStatus.ARCHIVED},
