@@ -18,7 +18,7 @@ def issue_dev_token(req: DevTokenRequest):
     Issues signed JWT access tokens strictly in local development environment (ENV=dev).
     Blocked in production.
     """
-    env = os.getenv("ENV", "dev").lower()
+    env = (os.getenv("ENV") or "production").strip().lower()
     if env != "dev":
         raise HTTPException(
             status_code=403,
