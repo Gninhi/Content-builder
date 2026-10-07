@@ -6,10 +6,10 @@
   },
   "models": {
     "gemini-3.8-flash": {
-      "input_per_1m": 0.075,
-      "output_per_1m": 0.30,
-      "input_per_1k": 0.000075,
-      "output_per_1k": 0.000300
+      "input_per_1m": 0.75,
+      "output_per_1m": 3.75,
+      "input_per_1k": 0.00075,
+      "output_per_1k": 0.00375
     },
     "gemini-2.5-flash": {
       "input_per_1m": 0.075,
