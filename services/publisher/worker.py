@@ -140,12 +140,37 @@ class PublisherWorker:
                 self.db.commit()
                 raise ValueError(job.error_message)
 
-        # 3. Transition to PUBLISHING using validated state machine
-        ContentStateMachine.transition(ContentStatus(job.status), ContentStatus.PUBLISHING)
+        # 3. Atomic database-level lock transition to PUBLISHING
+        # Guarantees single-execution mutual exclusion across concurrent workers
+        updated = (
+            self.db.query(PublicationJobModel)
+            .filter(
+                PublicationJobModel.id == job_id,
+                PublicationJobModel.status.in_([ContentStatus.APPROVED.value, ContentStatus.SCHEDULED.value])
+            )
+            .update(
+                {
+                    PublicationJobModel.status: ContentStatus.PUBLISHING.value,
+                    PublicationJobModel.attempt_count: PublicationJobModel.attempt_count + 1
+                },
+                synchronize_session=False
+            )
+        )
+        if updated == 0:
+            self.db.rollback()
+            self.db.refresh(job)
+            if job.status == ContentStatus.PUBLISHED.value:
+                existing_post = job.published_post
+                return {
+                    "status": "ALREADY_PUBLISHED",
+                    "job_id": job.id,
+                    "external_post_id": existing_post.external_post_id if existing_post else None,
+                    "permalink": existing_post.permalink if existing_post else None
+                }
+            raise RuntimeError(f"Concurrent execution detected: Job '{job_id}' is already in {job.status} status.")
+
         ContentStateMachine.transition(ContentStatus(variant.status), ContentStatus.PUBLISHING)
-        job.status = ContentStatus.PUBLISHING.value
         variant.status = ContentStatus.PUBLISHING.value
-        job.attempt_count += 1
         self.db.commit()
 
         # 4. Delegate to platform connector
