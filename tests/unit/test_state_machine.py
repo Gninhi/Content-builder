@@ -66,3 +66,23 @@ def test_review_rejection_and_rewrite():
     # In review to rejected
     st = ContentStateMachine.transition(st, ContentStatus.REJECTED)
     assert st == ContentStatus.REJECTED
+
+
+def test_state_machine_parse_and_publish_unknown():
+    assert ContentStatus.parse("PENDING_REVIEW") == ContentStatus.IN_REVIEW
+    assert ContentStatus.parse("PENDING") == ContentStatus.IN_REVIEW
+    assert ContentStatus.parse("FAILED") == ContentStatus.PUBLISH_FAILED
+    assert ContentStatus.parse(ContentStatus.APPROVED) == ContentStatus.APPROVED
+    assert ContentStatus.parse("PUBLISH_UNKNOWN") == ContentStatus.PUBLISH_UNKNOWN
+
+    # Test PUBLISHING -> PUBLISH_UNKNOWN transition
+    st = ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISH_UNKNOWN)
+    assert st == ContentStatus.PUBLISH_UNKNOWN
+
+    # Test PUBLISH_UNKNOWN -> PUBLISHED reconciliation
+    st_pub = ContentStateMachine.transition(ContentStatus.PUBLISH_UNKNOWN, ContentStatus.PUBLISHED)
+    assert st_pub == ContentStatus.PUBLISHED
+
+    # Test PUBLISH_UNKNOWN -> PUBLISH_FAILED reconciliation
+    st_fail = ContentStateMachine.transition(ContentStatus.PUBLISH_UNKNOWN, ContentStatus.PUBLISH_FAILED)
+    assert st_fail == ContentStatus.PUBLISH_FAILED
