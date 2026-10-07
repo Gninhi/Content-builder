@@ -1,12 +1,17 @@
-from abc import ABC, abstractmethod
-from typing import Dict, Any
-from datetime import datetime, timezone
 import uuid
+from abc import ABC, abstractmethod
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+from packages.connectors.social.models import (
+    PublicationResult,
+    PublicationStatus,
+    SocialProvider,
+)
 
 
 class BaseSocialConnector(ABC):
     """
-    Abstract base class for all social platform connectors.
+    Abstract base class for existing social platform connectors.
     Provides sandbox mode, format validation, and receipt generation.
     """
 
@@ -51,3 +56,47 @@ class BaseSocialConnector(ABC):
         }
         self._receipts[idempotency_key] = receipt
         return receipt
+
+
+class SocialPublisher(ABC):
+    """
+    Standardized abstract interface for publishing and scheduling across social networks.
+    Defines the contract for LinkedIn, X, and Sandbox integrations.
+    """
+
+    @property
+    @abstractmethod
+    def provider(self) -> SocialProvider:
+        """Returns the social network provider handled by this publisher."""
+        pass
+
+    @abstractmethod
+    def publish(
+        self,
+        content: str,
+        media_urls: Optional[List[str]] = None,
+        options: Optional[Dict[str, Any]] = None
+    ) -> PublicationResult:
+        """Publishes content immediately to the social platform."""
+        pass
+
+    @abstractmethod
+    def schedule(
+        self,
+        content: str,
+        scheduled_at: datetime,
+        media_urls: Optional[List[str]] = None,
+        options: Optional[Dict[str, Any]] = None
+    ) -> PublicationResult:
+        """Schedules content for future publication."""
+        pass
+
+    @abstractmethod
+    def delete(self, platform_post_id: str) -> bool:
+        """Deletes a previously published or scheduled post."""
+        pass
+
+    @abstractmethod
+    def get_status(self, platform_post_id: str) -> PublicationStatus:
+        """Retrieves the current status of a post on the platform."""
+        pass

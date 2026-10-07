@@ -190,6 +190,56 @@ def health_check():
     }
 
 
+@app.get("/ready", tags=["System"])
+def readiness_check():
+    """
+    Readiness probe checking database, LangGraph checkpointer, and LLM configuration.
+    Returns HTTP 200 if dependencies are ready, HTTP 503 if critical dependencies are down.
+    """
+    checks = {}
+    is_ready = True
+
+    # 1. Database Connectivity
+    try:
+        from infra.db.database import SessionLocal
+        from sqlalchemy import text
+        db = SessionLocal()
+        try:
+            db.execute(text("SELECT 1"))
+            checks["database"] = "ok"
+        finally:
+            db.close()
+    except Exception as e:
+        checks["database"] = f"error: {str(e)}"
+        is_ready = False
+
+    # 2. LangGraph Checkpointer
+    try:
+        from services.orchestration.checkpointer import get_checkpointer
+        cp = get_checkpointer()
+        checks["checkpointer"] = "ok" if cp is not None else "unavailable"
+        if cp is None:
+            is_ready = False
+    except Exception as e:
+        checks["checkpointer"] = f"error: {str(e)}"
+        is_ready = False
+
+    # 3. Google Gemini API Key
+    from services.orchestration.llm import is_gemini_available
+    has_llm = is_gemini_available()
+    checks["llm_key"] = "configured" if has_llm else "missing_or_placeholder"
+
+    status_code = 200 if is_ready else 503
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": "ready" if is_ready else "not_ready",
+            "checks": checks,
+            "version": "1.0.0"
+        }
+    )
+
+
 @app.get("/", tags=["System"])
 def root():
     return RedirectResponse(url="/ui")

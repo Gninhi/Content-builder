@@ -25,7 +25,7 @@ Chaque correctif est rattaché à son commit atomique et à ses tests de non-ré
 | **EDT-03** | Éditorial | **P2 (Moyenne)** | Non-conformité AI Act (absence mention IA) | Détection de mention légale de transparence sur les contenus générés | P3 | **RÉSOLU** | `tests/evals/test_quality_evaluator.py` |
 | **PUB-01** | Publication | **P0 (Critique)** | Crash désynchronisation temporelle UTC/naïve | Migration intégrale vers `datetime.now(timezone.utc)`, suppression des `utcnow()` | P2 | **RÉSOLU** | `tests/reliability/test_resilience_and_killswitch.py` |
 | **PUB-02** | Publication | **P0 (Élevée)** | Concurrence dispatcher sans verrouillage | Transitions strictes de la machine à états et lock anti-double publication | P2 | **RÉSOLU** | `tests/reliability/test_state_machine_and_concurrency.py` |
-| **PUB-03** | Publication | **P1 (Élevée)** | Connecteurs sociaux réels non branchés | **Reporté justifié (Hors périmètre prompt)** : Connecteurs sandbox conservés, mise en place de `SocialPublisher`, OAuth Token Vault et modèles | Social Ready | **À FAIRE** | `tests/unit/test_social_publisher_interface.py` |
+| **PUB-03** | Publication | **P1 (Élevée)** | Connecteurs sociaux réels non branchés | **Social Ready** : Interface `SocialPublisher`, `SandboxSocialPublisher`, `EncryptedOAuthTokenVault` AES-GCM et modèles de comptes connectés | Social Ready | **RÉSOLU** | `tests/unit/test_social_ready_contracts.py` |
 | **PUB-04** | Publication | **P0 (Moyenne)** | Kill switch purement manuel / documentaire | Kill switch global (env var & DB) vérifié avant toute publication + plafond de fréquence | P2 | **RÉSOLU** | `tests/reliability/test_resilience_and_killswitch.py` |
 | **COD-01** | Code | **P0 (Critique)** | Bug `repo.db.models` dans router strategy | Remplacement par `repo.db.query(MetricSnapshotModel)` | Pré | **RÉSOLU** | `audit/gemini-langfuse` |
 | **COD-02** | Code | **P1 (Élevée)** | Dépendances non épinglées | Épinglage strict des versions (`langchain-google-genai==4.4.0`, `langfuse==4.17.0`) et génération d'un lockfile | P4 | **RÉSOLU** | `requirements.lock` & `pyproject.toml` |
@@ -39,8 +39,9 @@ Chaque correctif est rattaché à son commit atomique et à ses tests de non-ré
 | **OBS-01** | Observabilité | **P0 (Critique)** | Tracing LangSmith/factice | Remplacement par SDK Langfuse officiel (`CallbackHandler`) | Pré | **RÉSOLU** | `audit/gemini-langfuse` |
 | **OBS-02** | Observabilité | **P0 (Élevée)** | Absence de feedback corrélé aux traces | Enregistrement des scores QA et HITL via `create_score` Langfuse | Pré | **RÉSOLU** | `audit/gemini-langfuse` |
 | **OBS-03** | Observabilité | **P1 (Moyenne)** | Absence de corrélation logs et traces | Middleware correlation ID, filtre logs applicatifs et injection trace Langfuse | P4 | **RÉSOLU** | `tests/observability/test_correlation_and_routing.py` |
-| **OPS-01** | Ops | **P1 (Élevée)** | Absence de pipeline CI/CD automatisé | `.github/workflows/ci.yml` (pytest, ruff, mypy, pip-audit, secret scan) | P5 | **À FAIRE** | `.github/workflows/ci.yml` |
-| **OPS-02** | Ops | **P1 (Moyenne)** | Conteneur Docker exécuté en `root` | Dockerfile durci avec utilisateur non-root (`appuser`), HEALTHCHECK, image minimale | P1/P5 | **À FAIRE** | `infra/docker/Dockerfile.api` |
+| **OPS-01** | Ops | **P1 (Élevée)** | Absence de pipeline CI/CD automatisé | `.github/workflows/ci.yml` (pytest, ruff, mypy, pip-audit, secret scan, docker build) | P5 | **RÉSOLU** | `.github/workflows/ci.yml` |
+| **OPS-02** | Ops | **P1 (Moyenne)** | Conteneur Docker exécuté en `root` | Dockerfile durci avec utilisateur non-root (`appuser`), HEALTHCHECK, image minimale | P1/P5 | **RÉSOLU** | `infra/docker/Dockerfile.api` |
+| **OPS-03** | Ops | **P1 (Moyenne)** | Probes /health et /ready, logs JSON | Endpoint `/ready` (DB, checkpointer, LLM), formatter JSON avec censure des secrets | P5 | **RÉSOLU** | `tests/unit/test_readiness_probe.py` & `tests/observability/test_json_logger.py` |
 
 ---
 

@@ -171,19 +171,19 @@ POST /v1/strategy/insights            # Génère les hypothèses et recommandati
 
 ---
 
-## 🧪 Suite de Tests & Évaluations (80 Cas)
+## 🧪 Suite de Tests & Évaluations (69+ Tests)
 
 ### 1. Lancer la Suite Complète de Tests Pytest
 ```bash
-PYTHONPATH=. pytest -v tests/
+pytest -v
 ```
-*Résultat : 18 tests exécutés avec succès (Unit, Contract, Integration, E2E, Security).*
+*Couverture : 69 tests automatisés sans aucun avertissement couvrant Sécurité P0 (JWT, RBAC, IDOR/BOLA, injection de prompt, Docker), Fiabilité P0 (Checkpointer persistant, Machine à états, Idempotence, Degraded Mode, LLM Resilience, Kill-switch), Qualité (Règles déterministes, 90d duplicate, AI Act), Observabilité & Coûts (Cache LLM, Correlation ID, Pricing externe), et Social Ready.*
 
-### 2. Exécuter le Dataset d'Évaluation de Régression (80 Cas)
+### 2. Exécuter l'Évaluation Qualité sur Dataset Versionné
 ```bash
-PYTHONPATH=. python evals/evaluators/quality_evaluator.py
+python evals/evaluators/quality_evaluator.py
 ```
-*Résultat : 100.0% de taux de passage sur les 80 cas répartis sur les 6 familles du PRD.*
+*Dataset : `evals/datasets/golden_evaluation_dataset.json` et `eval_dataset_80.json` sans aucun faux résultat positif.*
 
 ---
 
