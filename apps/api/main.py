@@ -213,8 +213,10 @@ app.include_router(auth.router)
 app.include_router(oauth.router)
 
 web_dir = Path(__file__).resolve().parent.parent / "web"
-if web_dir.exists():
-    app.mount("/ui", StaticFiles(directory=str(web_dir), html=True), name="ui")
+dist_dir = web_dir / "dist"
+target_static_dir = dist_dir if dist_dir.exists() else web_dir
+if target_static_dir.exists():
+    app.mount("/ui", StaticFiles(directory=str(target_static_dir), html=True), name="ui")
 
 
 @app.get("/health", tags=["System"])
