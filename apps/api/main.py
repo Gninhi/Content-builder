@@ -2,6 +2,11 @@ import os
 import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
+
+# Automatically load environment variables from .env before importing application modules
+load_dotenv()
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -29,6 +34,7 @@ from apps.api.routers import (
 )
 
 logger = logging.getLogger("apps.api.main")
+
 
 # Max request body size: default 1 MB
 MAX_REQUEST_BODY_SIZE = int(os.getenv("MAX_REQUEST_BODY_SIZE_BYTES", str(1024 * 1024)))

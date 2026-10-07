@@ -54,6 +54,10 @@ ignore_missing_imports = true
 check_untyped_defs = false
 warn_return_any = false
 
+[tool.ruff.lint.per-file-ignores]
+"apps/api/main.py" = ["E402"]
+
+
 
 
 

@@ -19,7 +19,7 @@ def issue_dev_token(req: DevTokenRequest):
     Blocked in production.
     """
     env = (os.getenv("ENV") or "production").strip().lower()
-    if env != "dev":
+    if env not in ("dev", "development", "local", "test"):
         raise HTTPException(
             status_code=403,
             detail="Dev token generation is strictly disabled in non-dev environments."

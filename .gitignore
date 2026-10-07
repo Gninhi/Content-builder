@@ -20,7 +20,9 @@ htmlcov/
 
 # Databases & local state
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
-contentops.db
+contentops.db*
 artifacts/

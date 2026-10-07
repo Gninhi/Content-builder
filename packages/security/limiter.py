@@ -46,11 +46,29 @@ def get_rate_limit_key(request: Request) -> str:
     return get_client_ip(request)
 
 
-# Configure storage: shared Redis in multi-worker production or local fallback
-_storage_uri = os.getenv("RATE_LIMIT_STORAGE_URI") or os.getenv("REDIS_URL") or "memory://"
+def _resolve_storage_uri() -> str:
+    candidate = os.getenv("RATE_LIMIT_STORAGE_URI") or os.getenv("REDIS_URL")
+    if candidate and candidate.startswith("redis"):
+        try:
+            import redis  # type: ignore # noqa: F401
+            return candidate
+        except (ImportError, Exception):
+            return "memory://"
+    return candidate or "memory://"
 
-limiter = Limiter(
-    key_func=get_rate_limit_key,
-    default_limits=[os.getenv("RATE_LIMIT_DEFAULT", "200/minute")],
-    storage_uri=_storage_uri
-)
+
+_storage_uri = _resolve_storage_uri()
+
+try:
+    limiter = Limiter(
+        key_func=get_rate_limit_key,
+        default_limits=[os.getenv("RATE_LIMIT_DEFAULT", "200/minute")],
+        storage_uri=_storage_uri,
+    )
+except Exception:
+    # Graceful fallback to memory limiter if Redis storage initialization fails
+    limiter = Limiter(
+        key_func=get_rate_limit_key,
+        default_limits=[os.getenv("RATE_LIMIT_DEFAULT", "200/minute")],
+        storage_uri="memory://",
+    )

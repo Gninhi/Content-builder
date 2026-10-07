@@ -3,6 +3,10 @@ from typing import Dict, Any, Optional, Set, Union
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 import jwt
+from dotenv import load_dotenv
+
+# Load local .env if present
+load_dotenv()
 
 
 class Role(str, Enum):
@@ -28,15 +32,23 @@ JWT_ISSUER = "contentops-auth"
 JWT_AUDIENCE = "contentops-api"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
-# Key ring for key rotation support: kid -> secret_key
-_KEY_RING: Dict[str, str] = {
-    JWT_KEY_ID: JWT_SECRET_KEY,
-}
-if os.getenv("JWT_ROTATION_KEYS"):
-    for pair in os.getenv("JWT_ROTATION_KEYS", "").split(","):
-        if ":" in pair:
-            kid, ksecret = pair.split(":", 1)
-            _KEY_RING[kid.strip()] = ksecret.strip()
+
+def get_key_ring() -> Dict[str, str]:
+    """Returns the current key ring mapping key_id to secret key."""
+    key_id = os.getenv("JWT_KEY_ID", "key_v1")
+    secret = os.getenv("JWT_SECRET_KEY", DEFAULT_DEV_JWT_SECRET)
+    ring: Dict[str, str] = {key_id: secret}
+    rotation_keys = os.getenv("JWT_ROTATION_KEYS")
+    if rotation_keys:
+        for pair in rotation_keys.split(","):
+            if ":" in pair:
+                kid, ksecret = pair.split(":", 1)
+                ring[kid.strip()] = ksecret.strip()
+    return ring
+
+
+# Key ring for backward compatibility with direct module imports
+_KEY_RING: Dict[str, str] = get_key_ring()
 
 
 def validate_jwt_configuration() -> None:
@@ -44,13 +56,16 @@ def validate_jwt_configuration() -> None:
     Enforces fail-closed validation of JWT keys in production.
     Raises RuntimeError if insecure defaults or weak keys are used.
     """
+    load_dotenv()
     env = (os.getenv("ENV") or "production").strip().lower()
-    if env == "production":
+    if env in ("production", "prod"):
         secret = os.getenv("JWT_SECRET_KEY", "")
         if not secret or secret == DEFAULT_DEV_JWT_SECRET or len(secret) < 32:
             raise RuntimeError(
                 "Production Startup Denied: JWT_SECRET_KEY must be configured with a dedicated strong secret "
-                "of at least 32 characters in production. Default development keys are strictly rejected."
+                "of at least 32 characters in production. Default development keys are strictly rejected. "
+                "For local development, configure ENV=dev or ENV=development in your .env file, "
+                "or define a strong JWT_SECRET_KEY (at least 32 characters)."
             )
 
 
@@ -81,8 +96,9 @@ def create_access_token(
         "exp": expire.timestamp(),
     }
 
-    kid = key_id or JWT_KEY_ID
-    secret = _KEY_RING.get(kid, JWT_SECRET_KEY)
+    kid: str = str(key_id or os.getenv("JWT_KEY_ID") or JWT_KEY_ID)
+    ring = get_key_ring()
+    secret: str = ring.get(kid) or _KEY_RING.get(kid) or os.getenv("JWT_SECRET_KEY") or JWT_SECRET_KEY
     headers = {"kid": kid}
 
     return jwt.encode(payload, secret, algorithm=JWT_ALGORITHM, headers=headers)
@@ -92,13 +108,16 @@ def decode_access_token(token: str) -> Dict[str, Any]:
     """
     Verifies signature using matching kid, expiration, issuer, audience, and algorithms strictly.
     """
+    default_kid: str = os.getenv("JWT_KEY_ID") or JWT_KEY_ID
     try:
         unverified_headers = jwt.get_unverified_header(token)
-        kid = unverified_headers.get("kid", JWT_KEY_ID)
+        kid_val = unverified_headers.get("kid", default_kid)
+        kid: str = str(kid_val) if kid_val else default_kid
     except Exception:
-        kid = JWT_KEY_ID
+        kid = default_kid
 
-    secret = _KEY_RING.get(kid, JWT_SECRET_KEY)
+    ring = get_key_ring()
+    secret: str = ring.get(kid) or _KEY_RING.get(kid) or os.getenv("JWT_SECRET_KEY") or JWT_SECRET_KEY
     payload = jwt.decode(
         token,
         secret,

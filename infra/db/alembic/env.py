@@ -18,9 +18,13 @@ target_metadata = Base.metadata
 def get_url() -> str:
     # First check if custom url is specified on the Alembic Config object (e.g. from tests or CLI)
     config_url = config.get_main_option("sqlalchemy.url")
-    db_env_url = os.getenv("DATABASE_URL")
+    ini_default = "sqlite:///./contentops.db"
 
-    # If an environment variable is explicitly passed, let it override default ini
+    # If caller/test explicitly configured a database url different from default ini
+    if config_url and config_url not in (ini_default, "driver://user:pass@localhost/dbname"):
+        return config_url
+
+    db_env_url = os.getenv("DATABASE_URL")
     if db_env_url:
         if db_env_url.startswith("sqlite+aiosqlite"):
             return db_env_url.replace("sqlite+aiosqlite", "sqlite")

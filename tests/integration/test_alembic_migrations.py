@@ -7,11 +7,12 @@ from alembic import command
 
 
 @pytest.fixture
-def temp_alembic_db():
+def temp_alembic_db(monkeypatch):
     """Provides a temporary SQLite database path and configured Alembic Config."""
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     db_url = f"sqlite:///{path}"
+    monkeypatch.setenv("DATABASE_URL", db_url)
 
     config = Config("alembic.ini")
     config.set_main_option("sqlalchemy.url", db_url)
