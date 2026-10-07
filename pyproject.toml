@@ -40,3 +40,13 @@ dev = [
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "."
+explicit_package_bases = true
+ignore_missing_imports = true
+check_untyped_defs = false
+warn_return_any = false
+
+

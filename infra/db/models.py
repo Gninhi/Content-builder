@@ -116,6 +116,7 @@ class ContentVariantModel(Base):
     media_spec = Column(JSON, default=dict, nullable=False)
     claims = Column(JSON, default=list, nullable=False)
     payload_hash = Column(String(64), nullable=False)
+    degraded = Column(Boolean, default=False, nullable=False)
     status = Column(String(32), default="DRAFT")
     created_at = Column(DateTime, default=datetime.utcnow)
 

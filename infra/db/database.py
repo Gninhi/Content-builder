@@ -43,6 +43,16 @@ def get_db():
 
 
 def init_db():
-    """Initializes tables in database."""
+    """Initializes tables in database and applies backwards-compatible column additions."""
     Base.metadata.create_all(bind=engine)
+    try:
+        from sqlalchemy import text, inspect
+        inspector = inspect(engine)
+        if "content_variants" in inspector.get_table_names():
+            columns = [c["name"] for c in inspector.get_columns("content_variants")]
+            if "degraded" not in columns:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE content_variants ADD COLUMN degraded BOOLEAN DEFAULT 0"))
+    except Exception:
+        pass
 

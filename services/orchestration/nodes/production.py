@@ -85,7 +85,17 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
                 logger.warning(f"Gemini variant generation failed for {platform}: {e}")
 
         # 2. Deterministic structured fallback (ensures tests and offline runs succeed)
+        is_degraded = False
         if not variant_data:
+            is_degraded = True
+            ObservabilityTracer.tag_trace(trace_meta["run_id"], ["degraded"])
+            ObservabilityTracer.record_score(
+                name="degraded_fallback",
+                value=1.0,
+                trace_id=trace_meta["run_id"],
+                comment="Deterministic fallback used due to LLM unavailability or failure"
+            )
+
             if platform == "linkedin":
                 hook = "Pourquoi 80% des projets IA échouent sans gouvernance éditoriale claire ?"
                 body = (
@@ -169,11 +179,17 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
             "media_spec": variant_data["media_spec"],
             "claims": variant_data["claims"],
             "payload_hash": payload_hash,
+            "degraded": is_degraded,
             "status": ContentStatus.DRAFT.value
         })
+
+    tags = list(trace_meta.get("tags", []))
+    if any(v.get("degraded") for v in variants) and "degraded" not in tags:
+        tags.append("degraded")
 
     return {
         "generated_variants": variants,
         "status": ContentStatus.DRAFT,
-        "run_id": trace_meta["run_id"]
+        "run_id": trace_meta["run_id"],
+        "tags": tags
     }

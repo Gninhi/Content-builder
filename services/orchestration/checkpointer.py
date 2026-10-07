@@ -1,7 +1,7 @@
 import os
 import sqlite3
 import logging
-from typing import Optional
+from typing import Optional, Any
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -33,10 +33,10 @@ def get_checkpointer(
             if "+psycopg" in pg_url:
                 pg_url = pg_url.split("+")[0] + "://" + pg_url.split("://")[1]
 
-            conn = psycopg.connect(pg_url, autocommit=True)
-            saver = PostgresSaver(conn)
-            saver.setup()
-            return saver
+            pg_conn: Any = psycopg.connect(pg_url, autocommit=True)
+            pg_saver = PostgresSaver(pg_conn)
+            pg_saver.setup()
+            return pg_saver
         except Exception as e:
             logger.warning(f"Failed to initialize PostgresSaver ({e}), falling back")
 
@@ -47,10 +47,10 @@ def get_checkpointer(
             parent = os.path.dirname(os.path.abspath(db_path))
             if parent:
                 os.makedirs(parent, exist_ok=True)
-            conn = sqlite3.connect(db_path, check_same_thread=False)
-            saver = SqliteSaver(conn)
-            saver.setup()
-            return saver
+            sq_conn = sqlite3.connect(db_path, check_same_thread=False)
+            sq_saver = SqliteSaver(sq_conn)
+            sq_saver.setup()
+            return sq_saver
         except Exception as e:
             logger.warning(f"Failed to initialize SqliteSaver ({e}), falling back to Memory")
 

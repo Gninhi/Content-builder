@@ -79,6 +79,16 @@ class PublisherWorker:
             self.db.commit()
             raise ValueError(job.error_message)
 
+        # Degraded mode safety lock: content generated via fallback requires explicit human reviewer approval
+        is_degraded = getattr(variant, "degraded", False) or (variant.media_spec and variant.media_spec.get("degraded", False))
+        if is_degraded:
+            reviewer = (valid_approval.reviewer_id or "").strip().lower()
+            if reviewer in ("system", "auto", "automated", ""):
+                job.status = ContentStatus.PUBLISH_FAILED.value
+                job.error_message = "Degraded mode safety lock: Content generated via fallback requires explicit human reviewer approval before publication."
+                self.db.commit()
+                raise ValueError(job.error_message)
+
         # 3. Transition to PUBLISHING using validated state machine
         ContentStateMachine.transition(ContentStatus(job.status), ContentStatus.PUBLISHING)
         ContentStateMachine.transition(ContentStatus(variant.status), ContentStatus.PUBLISHING)

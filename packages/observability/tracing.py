@@ -112,6 +112,25 @@ class ObservabilityTracer:
             return False
 
     @classmethod
+    def tag_trace(cls, trace_id: str, tags: List[str]) -> bool:
+        """
+        Appends or updates tags (e.g. 'degraded') on a Langfuse trace.
+        """
+        client = cls.get_langfuse_client()
+        if not client or not trace_id:
+            return False
+
+        try:
+            if hasattr(client, "trace"):
+                trace_obj = client.trace(id=trace_id)
+                if hasattr(trace_obj, "update"):
+                    trace_obj.update(tags=tags)
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to update trace tags in Langfuse: {e}")
+            return False
+
+    @classmethod
     def get_run_metadata(
         cls,
         workspace_id: str,

@@ -224,15 +224,20 @@ class ContentOpsRepository:
         cta: str,
         hashtags: Optional[List[str]] = None,
         media_spec: Optional[Dict[str, Any]] = None,
-        claims: Optional[List[Dict[str, Any]]] = None
+        claims: Optional[List[Dict[str, Any]]] = None,
+        degraded: bool = False
     ) -> ContentVariantModel:
+        m_spec = dict(media_spec or {})
+        if degraded:
+            m_spec["degraded"] = True
+
         raw_payload = {
             "platform": platform,
             "hook": hook,
             "body": body,
             "cta": cta,
             "hashtags": hashtags or [],
-            "media_spec": media_spec or {},
+            "media_spec": m_spec,
         }
         p_hash = compute_payload_hash(raw_payload)
 
@@ -244,9 +249,10 @@ class ContentOpsRepository:
             body=body,
             cta=cta,
             hashtags=hashtags or [],
-            media_spec=media_spec or {},
+            media_spec=m_spec,
             claims=claims or [],
             payload_hash=p_hash,
+            degraded=degraded,
             status=ContentStatus.DRAFT.value
         )
         self.db.add(variant)
