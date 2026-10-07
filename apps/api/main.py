@@ -1,9 +1,18 @@
 import os
+import logging
+from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from infra.db.database import init_db, SessionLocal
 from infra.db.repository import ContentOpsRepository
+from packages.security.limiter import limiter
 from apps.api.routers import (
     workspaces,
     sources,
@@ -16,6 +25,11 @@ from apps.api.routers import (
     strategy,
     auth,
 )
+
+logger = logging.getLogger("apps.api.main")
+
+# Max request body size: default 1 MB
+MAX_REQUEST_BODY_SIZE = int(os.getenv("MAX_REQUEST_BODY_SIZE_BYTES", str(1024 * 1024)))
 
 
 @asynccontextmanager
@@ -31,7 +45,7 @@ async def lifespan(app: FastAPI):
         if not default_ws:
             ws = repo.create_workspace(name="Default Editorial Workspace", timezone="UTC", owner_id="owner_martial")
             # Force the ID to be ws_default for consistent quickstart
-            ws.id = "ws_default"
+            ws.id = "ws_default"  # type: ignore[assignment]
             db.commit()
 
             repo.create_or_version_brand_profile(
@@ -70,14 +84,79 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS setup
+# Attach rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+app.add_middleware(SlowAPIMiddleware)
+
+# Restrictive CORS configuration
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000,http://127.0.0.1:8000"
+    ).split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def security_and_size_middleware(request: Request, call_next):
+    # Enforce request payload size limit
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > MAX_REQUEST_BODY_SIZE:
+                return JSONResponse(
+                    status_code=413,
+                    content={
+                        "error": "payload_too_large",
+                        "detail": f"La taille de la requête ({int(content_length)} octets) dépasse la limite autorisée ({MAX_REQUEST_BODY_SIZE} octets)."
+                    }
+                )
+        except ValueError:
+            pass
+
+    response = await call_next(request)
+
+    # Invert/inject robust security headers
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none';"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": "http_error", "detail": exc.detail},
+        headers=getattr(exc, "headers", None)
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Internal unhandled error during {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "internal_server_error",
+            "detail": "Une erreur interne est survenue. Veuillez contacter le support."
+        }
+    )
+
 
 # Include all sub-routers
 app.include_router(workspaces.router)
@@ -90,10 +169,6 @@ app.include_router(calendar.router)
 app.include_router(analytics.router)
 app.include_router(strategy.router)
 app.include_router(auth.router)
-
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
-from pathlib import Path
 
 web_dir = Path(__file__).resolve().parent.parent / "web"
 if web_dir.exists():
