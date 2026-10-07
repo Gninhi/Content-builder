@@ -44,6 +44,7 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
     # 1. Check deterministic LLM cache
     cache = get_llm_cache()
     cache_payload = {
+        "workspace_id": state.get("workspace_id", "default"),
         "topic": topic.strip().lower(),
         "pillars": sorted([p.strip().lower() for p in pillars]),
         "audience": sorted([a.strip().lower() for a in audience]),
