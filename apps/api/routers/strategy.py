@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, Body
+from fastapi import APIRouter, Depends, Body, HTTPException
 from datetime import datetime, timezone
 from packages.contracts.schemas import StrategyInsightsResponse, StrategyInsight
 from services.orchestration.graphs.strategy_insights import graph as strategy_insights_graph
 from packages.observability.tracing import ObservabilityTracer
-from infra.db.models import MetricSnapshotModel
+from infra.db.models import MetricSnapshotModel, PublishedPostModel
 from infra.db.repository import ContentOpsRepository
 from apps.api.dependencies import get_repository, UserContext, require_roles
 
@@ -14,13 +14,21 @@ router = APIRouter(tags=["Strategy & Insights"])
 def generate_strategy_insights(
     workspace_id: str = Body("ws_default", embed=True),
     repo: ContentOpsRepository = Depends(get_repository),
-    user: UserContext = Depends(require_roles("Owner", "Analyst"))
+    user: UserContext = Depends(require_roles("Owner", "Editor"))
 ):
-    brand_profile = repo.get_latest_brand_profile(workspace_id)
+    if workspace_id and workspace_id != user.workspace_id:
+        raise HTTPException(status_code=403, detail="Cannot generate strategy insights for another workspace.")
+    ws_id = user.workspace_id
+    brand_profile = repo.get_latest_brand_profile(ws_id)
     pillars = brand_profile.pillars if brand_profile else ["IA générative", "Systèmes multi-agents"]
 
-    # Gather recent snapshots
-    snapshots_models = repo.db.query(MetricSnapshotModel).all()
+    # Gather recent snapshots strictly isolated by workspace
+    snapshots_models = (
+        repo.db.query(MetricSnapshotModel)
+        .join(PublishedPostModel, MetricSnapshotModel.post_id == PublishedPostModel.id)
+        .filter(PublishedPostModel.workspace_id == ws_id)
+        .all()
+    )
     snapshots = [
         {"impressions": s.impressions, "engagements": s.engagements}
         for s in snapshots_models

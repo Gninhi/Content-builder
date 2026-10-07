@@ -51,16 +51,16 @@ def get_analytics_overview(
 
     avg_engagement_rate = (
         round((total_engagements / max(1, total_impressions)) * 100, 2)
-        if total_impressions > 0 else 4.8
+        if total_impressions > 0 else 0.0
     )
 
     return {
         "published_posts_count": len(posts),
-        "total_impressions": total_impressions if total_impressions > 0 else 12500,
-        "total_engagements": total_engagements if total_engagements > 0 else 610,
-        "total_clicks": total_clicks if total_clicks > 0 else 184,
-        "total_comments": total_comments if total_comments > 0 else 92,
-        "total_shares": total_shares if total_shares > 0 else 46,
+        "total_impressions": total_impressions,
+        "total_engagements": total_engagements,
+        "total_clicks": total_clicks,
+        "total_comments": total_comments,
+        "total_shares": total_shares,
         "average_engagement_rate": avg_engagement_rate,
         "platform_breakdown": {
             "linkedin": {"posts": len([p for p in posts if p.platform == "linkedin"]), "weight": 0.65},
