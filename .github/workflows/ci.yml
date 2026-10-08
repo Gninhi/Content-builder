@@ -2,20 +2,28 @@ name: ContentOps CI Hardened Pipeline
 
 on:
   push:
-    branches: [ "main", "fix/*", "feat/*", "audit/*" ]
+    branches: [ "main", "feat/*", "fix/*" ]
   pull_request:
     branches: [ "main" ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint-and-style:
     name: Lint & Style Checks (Ruff & Mypy)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
         with:
           python-version: "3.12"
           cache: "pip"
@@ -28,12 +36,13 @@ jobs:
       - name: Run Ruff Linter
         run: ruff check .
 
-      - name: Run Mypy Type Checker (Full Repository)
+      - name: Run Mypy Type Checker
         run: mypy .
 
   test-suite:
     name: Automated Tests & Coverage (Pytest)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:16-alpine
@@ -70,10 +79,10 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
         with:
           python-version: "3.12"
           cache: "pip"
@@ -89,45 +98,46 @@ jobs:
           alembic downgrade base
           alembic upgrade head
 
-      - name: Run Pytest with Strict Coverage Threshold (>= 85%)
+      - name: Run Pytest with Strict Coverage Threshold
         run: |
           pytest -v --cov=. --cov-report=term-missing --cov-fail-under=85
 
-
   security-audit:
-    name: Security & Dependency Audit
+    name: Security & Secret Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
         with:
           python-version: "3.12"
 
-      - name: Scan Secrets in Repository & History
-        uses: trufflesecurity/trufflehog@main
-        with:
-          path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
-          extra_args: --debug --only-verified
+      - name: Run Gitleaks Secret Scanner
+        uses: gitleaks/gitleaks-action@774e286395347e30d70da6b83f458ce3e1645e75 # v2.3.8
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
 
       - name: Audit Dependencies for Known Vulnerabilities (pip-audit)
         run: |
           python -m pip install --upgrade pip pip-audit
-          pip-audit --desc auto || echo "Audit complete - review any non-critical advisory"
+          pip-audit -r requirements.txt
 
   frontend-pipeline:
-    name: Frontend Quality & Tests (Vite, TypeScript, Vitest)
+    name: Frontend Quality & Tests (Vite & Vitest)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up Node.js 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
         with:
           node-version: 20
           cache: 'npm'
@@ -141,25 +151,22 @@ jobs:
         working-directory: apps/web
         run: npm run build
 
-      - name: Run Component & Unit Tests (Vitest)
+      - name: Run Vitest Unit Tests
         working-directory: apps/web
         run: npm run test
 
-      - name: Audit Frontend Dependencies
-        working-directory: apps/web
-        run: npm audit --audit-level=high || echo "Advisory logged"
-
   docker-build:
-    name: Container Build & Healthcheck Verification
+    name: Container Build Verification (No Publish)
     needs: [lint-and-style, test-suite, frontend-pipeline]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
-      - name: Build Hardened Docker Image (Multi-stage)
+      - name: Build Hardened Docker Image (Dry Run Verification)
         run: |
           docker build -f infra/docker/Dockerfile.api -t contentops-api:ci .

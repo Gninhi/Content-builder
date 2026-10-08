@@ -150,6 +150,17 @@ Une fois le serveur lancé, accédez directement au tableau de bord interactif :
 
 ---
 
+## 🔒 Sécurité & Mode Sandbox
+
+> [!IMPORTANT]
+> **AVERTISSEMENT FORMEL DE SÉCURITÉ** :
+> - Ne commitez **JAMAIS** de fichiers `.env` réels, de clés d'API (Google, Langfuse, Tavily) ou de jetons OAuth dans ce dépôt.
+> - Par défaut, `SOCIAL_SANDBOX_MODE=true` et `LIVE_PUBLISHING_ENABLED=false` sont actifs pour prévenir tout envoi externe involontaire.
+> - Toutes les requêtes sensibles et jetons d'accès OAuth sont chiffrés en base de données via AES-256-GCM.
+> - Consultez notre politique de divulgation dans [SECURITY.md](SECURITY.md).
+
+---
+
 ## 🔌 API REST & Documentation
 
 L'API interactive OpenAPI Swagger est accessible sur :
@@ -162,24 +173,32 @@ POST /v1/briefs                       # Crée un brief éditorial
 POST /v1/content/generate             # Produit les variantes et exécute le Quality Gate
 GET  /v1/inbox                        # Récupère les brouillons en attente de revue
 POST /v1/content/{variant_id}/approve # Valide/Rejette une variante avec intégrité de hash
+POST /v1/content/{variant_id}/rewrite # Déclenche une réécriture agentique avec feedback humain
 POST /v1/publications/schedule        # Programme la publication avec clé d'idempotence
 POST /v1/publications/{job_id}/publish-now # Déclenche le Publisher Worker
 GET  /v1/calendar                     # Retourne le calendrier complet
 GET  /v1/analytics/overview           # Statistiques globales
 POST /v1/strategy/insights            # Génère les hypothèses et recommandations
+POST /v1/oauth/test-connection/{p}    # Teste les connecteurs sociaux en temps réel
 ```
 
 ---
 
-## 🧪 Suite de Tests & Évaluations (69+ Tests)
+## 🧪 Suite de Tests & Évaluations (154 Tests)
 
-### 1. Lancer la Suite Complète de Tests Pytest
+### 1. Tests Backend Pytest (133 Tests)
 ```bash
 pytest -v
 ```
-*Couverture : 69 tests automatisés sans aucun avertissement couvrant Sécurité P0 (JWT, RBAC, IDOR/BOLA, injection de prompt, Docker), Fiabilité P0 (Checkpointer persistant, Machine à états, Idempotence, Degraded Mode, LLM Resilience, Kill-switch), Qualité (Règles déterministes, 90d duplicate, AI Act), Observabilité & Coûts (Cache LLM, Correlation ID, Pricing externe), et Social Ready.*
+*Couverture : 133 tests automatisés couvrant Sécurité P0 (JWT, RBAC, IDOR/BOLA, injection de prompt, OAuth PKCE Vault, masquage d'erreurs), Fiabilité P0 (Checkpointer persistant, Machine à états, Idempotence, Degraded Mode, LLM Resilience, Kill-switch, At-Most-Once), Qualité (Règles déterministes, 90d duplicate, AI Act), Observabilité & Coûts (Cache LLM, Correlation ID, Pricing externe), et Connecteurs Sociaux.*
 
-### 2. Exécuter l'Évaluation Qualité sur Dataset Versionné
+### 2. Tests Frontend Vitest (21 Tests)
+```bash
+cd apps/web && npm run test && cd ../..
+```
+*Couverture : 21 tests de composants et contextes React (AuthContext, ToastContext, Button, Badge, PlatformPreview).*
+
+### 3. Exécuter l'Évaluation Qualité sur Dataset Versionné
 ```bash
 python evals/evaluators/quality_evaluator.py
 ```
@@ -187,12 +206,15 @@ python evals/evaluators/quality_evaluator.py
 
 ---
 
-## 🛡️ Gouvernance & Sécurité (ADR)
+## 📄 Licence & Gouvernance
 
-Consultez les Décisions d'Architecture de Référence :
-- [ADR 0001 : Workflow Déterministe](docs/adr/0001-workflow-first.md)
-- [ADR 0002 : LangGraph Durable & HITL](docs/adr/0002-langgraph-durable-orchestration.md)
-- [ADR 0003 : Séparation du Publisher Worker](docs/adr/0003-separated-publisher-worker.md)
-- [ADR 0004 : PostgreSQL Source de Vérité](docs/adr/0004-postgres-source-of-truth.md)
-- [ADR 0005 : Versionnage des Prompts & Profils](docs/adr/0005-versioned-prompts-and-brand-profiles.md)
-- [ADR 0006 : Apprentissage Propositionnel](docs/adr/0006-propositional-learning.md)
+- **Licence** : Publié sous licence open-source [MIT License](LICENSE).
+- **Politique de Sécurité** : [SECURITY.md](SECURITY.md).
+- **Guide de Contribution** : [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Gouvernance & Décisions d'Architecture** :
+  - [ADR 0001 : Workflow Déterministe](docs/adr/0001-workflow-first.md)
+  - [ADR 0002 : LangGraph Durable & HITL](docs/adr/0002-langgraph-durable-orchestration.md)
+  - [ADR 0003 : Séparation du Publisher Worker](docs/adr/0003-separated-publisher-worker.md)
+  - [ADR 0004 : PostgreSQL Source de Vérité](docs/adr/0004-postgres-source-of-truth.md)
+  - [ADR 0005 : Versionnage des Prompts & Profils](docs/adr/0005-versioned-prompts-and-brand-profiles.md)
+  - [ADR 0006 : Apprentissage Propositionnel](docs/adr/0006-propositional-learning.md)

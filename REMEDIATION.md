@@ -1,6 +1,6 @@
 # Matrice de Remédiation & Durcissement (REMEDIATION.md)
 
-Ce document suit la résolution exhaustive des failles recensées dans [AUDIT.md](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/AUDIT.md).
+Ce document suit la résolution exhaustive des failles recensées dans [AUDIT.md](AUDIT.md).
 Chaque correctif est rattaché à son commit atomique et à ses tests de non-régression.
 
 ---

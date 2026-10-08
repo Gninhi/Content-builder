@@ -1,0 +1,22 @@
+# Gitleaks Configuration for ContentOps Harness
+title = "ContentOps Gitleaks Config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlists for test mocks and fixtures"
+paths = [
+  '''tests/unit/.*''',
+  '''tests/security/.*''',
+  '''evals/datasets/.*''',
+  '''\.env\.example''',
+  '''\.gitleaks\.toml'''
+]
+regexes = [
+  '''idempotency_key''',
+  '''SuperSecretKey@internal\.cluster''',
+  '''fixture-test-vault-key''',
+  '''sk-lf-test-12345678''',
+  '''pk-lf-test-12345678'''
+]

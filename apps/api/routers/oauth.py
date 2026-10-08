@@ -513,7 +513,7 @@ def test_social_connection(
             "provider": provider_clean,
             "external_post_id": res.platform_post_id,
             "url": res.permalink_url,
-            "verified_at": res.published_at.isoformat(),
+            "verified_at": res.published_at.isoformat() if res.published_at else datetime.now(timezone.utc).isoformat(),
             "receipt": res.metadata,
             "message": f"Connecteur {provider_clean.upper()} vérifié et 100% opérationnel !"
         }

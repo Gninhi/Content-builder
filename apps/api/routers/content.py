@@ -204,9 +204,9 @@ def rewrite_content_variant(
 
     # Invoke Gemini / LLM to rewrite based on user feedback
     model = get_gemini_model(model_type="reasoning", temperature=0.3)
-    revised_hook = variant.hook
-    revised_body = variant.body
-    revised_cta = variant.cta
+    revised_hook: str = str(variant.hook or "")
+    revised_body: str = str(variant.body or "")
+    revised_cta: str = str(variant.cta or "")
 
     if model is not None:
         try:
@@ -224,16 +224,16 @@ Garde le style professionnel et direct. Ne génère aucune hallucination."""
             structured_llm = model.with_structured_output(GeneratedVariant)
             res = structured_llm.invoke(prompt)
             if res and res.body:
-                revised_hook = res.hook
-                revised_body = res.body
-                revised_cta = res.cta or variant.cta
+                revised_hook = str(res.hook or "")
+                revised_body = str(res.body or "")
+                revised_cta = str(res.cta or variant.cta or "")
         except Exception:
             revised_body = f"{variant.body}\n\n[Révision suite au retour : {feedback}]"
     else:
         revised_body = f"{variant.body}\n\n[Révision suite au retour : {feedback}]"
 
     # Update variant with revised content and recalculate payload hash
-    new_payload = {
+    new_payload: Dict[str, Any] = {
         "hook": revised_hook,
         "body": revised_body,
         "cta": revised_cta,
@@ -243,11 +243,11 @@ Garde le style professionnel et direct. Ne génère aucune hallucination."""
     }
     new_hash = compute_payload_hash(new_payload)
 
-    variant.hook = revised_hook
-    variant.body = revised_body
-    variant.cta = revised_cta
-    variant.payload_hash = new_hash
-    variant.status = ContentStatus.IN_REVIEW.value
+    setattr(variant, "hook", revised_hook)
+    setattr(variant, "body", revised_body)
+    setattr(variant, "cta", revised_cta)
+    setattr(variant, "payload_hash", new_hash)
+    setattr(variant, "status", ContentStatus.IN_REVIEW.value)
     repo.db.commit()
     repo.db.refresh(variant)
 

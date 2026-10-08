@@ -146,7 +146,7 @@ def toggle_workspace_kill_switch(
     ws = repo.get_workspace(workspace_id)
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace not found.")
-    ws.kill_switch_enabled = enabled
+    setattr(ws, "kill_switch_enabled", enabled)
     repo.db.commit()
     return {
         "workspace_id": ws.id,

@@ -89,25 +89,25 @@ Une refonte complète de niveau production a été menée sur la branche isolée
 ### 1. Écran d'Authentification (Screen 0)
 | Avant (Baseline) | Après (Production Ready) |
 | :---: | :---: |
-| ![Baseline Auth](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/docs/ui/baseline/auth_1440px.png) | ![Production Auth](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/docs/ui/production/0_auth_1440px.png) |
+| ![Baseline Auth](docs/ui/baseline/auth_1440px.png) | ![Production Auth](docs/ui/production/0_auth_1440px.png) |
 | *Formulaire non stylé, CSP bloquante, champs désordonnés* | *Design moderne glassmorphism, sélecteur de rôle RBAC, avis de sécurité in-memory, WCAG AA* |
 
 ### 2. Vue d'Ensemble & Tableau de Bord (Screen 1)
 | Avant (Baseline) | Après (Production Ready) |
 | :---: | :---: |
-| ![Baseline Dashboard](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/docs/ui/baseline/dashboard_1440px.png) | ![Production Dashboard](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/docs/ui/production/1_dashboard_1440px.png) |
+| ![Baseline Dashboard](docs/ui/baseline/dashboard_1440px.png) | ![Production Dashboard](docs/ui/production/1_dashboard_1440px.png) |
 | *Erreurs console 401, valeurs vides ou undefined, pas de grille* | *KPIs réels connectés à l'API, cartes réseaux, alerte kill-switch, activités récentes* |
 
 ### 3. Revue HITL (Screen 2 - Critique)
 | Avant (Baseline) | Après (Production Ready) |
 | :---: | :---: |
-| ![Baseline Inbox](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/docs/ui/baseline/inbox_1440px.png) | ![Production Inbox](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/docs/ui/production/2_inbox_1440px.png) |
+| ![Baseline Inbox](docs/ui/baseline/inbox_1440px.png) | ![Production Inbox](docs/ui/production/2_inbox_1440px.png) |
 | *Crash JS TypeError, aucun aperçu, boutons inopérants* | *Aperçus LinkedIn & X jumeaux, compteurs en direct, QualityGate, raccourcis clavier, validation obligatoire* |
 
 ### 4. Idéation & Modale (Screen 4)
 | Avant (Baseline) | Après (Production Ready) |
 | :---: | :---: |
-| ![Baseline Ideation](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/docs/ui/baseline/ideation_1440px.png) | ![Production Ideation](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/docs/ui/production/4_ideation_1440px.png) |
+| ![Baseline Ideation](docs/ui/baseline/ideation_1440px.png) | ![Production Ideation](docs/ui/production/4_ideation_1440px.png) |
 | *Fausse modale figée, tiret orphelin, aucun feedback* | *Vraie modale accessible Radix, suivi agentique en direct, cartes d'idées scorées, transformation en brouillon* |
 
 ---

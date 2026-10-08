@@ -81,7 +81,7 @@ Ces 96 erreurs doivent être intégralement résolues lors de la Phase 3.
 
 ## 5. Diagnostic de Configuration Réelle (Sans Fuite de Secret)
 
-Exécution de [`scripts/diagnose_config.py`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/scripts/diagnose_config.py) :
+Exécution de [`scripts/diagnose_config.py`](scripts/diagnose_config.py) :
 
 ```text
 === DIAGNOSTIC DE CONFIGURATION DE L'ENVIRONNEMENT ===

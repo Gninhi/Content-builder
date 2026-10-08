@@ -12,6 +12,6 @@ Un job de publication passe au statut `PUBLISH_FAILED` ou atteint le nombre maxi
 - **En cas de limite de taux (429) :**  
   Le dispatcher applique un backoff exponentiel. Aucune intervention manuelle requise sauf si la durée dépasse 2h.
 - **En cas de token expiré (401) :**  
-  Suivre le [Runbook de Rotation des Tokens](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/docs/runbooks/token_rotation.md).
+  Suivre le [Runbook de Rotation des Tokens](docs/runbooks/token_rotation.md).
 - **En cas de corruption ou altération de payload :**  
   Annuler le job via `POST /v1/publications/{job_id}/cancel`. Le contenu revient au statut `APPROVED` et doit faire l'objet d'une nouvelle validation.

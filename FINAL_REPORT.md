@@ -31,16 +31,16 @@ Le système **ContentOps Harness** a été audité de manière indépendante, du
 
 | Critère DoD | Statut | Preuve Exécutable / Référence |
 | :--- | :---: | :--- |
-| **1. Aucune faille Critique ou Élevée ouverte ; Moyennes traitées** | **CONFORME** | Matrice dans [`REMEDIATION_V2.md`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/REMEDIATION_V2.md). Suite d'attaques [`tests/security/test_reproduction_attacks.py`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/tests/security/test_reproduction_attacks.py) passant à 100%. |
+| **1. Aucune faille Critique ou Élevée ouverte ; Moyennes traitées** | **CONFORME** | Matrice dans [`REMEDIATION_V2.md`](REMEDIATION_V2.md). Suite d'attaques [`tests/security/test_reproduction_attacks.py`](tests/security/test_reproduction_attacks.py) passant à 100%. |
 | **2. Tests, ruff, mypy complet, pip-audit verts ; Couverture $\ge 85\%$** | **CONFORME** | 133/133 tests verts ; `mypy .` : 115 fichiers vérifiés sans erreur ; `ruff check .` : 0 erreur ; `pip-audit -r requirements.txt` : 0 vulnérabilité ; Couverture totale : 88%. |
-| **3. Aucun secret dans le dépôt ou l'historique** | **CONFORME** | `git log --all --full-history -- ".env"` retourne vide. Script [`scripts/diagnose_config.py`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/scripts/diagnose_config.py) n'affiche que "défini / non défini" sans fuite. TruffleHog intégré en CI. |
-| **4. Connecteurs LinkedIn et X implémentés, testés, OAuth PKCE complet** | **CONFORME** | [`packages/connectors/social/linkedin.py`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/packages/connectors/social/linkedin.py), [`packages/connectors/social/x_twitter.py`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/packages/connectors/social/x_twitter.py), [`apps/api/routers/oauth.py`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/apps/api/routers/oauth.py). Contrats vérifiés dans [`tests/unit/test_social_publishers.py`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/tests/unit/test_social_publishers.py). |
-| **5. Protocole "Au plus une fois" prouvé par tests** | **CONFORME** | Transition préalable `PUBLISHING`, conversion automatique des timeouts en `PUBLISH_UNKNOWN`, interdiction de réessai aveugle, tests de course et réconciliation dans [`tests/reliability/test_at_most_once_publishing.py`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/tests/reliability/test_at_most_once_publishing.py). |
-| **6. Postgres, Redis, Alembic validés en CI** | **CONFORME** | Workflow durci [`./.github/workflows/ci.yml`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/.github/workflows/ci.yml) avec conteneurs de services PostgreSQL 16 et Redis 7, double migration Alembic (upgrade -> downgrade -> upgrade). |
-| **7. Démarrage Fail-Closed, ENV par défaut production, Sandbox par défaut** | **CONFORME** | `ENV=production` par défaut dans [`apps/api/main.py`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/apps/api/main.py) et [`packages/security/auth.py`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/packages/security/auth.py). Refus au boot si clés faibles/par défaut. `SOCIAL_SANDBOX_MODE=true` et `LIVE_PUBLISHING_ENABLED=false` par défaut. |
+| **3. Aucun secret dans le dépôt ou l'historique** | **CONFORME** | `git log --all --full-history -- ".env"` retourne vide. Script [`scripts/diagnose_config.py`](scripts/diagnose_config.py) n'affiche que "défini / non défini" sans fuite. TruffleHog intégré en CI. |
+| **4. Connecteurs LinkedIn et X implémentés, testés, OAuth PKCE complet** | **CONFORME** | [`packages/connectors/social/linkedin.py`](packages/connectors/social/linkedin.py), [`packages/connectors/social/x_twitter.py`](packages/connectors/social/x_twitter.py), [`apps/api/routers/oauth.py`](apps/api/routers/oauth.py). Contrats vérifiés dans [`tests/unit/test_social_publishers.py`](tests/unit/test_social_publishers.py). |
+| **5. Protocole "Au plus une fois" prouvé par tests** | **CONFORME** | Transition préalable `PUBLISHING`, conversion automatique des timeouts en `PUBLISH_UNKNOWN`, interdiction de réessai aveugle, tests de course et réconciliation dans [`tests/reliability/test_at_most_once_publishing.py`](tests/reliability/test_at_most_once_publishing.py). |
+| **6. Postgres, Redis, Alembic validés en CI** | **CONFORME** | Workflow durci [`./.github/workflows/ci.yml`](.github/workflows/ci.yml) avec conteneurs de services PostgreSQL 16 et Redis 7, double migration Alembic (upgrade -> downgrade -> upgrade). |
+| **7. Démarrage Fail-Closed, ENV par défaut production, Sandbox par défaut** | **CONFORME** | `ENV=production` par défaut dans [`apps/api/main.py`](apps/api/main.py) et [`packages/security/auth.py`](packages/security/auth.py). Refus au boot si clés faibles/par défaut. `SOCIAL_SANDBOX_MODE=true` et `LIVE_PUBLISHING_ENABLED=false` par défaut. |
 | **8. Observabilité complète (Langfuse, logs corrélés, alertes)** | **CONFORME** | Traces Langfuse avec `trace_id` unifié, émission de scores (`publication_success`, `publication_unknown`, `publication_failed`), purge propre au shutdown (`ObservabilityTracer.flush()`), masquage PII étendu. |
-| **9. Smoke test LIVE script prêt** | **CONFORME** | CLI manuel [`scripts/smoke_test_live.py`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/scripts/smoke_test_live.py) verrouillé sous `LIVE_TESTS=1`, avec vérification de traces et option de suppression automatique `--delete-after`. |
-| **10. Runbooks et documentation complets** | **CONFORME** | 5 runbooks opérationnels dans [`docs/runbooks/`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/docs/runbooks/), matrice de configuration dans [`.env.example`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/.env.example). |
+| **9. Smoke test LIVE script prêt** | **CONFORME** | CLI manuel [`scripts/smoke_test_live.py`](scripts/smoke_test_live.py) verrouillé sous `LIVE_TESTS=1`, avec vérification de traces et option de suppression automatique `--delete-after`. |
+| **10. Runbooks et documentation complets** | **CONFORME** | 5 runbooks opérationnels dans [`docs/runbooks/`](docs/runbooks/), matrice de configuration dans [`.env.example`](.env.example). |
 
 ---
 
@@ -76,19 +76,19 @@ Ni LinkedIn ni X ne proposant de clé d'idempotence native pour la publication d
 1. **Verrou Transactionnel :** Le worker bascule le job en état `PUBLISHING` en base de données avant tout appel réseau.
 2. **Gestion des Coupures :** En cas de timeout réseau après l'envoi de la requête (`ReadTimeout`), une exception `SocialPublishUnknownError` est levée.
 3. **État de Sécurité PUBLISH_UNKNOWN :** Le job et la variante basculent en `PUBLISH_UNKNOWN`. **Aucun retry automatique n'est exécuté aveuglément.**
-4. **Réconciliation :** Le runbook [`docs/runbooks/publish_unknown_recovery.md`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/docs/runbooks/publish_unknown_recovery.md) et la méthode `worker.reconcile_job(...)` permettent de vérifier l'existence du post distant et de solder le job proprement vers `PUBLISHED` ou `PUBLISH_FAILED`.
+4. **Réconciliation :** Le runbook [`docs/runbooks/publish_unknown_recovery.md`](docs/runbooks/publish_unknown_recovery.md) et la méthode `worker.reconcile_job(...)` permettent de vérifier l'existence du post distant et de solder le job proprement vers `PUBLISHED` ou `PUBLISH_FAILED`.
 5. **Score Observabilité :** Émission du score Langfuse `publication_unknown` (0.5) pour alerter les équipes d'astreinte.
 
 ---
 
 ## 4. Documentation et Runbooks Opérationnels
 
-Les runbooks suivants ont été rédigés et validés dans [`docs/runbooks/`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/docs/runbooks/) :
-1. **[`kill_switch.md`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/docs/runbooks/kill_switch.md)** : Procédure d'arrêt d'urgence global (`KILL_SWITCH_GLOBAL=true`) ou par workspace, et réarmement contrôlé.
-2. **[`token_rotation.md`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/docs/runbooks/token_rotation.md)** : Procédure de rotation sans coupure pour la clé maîtresse du coffre OAuth (`SECRET_VAULT_KEY` avec `ACTIVE_VAULT_KEY_ID`), les secrets JWT (`JWT_ROTATION_KEYS`), et les clés d'API LLM.
-3. **[`reconnection_guide.md`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/docs/runbooks/reconnection_guide.md)** : Traitement du cycle de vie des jetons sociaux, alerte préventive J-7 pour LinkedIn et ré-authentification par l'Owner.
-4. **[`publish_unknown_recovery.md`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/docs/runbooks/publish_unknown_recovery.md)** : Procédure de diagnostic et de résolution des jobs orphelins ou bloqués en `PUBLISH_UNKNOWN`.
-5. **[`llm_circuit_breaker.md`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/docs/runbooks/llm_circuit_breaker.md)** : Gestion des quotas Gemini (429), état du disjoncteur (CLOSED / OPEN / HALF-OPEN), et garanties de sécurité du mode dégradé (interdiction stricte d'auto-publication sans validation humaine).
+Les runbooks suivants ont été rédigés et validés dans [`docs/runbooks/`](docs/runbooks/) :
+1. **[`kill_switch.md`](docs/runbooks/kill_switch.md)** : Procédure d'arrêt d'urgence global (`KILL_SWITCH_GLOBAL=true`) ou par workspace, et réarmement contrôlé.
+2. **[`token_rotation.md`](docs/runbooks/token_rotation.md)** : Procédure de rotation sans coupure pour la clé maîtresse du coffre OAuth (`SECRET_VAULT_KEY` avec `ACTIVE_VAULT_KEY_ID`), les secrets JWT (`JWT_ROTATION_KEYS`), et les clés d'API LLM.
+3. **[`reconnection_guide.md`](docs/runbooks/reconnection_guide.md)** : Traitement du cycle de vie des jetons sociaux, alerte préventive J-7 pour LinkedIn et ré-authentification par l'Owner.
+4. **[`publish_unknown_recovery.md`](docs/runbooks/publish_unknown_recovery.md)** : Procédure de diagnostic et de résolution des jobs orphelins ou bloqués en `PUBLISH_UNKNOWN`.
+5. **[`llm_circuit_breaker.md`](docs/runbooks/llm_circuit_breaker.md)** : Gestion des quotas Gemini (429), état du disjoncteur (CLOSED / OPEN / HALF-OPEN), et garanties de sécurité du mode dégradé (interdiction stricte d'auto-publication sans validation humaine).
 
 ---
 
@@ -111,7 +111,7 @@ Vérifiez que les portails développeurs LinkedIn et X ont bien enregistré l'UR
 5. Vérifiez la confirmation sur le callback et interrogez `GET /v1/oauth/accounts` pour confirmer que le compte apparaît en statut `ACTIVE`.
 
 ### Étape 3 : Exécution du Script de Smoke Test Live
-Le script [`scripts/smoke_test_live.py`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/scripts/smoke_test_live.py) est spécialement conçu pour cette phase :
+Le script [`scripts/smoke_test_live.py`](scripts/smoke_test_live.py) est spécialement conçu pour cette phase :
 ```bash
 # Activation des flags de sécurité pour autoriser l'appel réseau
 export LIVE_TESTS=1

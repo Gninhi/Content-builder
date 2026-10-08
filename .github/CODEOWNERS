@@ -1,0 +1,8 @@
+# CODEOWNERS for ContentOps Harness
+# Global owner for the entire repository
+* @Gninhi
+
+# Security and supply chain definitions
+/packages/security/ @Gninhi
+/infra/ @Gninhi
+/.github/ @Gninhi
