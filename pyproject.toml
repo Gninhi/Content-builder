@@ -54,8 +54,17 @@ ignore_missing_imports = true
 check_untyped_defs = false
 warn_return_any = false
 
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501", "W291", "W292", "W293"]
+
 [tool.ruff.lint.per-file-ignores]
 "apps/api/main.py" = ["E402"]
+"scripts/*.py" = ["E402"]
 
 
 
