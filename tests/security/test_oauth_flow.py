@@ -9,7 +9,7 @@ from packages.security.auth import create_access_token, Role
 from packages.security.oauth_state import oauth_state_manager
 from packages.connectors.social.vault import EncryptedOAuthTokenVault
 from infra.db.database import SessionLocal
-from infra.db.models import ConnectedSocialAccountModel
+from infra.db.models import ConnectedSocialAccountModel, WorkspaceModel
 
 client = TestClient(app)
 
@@ -25,6 +25,14 @@ def clean_oauth_env():
     os.environ["X_CLIENT_ID"] = "test_x_client_id"
     os.environ["X_CLIENT_SECRET"] = "test_x_client_secret"
     os.environ["X_REDIRECT_URI"] = "http://localhost:8000/v1/oauth/callback/x"
+
+    # Ensure required test workspaces exist to satisfy foreign key constraints on PostgreSQL
+    with SessionLocal() as db:
+        for ws_id in ["ws_test_oauth", "ws_li_connected", "ws_x_connected", "ws_to_disconnect", "ws_replay", "ws_mismatch"]:
+            if not db.query(WorkspaceModel).filter_by(id=ws_id).first():
+                db.add(WorkspaceModel(id=ws_id, name=f"Workspace {ws_id}", owner_id="owner_1"))
+        db.commit()
+
     yield
     os.environ.clear()
     os.environ.update(old_env)

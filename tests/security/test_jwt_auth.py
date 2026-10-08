@@ -3,6 +3,7 @@ from datetime import datetime, timezone, timedelta
 from fastapi.testclient import TestClient
 import jwt
 
+import pytest
 from apps.api.main import app
 from packages.security.auth import (
     create_access_token,
@@ -11,8 +12,34 @@ from packages.security.auth import (
     JWT_SECRET_KEY,
     Role
 )
+from infra.db.database import SessionLocal
+from infra.db.models import WorkspaceModel, BrandProfileModel
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def ensure_default_brand_profile():
+    """Ensures ws_default and brand profile exist in database for authenticated endpoints."""
+    with SessionLocal() as db:
+        ws = db.query(WorkspaceModel).filter_by(id="ws_default").first()
+        if not ws:
+            db.add(WorkspaceModel(id="ws_default", name="Default Workspace", owner_id="owner_1"))
+            db.commit()
+        bp = db.query(BrandProfileModel).filter_by(workspace_id="ws_default").first()
+        if not bp:
+            db.add(BrandProfileModel(
+                id="bp_default",
+                workspace_id="ws_default",
+                version=1,
+                audience=["Tech"],
+                voice="Professional",
+                pillars=["AI"],
+                prohibited_topics=[],
+                cta_policy={}
+            ))
+            db.commit()
+    yield
 
 
 def test_forged_x_user_role_header_without_jwt_is_rejected():
