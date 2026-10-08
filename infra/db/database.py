@@ -13,7 +13,9 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./contentops.db")
 if DATABASE_URL.startswith("sqlite+aiosqlite"):
     SYNC_DATABASE_URL = DATABASE_URL.replace("sqlite+aiosqlite", "sqlite")
 elif DATABASE_URL.startswith("postgresql+asyncpg"):
-    SYNC_DATABASE_URL = DATABASE_URL.replace("postgresql+asyncpg", "postgresql")
+    SYNC_DATABASE_URL = DATABASE_URL.replace("postgresql+asyncpg", "postgresql+psycopg2")
+elif DATABASE_URL.startswith("postgresql://"):
+    SYNC_DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://")
 else:
     SYNC_DATABASE_URL = DATABASE_URL
 

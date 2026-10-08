@@ -29,7 +29,9 @@ def get_url() -> str:
         if db_env_url.startswith("sqlite+aiosqlite"):
             return db_env_url.replace("sqlite+aiosqlite", "sqlite")
         elif db_env_url.startswith("postgresql+asyncpg"):
-            return db_env_url.replace("postgresql+asyncpg", "postgresql")
+            return db_env_url.replace("postgresql+asyncpg", "postgresql+psycopg2")
+        elif db_env_url.startswith("postgresql://"):
+            return db_env_url.replace("postgresql://", "postgresql+psycopg2://")
         return db_env_url
 
     if config_url and config_url != "driver://user:pass@localhost/dbname":

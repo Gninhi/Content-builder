@@ -69,7 +69,7 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/contentops_test
+      DATABASE_URL: postgresql+psycopg2://postgres:postgrespassword@localhost:5432/contentops_test
       REDIS_URL: redis://localhost:6379/0
       ENV: production
       JWT_SECRET_KEY: ci-very-strong-production-test-jwt-secret-key-32b!
