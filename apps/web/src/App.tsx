@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { ToastProvider } from './context/ToastContext';
 import { AppShell } from './components/layout/AppShell';
 
 // Screens
@@ -14,6 +15,7 @@ import { InsightsScreen } from './screens/InsightsScreen';
 import { BrandProfileScreen } from './screens/BrandProfileScreen';
 import { ConnectionsScreen } from './screens/ConnectionsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { AgentsScreen } from './screens/AgentsScreen';
 
 const MainRouter: React.FC = () => {
   const { isAuthenticated } = useAuth();
@@ -60,6 +62,8 @@ const MainRouter: React.FC = () => {
         return <ConnectionsScreen />;
       case 'settings':
         return <SettingsScreen />;
+      case 'agents':
+        return <AgentsScreen />;
       default:
         return <DashboardScreen onNavigate={navigateTo} />;
     }
@@ -77,7 +81,9 @@ export const App: React.FC = () => {
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
-          <MainRouter />
+          <ToastProvider>
+            <MainRouter />
+          </ToastProvider>
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>
@@ -85,3 +91,4 @@ export const App: React.FC = () => {
 };
 
 export default App;
+

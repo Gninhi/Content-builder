@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { apiClient } from '../lib/api';
 import { InboxVariant } from '../types/api';
 import { Button } from '../components/common/Button';
@@ -26,6 +27,7 @@ import {
 export const InboxScreen: React.FC = () => {
   const { t } = useLanguage();
   const { session, canApprove, canEdit } = useAuth();
+  const { showToast } = useToast();
 
   const [variants, setVariants] = useState<InboxVariant[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
@@ -103,24 +105,42 @@ export const InboxScreen: React.FC = () => {
 
     setActionLoading(true);
     try {
-      const payload: any = {
-        decision: decision === 'rewrite' ? 'request_rewrite' : decision,
-        reviewer_id: session?.user_id || 'anonymous_reviewer',
-        feedback: feedback || undefined,
-      };
-
-      if (isEditing) {
-        payload.edited_payload = {
-          hook: editHook,
-          body: editBody,
-          cta: editCta,
+      if (decision === 'rewrite') {
+        const res = await apiClient<{ message: string }>(
+          `/v1/content/${selectedVariant.id}/rewrite`,
+          {
+            method: 'POST',
+            body: JSON.stringify({ feedback: feedback || 'Améliorer le style et la clarté' }),
+          }
+        );
+        showToast('success', res.message || 'Brouillon réécrit avec succès par l’agent !');
+      } else {
+        const payload: any = {
+          decision,
+          reviewer_id: session?.user_id || 'anonymous_reviewer',
+          feedback: feedback || undefined,
         };
-      }
 
-      await apiClient(`/v1/content/${selectedVariant.id}/approve`, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
+        if (isEditing) {
+          payload.edited_payload = {
+            hook: editHook,
+            body: editBody,
+            cta: editCta,
+          };
+        }
+
+        await apiClient(`/v1/content/${selectedVariant.id}/approve`, {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+
+        showToast(
+          'success',
+          decision === 'approve'
+            ? 'Brouillon approuvé et scellé cryptographiquement !'
+            : 'Brouillon rejeté avec succès.'
+        );
+      }
 
       // Refetch inbox only upon confirmed server success
       await fetchInbox();
@@ -128,7 +148,7 @@ export const InboxScreen: React.FC = () => {
       setFeedbackComment('');
       setConfirmApproveOpen(false);
     } catch (err: any) {
-      alert(`Erreur d'approbation: ${err.message || 'Échec de la validation'}`);
+      showToast('error', `Erreur d'action : ${err.message || 'Échec de la validation'}`);
     } finally {
       setActionLoading(false);
     }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { apiClient } from '../lib/api';
 import { Workspace } from '../types/api';
 import { Button } from '../components/common/Button';
@@ -16,6 +17,7 @@ import {
 export const SettingsScreen: React.FC = () => {
   const { t } = useLanguage();
   const { session, isOwner } = useAuth();
+  const { showToast } = useToast();
 
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,8 +56,14 @@ export const SettingsScreen: React.FC = () => {
       });
       await fetchWorkspace();
       setKillSwitchModalOpen(false);
+      showToast(
+        targetState ? 'warning' : 'success',
+        targetState
+          ? 'KILL SWITCH ACTIVÉ : Toutes les publications sont verrouillées en urgence.'
+          : 'KILL SWITCH DÉSACTIVÉ : Système nominal rétabli.'
+      );
     } catch (err: any) {
-      alert(`Erreur de modification du Kill Switch : ${err.message}`);
+      showToast('error', `Erreur de modification du Kill Switch : ${err.message}`);
     } finally {
       setTogglingKillSwitch(false);
     }

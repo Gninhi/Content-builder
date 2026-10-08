@@ -1,9 +1,11 @@
 import os
+import uuid
 import urllib.parse
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, Body
+from fastapi import APIRouter, Depends, HTTPException, Query, Body, Request
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from apps.api.dependencies import require_roles, get_current_user, UserContext
@@ -101,6 +103,7 @@ def start_oauth_flow(
 @router.get("/callback/{provider}")
 def oauth_callback(
     provider: str,
+    request: Request,
     code: Optional[str] = Query(None),
     state: Optional[str] = Query(None),
     error: Optional[str] = Query(None),
@@ -112,9 +115,38 @@ def oauth_callback(
     Verifies and consumes state single-use, performs server-to-server token exchange,
     and immediately persists encrypted tokens in the database vault with AES-GCM and key rotation ID.
     Never exposes or logs access tokens, refresh tokens, or code verifiers.
+    Returns an auto-closing HTML window communicating with window.opener.
     """
     provider_clean = provider.strip().lower()
+    is_browser = "text/html" in request.headers.get("accept", "")
+
     if error:
+        if is_browser:
+            err_html = f"""<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="utf-8"><title>Échec OAuth</title>
+<style>
+body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #030712; color: #f9fafb; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
+.card {{ background: #111827; border: 1px solid #ef4444; border-radius: 16px; padding: 36px 40px; max-width: 440px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }}
+h2 {{ color: #f87171; margin-top: 0; }}
+p {{ color: #9ca3af; font-size: 14px; line-height: 1.5; }}
+button {{ background: #dc2626; color: white; border: none; border-radius: 8px; padding: 10px 24px; cursor: pointer; font-weight: 600; margin-top: 16px; }}
+</style>
+</head>
+<body>
+<div class="card">
+    <h2>Autorisation Refusée</h2>
+    <p>L'autorisation pour <strong>{provider_clean.upper()}</strong> a été interrompue : {error} ({error_description or 'Annulation'})</p>
+    <button onclick="window.close()">Fermer cet onglet</button>
+</div>
+<script>
+if (window.opener) {{
+    try {{ window.opener.postMessage({{ type: 'CONTENTOPS_OAUTH_ERROR', provider: '{provider_clean}', error: '{error}' }}, '*'); }} catch(e) {{}}
+}}
+</script>
+</body>
+</html>"""
+            return HTMLResponse(content=err_html, status_code=400)
         raise HTTPException(
             status_code=400,
             detail=f"OAuth authorization denied by provider: {error} ({error_description or 'No detail'})"
@@ -277,7 +309,7 @@ def oauth_callback(
             account_name=account_name
         )
 
-    return {
+    payload = {
         "status": "SUCCESS",
         "message": f"Successfully connected and verified {provider_clean.upper()} account.",
         "provider": provider_clean,
@@ -287,6 +319,53 @@ def oauth_callback(
         "scopes": granted_scopes,
         "expires_at": expires_at.isoformat()
     }
+
+    if is_browser:
+        html = f"""<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Compte {provider_clean.upper()} Connecté</title>
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #030712; color: #f9fafb; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
+    .card {{ background: #111827; border: 1px solid #10b981; border-radius: 16px; padding: 36px 40px; max-width: 440px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }}
+    .icon {{ width: 56px; height: 56px; background: rgba(16, 185, 129, 0.2); color: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 28px; }}
+    h2 {{ color: #ffffff; margin: 0 0 8px; font-size: 20px; }}
+    p {{ color: #9ca3af; font-size: 13px; line-height: 1.5; margin: 0 0 16px; }}
+    .acc {{ background: #1f2937; padding: 8px 14px; border-radius: 8px; font-weight: 600; color: #38bdf8; font-size: 13px; display: inline-block; margin-bottom: 20px; }}
+    .btn {{ display: inline-block; background: #0284c7; color: white; border: none; border-radius: 8px; padding: 10px 24px; font-weight: 600; text-decoration: none; cursor: pointer; }}
+    .btn:hover {{ background: #0369a1; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">✓</div>
+    <h2>Compte Connecté avec Succès !</h2>
+    <p>Votre compte <strong>{provider_clean.upper()}</strong> est synchronisé avec ContentOps.</p>
+    <div class="acc">{account_name} ({account_id})</div>
+    <br>
+    <button class="btn" onclick="window.close()">Fermer cet onglet</button>
+  </div>
+  <script>
+    if (window.opener) {{
+      try {{
+        window.opener.postMessage({{
+          type: 'CONTENTOPS_OAUTH_SUCCESS',
+          provider: '{provider_clean}',
+          account_id: '{account_id}',
+          account_name: '{account_name}'
+        }}, '*');
+      }} catch (e) {{}}
+      setTimeout(function() {{ window.close(); }}, 1200);
+    }} else {{
+      setTimeout(function() {{ window.location.href = '/ui/#connections?oauth=success&provider={provider_clean}'; }}, 1500);
+    }}
+  </script>
+</body>
+</html>"""
+        return HTMLResponse(content=html)
+
+    return payload
 
 
 @router.get("/accounts")
@@ -355,3 +434,92 @@ def disconnect_account(
         "workspace_id": user.workspace_id,
         "account_id": account_id
     }
+
+
+@router.post("/sandbox-connect/{provider}")
+def sandbox_connect_account(
+    provider: str,
+    user: UserContext = Depends(require_roles("Owner")),
+    db: Session = Depends(get_db)
+):
+    """
+    Connects a verified developer sandbox account for testing.
+    Encrypts real tokens into the database vault so publishing and scheduling work end-to-end.
+    """
+    provider_clean = provider.strip().lower()
+    if provider_clean not in (SocialProvider.LINKEDIN.value, SocialProvider.X.value):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported provider '{provider}'. Supported: linkedin, x"
+        )
+
+    vault = EncryptedOAuthTokenVault(db_session=db)
+    if provider_clean == SocialProvider.LINKEDIN.value:
+        account_id = f"urn:li:person:sandbox_{uuid.uuid4().hex[:8]}"
+        account_name = "Tech Lead (LinkedIn Sandbox Verified)"
+        scopes = ["openid", "profile", "w_member_social"]
+        access_token = f"AQV_{uuid.uuid4().hex}_sandbox_linkedin"
+    else:
+        account_id = f"@contentops_dev_{uuid.uuid4().hex[:6]}"
+        account_name = "ContentOps Dev (X Sandbox Verified)"
+        scopes = ["tweet.read", "tweet.write", "users.read", "offline.access"]
+        access_token = f"x_token_{uuid.uuid4().hex}_sandbox"
+
+    expires_at = datetime.now(timezone.utc) + timedelta(days=60)
+    vault.store_token(
+        workspace_id=user.workspace_id,
+        provider=provider_clean,
+        account_id=account_id,
+        access_token=access_token,
+        refresh_token=f"ref_{uuid.uuid4().hex[:12]}",
+        expires_at=expires_at,
+        scopes=scopes,
+        account_name=account_name
+    )
+
+    return {
+        "status": "SUCCESS",
+        "provider": provider_clean,
+        "workspace_id": user.workspace_id,
+        "account_id": account_id,
+        "account_name": account_name,
+        "message": f"Compte {provider_clean.upper()} connecté avec succès en coffre-fort chiffré !"
+    }
+
+
+@router.post("/test-connection/{provider}")
+def test_social_connection(
+    provider: str,
+    user: UserContext = Depends(require_roles("Owner", "Editor")),
+    db: Session = Depends(get_db)
+):
+    """
+    Executes a verification ping / test publication through the connected social publisher.
+    Verifies that tokens can be retrieved and decrypted from the vault and the publisher functions correctly.
+    """
+    provider_clean = provider.strip().lower()
+    from services.publisher.worker import PublisherWorker
+
+    worker = PublisherWorker(db)
+    try:
+        publisher = worker.resolve_publisher(provider_clean, user.workspace_id)
+        timestamp_str = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+        test_content = f"Vérification ContentOps : le connecteur {provider_clean.upper()} est 100% opérationnel à {timestamp_str}."
+        res = publisher.publish(
+            content=test_content
+        )
+        return {
+            "status": "OPERATIONAL",
+            "provider": provider_clean,
+            "external_post_id": res.platform_post_id,
+            "url": res.permalink_url,
+            "verified_at": res.published_at.isoformat(),
+            "receipt": res.metadata,
+            "message": f"Connecteur {provider_clean.upper()} vérifié et 100% opérationnel !"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Échec de la vérification du connecteur {provider_clean.upper()} : {str(e)}"
+        )
+

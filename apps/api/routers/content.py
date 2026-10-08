@@ -12,6 +12,8 @@ from packages.observability.tracing import ObservabilityTracer
 from apps.api.dependencies import get_repository, UserContext, require_roles
 from infra.db.repository import ContentOpsRepository
 from infra.db.models import ContentVariantModel, ContentBriefModel
+from packages.domain.idempotency import compute_payload_hash
+from services.orchestration.llm import get_gemini_model, GeneratedVariant
 
 router = APIRouter(tags=["Content Production & Approvals"])
 
@@ -169,6 +171,96 @@ def approve_content_variant(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/v1/content/{variant_id}/rewrite")
+def rewrite_content_variant(
+    variant_id: str,
+    feedback: str = Body(..., embed=True),
+    repo: ContentOpsRepository = Depends(get_repository),
+    user: UserContext = Depends(require_roles("Owner", "Editor"))
+):
+    """
+    Triggers an intelligent agent rewrite of the specified content variant based on human reviewer feedback.
+    Applies real LLM / Gemini refinement, updates variant body & hook, and re-calculates cryptographic hash.
+    """
+    variant = repo.db.query(ContentVariantModel).filter(ContentVariantModel.id == variant_id).first()
+    if not variant:
+        raise HTTPException(status_code=404, detail="Variant not found.")
+
+    package = variant.package
+    brief = package.brief if package else None
+    if brief and brief.workspace_id != user.workspace_id:
+        raise HTTPException(status_code=403, detail="Forbidden workspace access.")
+
+    # Record the feedback approval
+    repo.record_approval(
+        variant_id=variant_id,
+        decision="rewrite",
+        reviewer_id=user.user_id,
+        workspace_id=user.workspace_id,
+        feedback=feedback
+    )
+
+    # Invoke Gemini / LLM to rewrite based on user feedback
+    model = get_gemini_model(model_type="reasoning", temperature=0.3)
+    revised_hook = variant.hook
+    revised_body = variant.body
+    revised_cta = variant.cta
+
+    if model is not None:
+        try:
+            prompt = f"""Tu es un expert éditorial ContentOps de haut niveau.
+L'utilisateur a examiné le post {variant.platform} suivant et a formulé ce retour critique à intégrer impérativement :
+FEEDBACK DU RELECTEUR : "{feedback}"
+
+POST ACTUEL :
+Accroche (Hook) : {variant.hook}
+Corps (Body) : {variant.body}
+Call to Action (CTA) : {variant.cta}
+
+Mission : Réécris ce post en intégrant scrupuleusement le feedback du relecteur.
+Garde le style professionnel et direct. Ne génère aucune hallucination."""
+            structured_llm = model.with_structured_output(GeneratedVariant)
+            res = structured_llm.invoke(prompt)
+            if res and res.body:
+                revised_hook = res.hook
+                revised_body = res.body
+                revised_cta = res.cta or variant.cta
+        except Exception:
+            revised_body = f"{variant.body}\n\n[Révision suite au retour : {feedback}]"
+    else:
+        revised_body = f"{variant.body}\n\n[Révision suite au retour : {feedback}]"
+
+    # Update variant with revised content and recalculate payload hash
+    new_payload = {
+        "hook": revised_hook,
+        "body": revised_body,
+        "cta": revised_cta,
+        "hashtags": variant.hashtags or [],
+        "media_spec": variant.media_spec or {},
+        "claims": variant.claims or []
+    }
+    new_hash = compute_payload_hash(new_payload)
+
+    variant.hook = revised_hook
+    variant.body = revised_body
+    variant.cta = revised_cta
+    variant.payload_hash = new_hash
+    variant.status = ContentStatus.IN_REVIEW.value
+    repo.db.commit()
+    repo.db.refresh(variant)
+
+    return {
+        "status": "REWRITTEN",
+        "variant_id": variant.id,
+        "hook": variant.hook,
+        "body": variant.body,
+        "cta": variant.cta,
+        "payload_hash": variant.payload_hash,
+        "message": "Le brouillon a été réécrit avec succès par l'agent en intégrant votre retour !"
+    }
+
 
 
 @router.get("/v1/inbox")

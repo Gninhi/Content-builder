@@ -22,7 +22,7 @@ engine = create_engine(
     connect_args={"check_same_thread": False} if "sqlite" in SYNC_DATABASE_URL else {}
 )
 
-SessionLocal = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
+SessionLocal = scoped_session(sessionmaker(autocommit=False, autoflush=False, expire_on_commit=False, bind=engine))
 
 Base = declarative_base()
 
@@ -34,7 +34,7 @@ def get_db_session():
     try:
         yield db
     finally:
-        db.close()
+        SessionLocal.remove()
 
 
 def get_db():
@@ -43,7 +43,7 @@ def get_db():
     try:
         yield db
     finally:
-        db.close()
+        SessionLocal.remove()
 
 
 def init_db():

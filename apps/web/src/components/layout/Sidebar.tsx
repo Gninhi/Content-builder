@@ -81,6 +81,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: null,
     },
     {
+      id: 'agents',
+      label: "Banc d'Essai Agents",
+      icon: Activity,
+      badge: 'Live',
+      badgeVariant: 'success' as const,
+    },
+    {
       id: 'settings',
       label: t.nav.settings,
       icon: Sliders,

@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
 import uuid
@@ -307,7 +307,8 @@ class ContentOpsRepository:
             next_status = ContentStateMachine.transition(current_status, ContentStatus.APPROVED)
         elif decision == "reject":
             next_status = ContentStateMachine.transition(current_status, ContentStatus.REJECTED)
-        elif decision == "request_rewrite":
+        elif decision in ("request_rewrite", "rewrite"):
+            decision = "request_rewrite"
             next_status = ContentStateMachine.transition(current_status, ContentStatus.REWRITE_REQUESTED)
         else:
             raise ValueError(f"Unknown approval decision '{decision}'")
@@ -525,6 +526,7 @@ class ContentOpsRepository:
     def get_editorial_calendar(self, workspace_id: str) -> Dict[str, Any]:
         scheduled_jobs = (
             self.db.query(PublicationJobModel)
+            .options(joinedload(PublicationJobModel.variant))
             .join(ContentVariantModel)
             .join(ContentPackageModel)
             .join(ContentBriefModel)
@@ -551,7 +553,7 @@ class ContentOpsRepository:
                     "platform": j.platform,
                     "scheduled_at": j.scheduled_at,
                     "status": j.status,
-                    "body_snippet": j.variant.body[:80] + "..." if j.variant else ""
+                    "body_snippet": (j.variant.body[:80] + "...") if (j.variant and j.variant.body) else ""
                 }
                 for j in scheduled_jobs
             ],

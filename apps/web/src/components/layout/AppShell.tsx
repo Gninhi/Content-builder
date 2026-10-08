@@ -77,6 +77,8 @@ export const AppShell: React.FC<AppShellProps> = ({
         return t.nav.connections;
       case 'settings':
         return t.nav.settings;
+      case 'agents':
+        return (t.nav as any).agents || "Banc d'Essai Agents";
       default:
         return t.nav.dashboard;
     }

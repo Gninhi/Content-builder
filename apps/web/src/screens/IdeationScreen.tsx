@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { apiClient } from '../lib/api';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
@@ -36,6 +37,7 @@ interface Idea {
 export const IdeationScreen: React.FC = () => {
   const { t } = useLanguage();
   const { session, canEdit } = useAuth();
+  const { showToast } = useToast();
 
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,12 +94,13 @@ export const IdeationScreen: React.FC = () => {
       });
 
       setModalOpen(false);
+      showToast('success', 'Nouvelles idées générées par l’agent LangGraph !');
       await fetchIdeas();
     } catch (err: any) {
       if (err.message?.toLowerCase().includes('tavily') || err.status === 502) {
         setDegradedTavily(true);
       }
-      alert(`Erreur de recherche d'idées : ${err.message || 'Échec du workflow'}`);
+      showToast('error', `Erreur de recherche d'idées : ${err.message || 'Échec du workflow'}`);
     } finally {
       setResearching(false);
       setResearchStep('');
@@ -128,10 +131,10 @@ export const IdeationScreen: React.FC = () => {
         }),
       });
 
-      alert('Brouillon généré avec succès ! Il est maintenant disponible dans la Revue HITL.');
+      showToast('success', 'Brouillon généré par les agents ! Redirection vers la Revue HITL...');
       window.location.hash = '#inbox';
     } catch (err: any) {
-      alert(`Erreur de transformation en brouillon : ${err.message}`);
+      showToast('error', `Erreur de transformation en brouillon : ${err.message}`);
     } finally {
       setConvertingId(null);
     }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { apiClient } from '../lib/api';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
@@ -24,6 +25,7 @@ interface Insight {
 export const InsightsScreen: React.FC = () => {
   const { t } = useLanguage();
   const { session } = useAuth();
+  const { showToast } = useToast();
 
   const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('7d');
   const [loading, setLoading] = useState(true);
@@ -56,8 +58,9 @@ export const InsightsScreen: React.FC = () => {
         }),
       });
       setInsights(res.insights || []);
+      showToast('success', 'Recommandations stratégiques générées par l’agent LangGraph !');
     } catch (err: any) {
-      alert(`Erreur d'analyse stratégique : ${err.message}`);
+      showToast('error', `Erreur d'analyse stratégique : ${err.message}`);
     } finally {
       setGeneratingInsights(false);
     }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { apiClient } from '../lib/api';
 import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
@@ -8,11 +9,13 @@ import { Skeleton } from '../components/common/Skeleton';
 import { ErrorState } from '../components/common/ErrorState';
 import { EmptyState } from '../components/common/EmptyState';
 import { Dialog } from '../components/common/Dialog';
+import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { Input } from '../components/common/Input';
 import {
   Clock,
   AlertTriangle,
   RefreshCw,
+  Zap,
 } from 'lucide-react';
 
 interface CalendarPost {
@@ -29,7 +32,8 @@ interface CalendarPost {
 
 export const CalendarScreen: React.FC = () => {
   const { t } = useLanguage();
-  const { session, canEdit } = useAuth();
+  const { session, canEdit, isOwner } = useAuth();
+  const { showToast } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +47,9 @@ export const CalendarScreen: React.FC = () => {
   const [selectedPost, setSelectedPost] = useState<CalendarPost | null>(null);
   const [newDateStr, setNewDateStr] = useState<string>('');
   const [isRescheduling, setIsRescheduling] = useState<boolean>(false);
+  const [isPublishingNow, setIsPublishingNow] = useState<boolean>(false);
+  const [cancelTargetJobId, setCancelTargetJobId] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState<boolean>(false);
   const [collisionWarning, setCollisionWarning] = useState<string | null>(null);
 
   const fetchCalendar = async () => {
@@ -108,23 +115,47 @@ export const CalendarScreen: React.FC = () => {
           scheduled_at: new Date(newDateStr).toISOString(),
         }),
       });
+      showToast('success', 'Publication reprogrammée avec succès !');
       await fetchCalendar();
       setSelectedPost(null);
     } catch (err: any) {
-      alert(`Erreur de programmation : ${err.message}`);
+      showToast('error', `Erreur de programmation : ${err.message}`);
     } finally {
       setIsRescheduling(false);
     }
   };
 
-  const handleCancelJob = async (jobId: string) => {
-    if (!confirm('Confirmer l’annulation de cette publication planifiée ?')) return;
+  const handlePublishNow = async (jobId: string) => {
+    if (!isOwner) {
+      showToast('error', 'Seul le rôle Owner peut déclencher la publication immédiate.');
+      return;
+    }
+    setIsPublishingNow(true);
     try {
-      await apiClient(`/v1/publications/${jobId}/cancel`, { method: 'POST' });
+      await apiClient(`/v1/publications/${jobId}/publish-now`, { method: 'POST' });
+      showToast('success', 'Publication diffusée et scellée en base avec succès !');
       await fetchCalendar();
       setSelectedPost(null);
     } catch (err: any) {
-      alert(`Erreur d'annulation : ${err.message}`);
+      showToast('error', `Erreur de publication immédiate : ${err.message}`);
+    } finally {
+      setIsPublishingNow(false);
+    }
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!cancelTargetJobId) return;
+    setIsCancelling(true);
+    try {
+      await apiClient(`/v1/publications/${cancelTargetJobId}/cancel`, { method: 'POST' });
+      showToast('info', 'Publication planifiée annulée.');
+      await fetchCalendar();
+      setCancelTargetJobId(null);
+      setSelectedPost(null);
+    } catch (err: any) {
+      showToast('error', `Erreur d'annulation : ${err.message}`);
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -324,32 +355,62 @@ export const CalendarScreen: React.FC = () => {
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-4 border-t border-slate-800">
-              {selectedPost.job_id && (
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => handleCancelJob(selectedPost.job_id!)}
-                >
-                  Annuler le job
-                </Button>
-              )}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-slate-800">
+              <div className="flex items-center gap-2">
+                {selectedPost.job_id && (
+                  <>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={!isOwner}
+                      isLoading={isPublishingNow}
+                      onClick={() => handlePublishNow(selectedPost.job_id!)}
+                      title={!isOwner ? 'Réservé au rôle Owner' : 'Publier immédiatement sans attendre'}
+                    >
+                      <Zap className="h-3.5 w-3.5 mr-1" />
+                      Diffuser maintenant
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      disabled={!isOwner}
+                      onClick={() => setCancelTargetJobId(selectedPost.job_id!)}
+                      title={!isOwner ? 'Réservé au rôle Owner' : 'Annuler la planification'}
+                    >
+                      Annuler le job
+                    </Button>
+                  </>
+                )}
+              </div>
               <div className="flex gap-2 ml-auto">
-                <Button variant="ghost" onClick={() => setSelectedPost(null)}>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedPost(null)}>
                   Fermer
                 </Button>
                 <Button
-                  variant="primary"
+                  variant="secondary"
+                  size="sm"
                   isLoading={isRescheduling}
                   onClick={handleReschedule}
                 >
-                  Confirmer
+                  Reprogrammer
                 </Button>
               </div>
             </div>
           </div>
         </Dialog>
       )}
+
+      {/* Cancellation Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={Boolean(cancelTargetJobId)}
+        onClose={() => setCancelTargetJobId(null)}
+        onConfirm={handleConfirmCancel}
+        title="Annuler la publication planifiée"
+        message="Êtes-vous certain de vouloir annuler définitivement ce travail de publication ?"
+        confirmText="Confirmer l'annulation"
+        variant="danger"
+        isLoading={isCancelling}
+      />
     </div>
   );
 };

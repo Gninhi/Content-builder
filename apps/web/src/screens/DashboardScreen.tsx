@@ -80,9 +80,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
       const accountsRes = await apiClient<{ accounts: any[] }>('/v1/oauth/accounts');
       const accounts = accountsRes.accounts || [];
       const hasLinkedIn = accounts.some(
-        (a) => a.provider === 'linkedin' && a.status === 'connected'
+        (a) => a.provider?.toLowerCase() === 'linkedin' && (a.status === 'ACTIVE' || a.status === 'connected')
       );
-      const hasX = accounts.some((a) => a.provider === 'x' && a.status === 'connected');
+      const hasX = accounts.some(
+        (a) => a.provider?.toLowerCase() === 'x' && (a.status === 'ACTIVE' || a.status === 'connected')
+      );
       setLinkedInStatus(hasLinkedIn ? 'connected' : 'disconnected');
       setXStatus(hasX ? 'connected' : 'disconnected');
     } catch (err: any) {
