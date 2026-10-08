@@ -90,7 +90,7 @@ jobs:
       - name: Install Application Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]" pytest-cov alembic
+          pip install -r requirements.txt pytest-cov alembic
 
       - name: Verify Alembic Migrations Up and Down
         run: |
@@ -118,10 +118,9 @@ jobs:
           python-version: "3.12"
 
       - name: Run Gitleaks Secret Scanner
-        uses: gitleaks/gitleaks-action@774e286395347e30d70da6b83f458ce3e1645e75 # v2.3.8
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_CONFIG: .gitleaks.toml
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | sudo tar -xz -C /usr/local/bin gitleaks
+          gitleaks detect --source . --config .gitleaks.toml --redact
 
       - name: Audit Dependencies for Known Vulnerabilities (pip-audit)
         run: |
