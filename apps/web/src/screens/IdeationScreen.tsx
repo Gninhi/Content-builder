@@ -289,37 +289,46 @@ export const IdeationScreen: React.FC = () => {
                   </p>
 
                   {/* Audience tags */}
-                  {idea.audience && idea.audience.length > 0 && (
-                    <div className="flex items-center gap-1.5 flex-wrap mb-3">
-                      <span className="text-[10px] text-txt-muted uppercase font-mono">{isEn ? 'Target:' : 'Cible:'}</span>
-                      {idea.audience.slice(0, 2).map((aud, i) => (
-                        <span key={i} className="text-[10px] bg-app px-1.5 py-0.5 rounded text-txt-secondary border border-border-subtle">
-                          {aud}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  {(() => {
+                    const rawAud: any = idea.audience;
+                    const audList: string[] = Array.isArray(rawAud)
+                      ? rawAud
+                      : typeof rawAud === 'string' && rawAud.trim()
+                      ? [rawAud.trim()]
+                      : [];
+                    if (audList.length === 0) return null;
+                    return (
+                      <div className="flex items-center gap-1.5 flex-wrap mb-3">
+                        <span className="text-[10px] text-txt-muted uppercase font-mono">{isEn ? 'Target:' : 'Cible:'}</span>
+                        {audList.slice(0, 2).map((aud, i) => (
+                          <span key={i} className="text-[10px] bg-app px-1.5 py-0.5 rounded text-txt-secondary border border-border-subtle">
+                            {String(aud)}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
 
                   {/* Grounded Evidence refs */}
-                  {idea.evidence_refs && idea.evidence_refs.length > 0 && (
+                  {Array.isArray(idea.evidence_refs) && idea.evidence_refs.length > 0 && (
                     <div className="space-y-1 py-2.5 border-t border-border-subtle mb-1">
                       <span className="text-[10px] font-mono text-txt-muted block uppercase tracking-wider">
                         {isEn ? 'Grounded Evidence' : 'Preuves et Ancrage'} ({idea.evidence_refs.length})
                       </span>
                       {idea.evidence_refs.slice(0, 2).map((ev: any, idx: number) => {
-                        const claim = typeof ev === 'string' ? ev : (ev.claim || ev.text || 'Fait vérifié');
-                        const sourceUrl = typeof ev === 'object' ? (ev.source_id || ev.url) : null;
+                        const claim = typeof ev === 'string' ? ev : (ev?.claim || ev?.text || ev?.fact || 'Fait vérifié');
+                        const sourceUrl = typeof ev === 'object' && ev ? (ev.source_id || ev.url || ev.source_url) : null;
                         return (
                           <div key={idx} className="text-[11px] text-txt-secondary flex items-start gap-1.5 bg-app/30 p-1.5 rounded border border-border-subtle">
                             <span className="text-accent">•</span>
                             <span className="line-clamp-1 flex-1 text-txt-primary">{claim}</span>
                             {sourceUrl && String(sourceUrl).startsWith('http') && (
                               <a
-                                href={sourceUrl}
+                                href={String(sourceUrl)}
                                 target="_blank"
                                 rel="noreferrer noopener"
                                 className="text-accent hover:underline shrink-0"
-                                title={sourceUrl}
+                                title={String(sourceUrl)}
                               >
                                 <ExternalLink className="h-3 w-3" />
                               </a>

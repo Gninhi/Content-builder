@@ -277,7 +277,17 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       'startViewTransition' in document &&
       resolvedMotion !== 'reduced'
     ) {
-      (document as any).startViewTransition(executeUpdate);
+      try {
+        const transition = (document as any).startViewTransition(executeUpdate);
+        if (transition?.finished && typeof transition.finished.catch === 'function') {
+          transition.finished.catch(() => {});
+        }
+        if (transition?.ready && typeof transition.ready.catch === 'function') {
+          transition.ready.catch(() => {});
+        }
+      } catch {
+        executeUpdate();
+      }
     } else {
       executeUpdate();
     }

@@ -4,6 +4,7 @@ import { LanguageProvider } from './context/LanguageContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import { AppShell } from './components/layout/AppShell';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 // Screens
 import { AuthScreen } from './screens/AuthScreen';
@@ -106,15 +107,17 @@ const MainRouter: React.FC = () => {
 
 export const App: React.FC = () => {
   return (
-    <ThemeProvider>
-      <LanguageProvider>
-        <AuthProvider>
-          <ToastProvider>
-            <MainRouter />
-          </ToastProvider>
-        </AuthProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+    <ErrorBoundary level="root">
+      <ThemeProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <MainRouter />
+            </ToastProvider>
+          </AuthProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 };
 

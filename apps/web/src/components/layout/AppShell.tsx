@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { apiClient } from '../../lib/api';
 import { InboxVariant, Workspace } from '../../types/api';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 import {
   LayoutDashboard,
   Inbox,
@@ -155,14 +156,16 @@ export const AppShell: React.FC<AppShellProps> = ({
           onOpenCommandMenu={() => setCommandMenuOpen(true)}
         />
 
-        {/* Scrollable Main Content */}
+        {/* Scrollable Main Content protected by Page-level ErrorBoundary */}
         <main
           id="main-content"
           tabIndex={-1}
           className="flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 lg:px-8 pb-20 lg:pb-8 focus:outline-none"
         >
           <div className="w-full max-w-7xl 2xl:max-w-[1720px] mx-auto">
-            {children}
+            <ErrorBoundary level="page" onNavigate={onNavigate} key={currentScreen}>
+              {children}
+            </ErrorBoundary>
           </div>
         </main>
 

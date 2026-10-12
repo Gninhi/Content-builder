@@ -70,6 +70,7 @@ Thumbs.db
 *.sqlite3
 contentops.db*
 artifacts/
+scratch/
 storage/sources/
 storage/checkpoints/
 storage/avatars/*.webp

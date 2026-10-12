@@ -425,7 +425,10 @@ export const VeilleScreen: React.FC<VeilleScreenProps> = ({ onNavigate }) => {
           {filteredSignals.map((signal) => {
             const axisProps = getAxisBadgeProps(signal.axis);
             const isConverting = convertingSignalId === signal.id;
-            const scoreOutOf100 = Math.round(signal.qualification_score * 20); // 0-5.0 scale to 0-100%
+            const scoreVal = typeof signal.qualification_score === 'number' && !isNaN(signal.qualification_score)
+              ? signal.qualification_score
+              : 0;
+            const scoreOutOf100 = Math.round(scoreVal * 20); // 0-5.0 scale to 0-100%
 
             return (
               <div
@@ -444,8 +447,8 @@ export const VeilleScreen: React.FC<VeilleScreenProps> = ({ onNavigate }) => {
                         className="text-[11px] font-mono font-bold text-accent px-1.5 py-0.5 bg-accent/10 rounded cursor-help"
                         title={
                           isEn
-                            ? `Editorial qualification score: ${signal.qualification_score.toFixed(1)}/5.0 (Authority, Freshness, Fact Density. Editorial index, not guarantee of truth)`
-                            : `Score de qualification éditoriale : ${signal.qualification_score.toFixed(1)}/5.0 (Autorité, Fraîcheur, Richesse factuelle. Indice éditorial, non garantie de vérité)`
+                            ? `Editorial qualification score: ${scoreVal.toFixed(1)}/5.0 (Authority, Freshness, Fact Density. Editorial index, not guarantee of truth)`
+                            : `Score de qualification éditoriale : ${scoreVal.toFixed(1)}/5.0 (Autorité, Fraîcheur, Richesse factuelle. Indice éditorial, non garantie de vérité)`
                         }
                       >
                         {scoreOutOf100}/100
@@ -459,7 +462,7 @@ export const VeilleScreen: React.FC<VeilleScreenProps> = ({ onNavigate }) => {
                       <span className="font-mono text-txt-secondary truncate max-w-[150px]">
                         {(() => {
                           try {
-                            return new URL(signal.canonical_url).hostname.replace('www.', '');
+                            return new URL(String(signal.canonical_url)).hostname.replace('www.', '');
                           } catch {
                             return 'source';
                           }
@@ -490,7 +493,7 @@ export const VeilleScreen: React.FC<VeilleScreenProps> = ({ onNavigate }) => {
                     <span>{signal.title}</span>
                     {signal.canonical_url && (
                       <a
-                        href={signal.canonical_url}
+                        href={String(signal.canonical_url)}
                         target="_blank"
                         rel="noreferrer noopener"
                         className="text-txt-muted hover:text-accent shrink-0 pt-0.5"
@@ -520,35 +523,40 @@ export const VeilleScreen: React.FC<VeilleScreenProps> = ({ onNavigate }) => {
                   )}
 
                   {/* Facts list with source links */}
-                  {signal.facts && signal.facts.length > 0 ? (
+                  {signal.facts && Array.isArray(signal.facts) && signal.facts.length > 0 ? (
                     <div className="space-y-1.5 py-2.5 border-t border-border-subtle">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[10px] font-mono text-txt-muted uppercase tracking-wider">
                           Faits vérifiés ({signal.facts.length})
                         </span>
                         <span className="text-[10px] text-status-success-text font-medium">
-                          {signal.facts.filter((f) => f.verified !== false).length}/{signal.facts.length} corroborés
+                          {signal.facts.filter((f) => f && f.verified !== false).length}/{signal.facts.length} corroborés
                         </span>
                       </div>
-                      {signal.facts.slice(0, 2).map((fact, i) => (
-                        <div key={i} className="flex items-start gap-1.5 text-[11px] text-txt-secondary bg-app/30 p-2 rounded border border-border-subtle">
-                          <CheckCircle2 className="h-3 w-3 text-status-success-text shrink-0 mt-0.5" />
-                          <div className="flex-1 min-w-0">
-                            <span className="line-clamp-2">{fact.claim}</span>
-                            {fact.source_id && (
-                              <a
-                                href={fact.source_id.startsWith('http') ? fact.source_id : (signal.canonical_url || '#')}
-                                target="_blank"
-                                rel="noreferrer noopener"
-                                className="inline-flex items-center gap-1 text-[10px] text-accent hover:underline mt-0.5 font-mono"
-                              >
-                                <span>Preuve source</span>
-                                <ExternalLink className="h-2.5 w-2.5" />
-                              </a>
-                            )}
+                      {signal.facts.slice(0, 2).map((fact, i) => {
+                        const f: any = fact;
+                        const claimText = typeof f === 'string' ? f : (f?.claim || f?.fact || 'Fait vérifié');
+                        const sourceUrl = typeof f === 'object' && f ? (f.source_url || f.source_id || f.url) : null;
+                        return (
+                          <div key={i} className="flex items-start gap-1.5 text-[11px] text-txt-secondary bg-app/30 p-2 rounded border border-border-subtle">
+                            <CheckCircle2 className="h-3 w-3 text-status-success-text shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <span className="line-clamp-2">{claimText}</span>
+                              {sourceUrl && String(sourceUrl).startsWith('http') && (
+                                <a
+                                  href={String(sourceUrl)}
+                                  target="_blank"
+                                  rel="noreferrer noopener"
+                                  className="inline-flex items-center gap-1 text-[10px] text-accent hover:underline mt-0.5 font-mono"
+                                >
+                                  <span>Preuve source</span>
+                                  <ExternalLink className="h-2.5 w-2.5" />
+                                </a>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="py-2 border-t border-border-subtle text-[11px] text-txt-muted italic">
