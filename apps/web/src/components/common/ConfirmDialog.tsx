@@ -1,7 +1,7 @@
 import React from 'react';
 import { Dialog } from './Dialog';
 import { Button } from './Button';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, AlertCircle } from 'lucide-react';
 
 export interface ConfirmDialogProps {
   isOpen: boolean;
@@ -33,22 +33,30 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   const finalConfirmLabel = confirmText || confirmLabel || 'Confirmer';
   const finalCancelLabel = cancelText || cancelLabel || 'Annuler';
 
+  const isDanger = variant === 'danger';
+
   return (
     <Dialog isOpen={isOpen} onClose={onClose} title={title} maxWidth="sm">
       <div className="space-y-4">
         <div className="flex items-start gap-3">
-          <div className="p-2.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 shrink-0">
-            <AlertTriangle className="w-5 h-5" />
+          <div
+            className={`p-2 rounded-md shrink-0 border ${
+              isDanger
+                ? 'bg-status-danger-bg text-status-danger-text border-status-danger-border'
+                : 'bg-status-warning-bg text-status-warning-text border-status-warning-border'
+            }`}
+          >
+            {isDanger ? <AlertCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
           </div>
-          <p className="text-sm text-slate-300 leading-relaxed pt-1">{message}</p>
+          <p className="text-sm text-txt-secondary leading-relaxed pt-0.5">{message}</p>
         </div>
 
-        <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
-          <Button variant="secondary" size="sm" onClick={onClose} disabled={isLoading}>
+        <div className="flex justify-end gap-2.5 pt-3 border-t border-border">
+          <Button variant="outline" size="sm" onClick={onClose} disabled={isLoading}>
             {finalCancelLabel}
           </Button>
           <Button
-            variant={variant === 'danger' ? 'danger' : 'primary'}
+            variant={isDanger ? 'danger' : 'primary'}
             size="sm"
             onClick={onConfirm}
             isLoading={isLoading}

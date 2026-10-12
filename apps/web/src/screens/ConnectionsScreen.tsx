@@ -224,44 +224,44 @@ export const ConnectionsScreen: React.FC = () => {
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-subtle pb-5">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-bold text-txt tracking-tight">
             {t.connections.title}
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-txt-secondary mt-1">
             Connecteurs officiels OAuth 2.0 PKCE. Connexions ouvertes en onglet externe pour garantir la persistance de session.
           </p>
         </div>
 
         <Button
-          variant="ghost"
+          variant="secondary"
           size="sm"
           onClick={() => fetchAccounts()}
-          className="text-xs text-slate-400"
+          className="text-xs min-h-[40px] sm:min-h-[36px]"
           title="Actualiser les statuts"
         >
-          <RefreshCw className="h-3.5 w-3.5 mr-1" />
+          <RefreshCw className="h-3.5 w-3.5 mr-1.5 text-txt-muted" />
           Actualiser
         </Button>
       </div>
 
       {/* Security Info Banner */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 text-xs text-slate-400 flex items-start gap-3">
-        <Lock className="h-4 w-4 text-sky-400 shrink-0 mt-0.5" />
+      <div className="rounded-xl border border-border-subtle bg-surface-subtle p-4 sm:p-5 text-xs text-txt-secondary flex items-start gap-3.5 shadow-sm">
+        <Lock className="h-4 w-4 text-accent shrink-0 mt-0.5" />
         <div>
-          <strong className="text-slate-200 block mb-0.5">Sécurité Zéro-Fuite & Coffre-Fort Chiffré</strong>
-          <span>
-            Les jetons d'accès ne transitent jamais dans l'URL ni dans le navigateur. Ils sont scellés côté serveur en base de données avec AES-256-GCM et clés tournantes.
+          <strong className="text-txt font-semibold block mb-1">Sécurité Zéro-Fuite & Coffre-Fort Chiffré</strong>
+          <span className="leading-relaxed text-txt-secondary">
+            Les jetons d'accès ne transitent jamais dans l'URL ni dans le navigateur. Ils sont scellés côté serveur en base de données avec AES-256-GCM et clés tournantes (AAD lié au workspace).
           </span>
         </div>
       </div>
 
       {!isOwner && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-xs text-amber-300 flex items-center gap-3">
-          <ShieldAlert className="h-4 w-4 text-amber-400 shrink-0" />
+        <div className="rounded-xl border border-status-warning-border bg-status-warning-bg p-4 text-xs sm:text-sm text-status-warning-text flex items-center gap-3">
+          <ShieldAlert className="h-5 w-5 shrink-0 text-status-warning-text" />
           <span>
-            Vous êtes connecté avec le rôle <strong>{session?.role}</strong>. Seul le rôle <strong>Owner</strong> est habilité à connecter ou révoquer les comptes tiers. Vous pouvez changer de rôle via le menu supérieur droit pour tester.
+            Vous êtes connecté avec le rôle <strong>{session?.role}</strong>. Seul le rôle <strong>Owner</strong> est habilité à connecter ou révoquer les comptes tiers. Vous pouvez changer de rôle via le sélecteur supérieur pour tester.
           </span>
         </div>
       )}
@@ -269,47 +269,51 @@ export const ConnectionsScreen: React.FC = () => {
       {/* Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* LinkedIn Account Card */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 flex flex-col justify-between space-y-5">
+        <div className="rounded-xl border border-border bg-surface p-6 flex flex-col justify-between space-y-5 shadow-sm hover:border-border-focus transition-colors">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0077b5]/20 text-[#0077b5] border border-[#0077b5]/30">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface-subtle text-accent border border-border-subtle">
                   <Share2 className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-base">LinkedIn</h3>
-                  <span className="text-xs text-slate-400 font-mono">w_member_social</span>
+                  <h3 className="font-semibold text-txt text-base">LinkedIn</h3>
+                  <span className="text-xs text-txt-muted font-mono">w_member_social</span>
                 </div>
               </div>
 
-              <Badge variant={linkedIn ? 'success' : 'neutral'} className="text-xs">
+              <Badge
+                variant={linkedIn ? 'success' : 'neutral'}
+                withDot
+                className="text-xs"
+              >
                 {linkedIn ? t.connections.status_connected : t.connections.status_disconnected}
               </Badge>
             </div>
 
             {linkedIn ? (
-              <div className="space-y-3 rounded-xl bg-slate-950/60 p-4 border border-slate-800 text-xs">
+              <div className="space-y-2.5 rounded-lg bg-surface-subtle p-4 border border-border-subtle text-xs">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Compte membre :</span>
-                  <span className="font-semibold text-slate-200">{linkedIn.account_name}</span>
+                  <span className="text-txt-muted">Compte membre :</span>
+                  <span className="font-medium text-txt">{linkedIn.account_name}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">ID d'entité :</span>
-                  <span className="font-mono text-slate-400 truncate max-w-[180px]">{linkedIn.account_id}</span>
+                  <span className="text-txt-muted">ID d'entité :</span>
+                  <span className="font-mono text-accent-txt truncate max-w-[180px]">{linkedIn.account_id}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Scopes autorisés :</span>
-                  <span className="text-sky-400">{linkedIn.scopes?.join(', ') || 'N/A'}</span>
+                  <span className="text-txt-muted">Scopes autorisés :</span>
+                  <span className="text-txt-secondary font-mono">{linkedIn.scopes?.join(', ') || 'N/A'}</span>
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-txt-secondary leading-relaxed">
                 Connectez un profil ou une page LinkedIn pour permettre la planification et la publication par les agents.
               </p>
             )}
           </div>
 
-          <div className="pt-2 space-y-2">
+          <div className="pt-2 space-y-2.5">
             {linkedIn ? (
               <div className="space-y-2">
                 <div className="flex gap-2">
@@ -318,10 +322,10 @@ export const ConnectionsScreen: React.FC = () => {
                     size="sm"
                     onClick={() => handleTestConnection('linkedin')}
                     isLoading={testingProvider === 'linkedin'}
-                    className="flex-1 text-xs"
+                    className="flex-1 text-xs min-h-[44px] font-medium"
                     title="Vérifier la validité du connecteur et tester la publication"
                   >
-                    <Zap className="h-3.5 w-3.5 mr-1" />
+                    <Zap className="h-3.5 w-3.5 mr-1.5" />
                     Tester le connecteur
                   </Button>
                   <Button
@@ -329,10 +333,10 @@ export const ConnectionsScreen: React.FC = () => {
                     size="sm"
                     disabled={!isOwner}
                     onClick={() => setDisconnectTarget(linkedIn)}
-                    className="text-xs"
+                    className="text-xs min-h-[44px]"
                     title={!isOwner ? 'Réservé au rôle Owner' : 'Déconnecter le compte'}
                   >
-                    <Unlink className="h-3.5 w-3.5 mr-1" />
+                    <Unlink className="h-3.5 w-3.5 mr-1.5" />
                     Déconnecter
                   </Button>
                 </div>
@@ -341,21 +345,21 @@ export const ConnectionsScreen: React.FC = () => {
                   size="sm"
                   disabled={!isOwner}
                   onClick={() => handleStartOAuth('linkedin')}
-                  className="w-full text-xs text-slate-400"
+                  className="w-full text-xs text-txt-muted hover:text-txt min-h-[40px]"
                   title="Ouvrir à nouveau la fenêtre d'autorisation dans un autre onglet"
                 >
-                  <ExternalLink className="h-3 w-3 mr-1" />
+                  <ExternalLink className="h-3 w-3 mr-1.5" />
                   Renouveler l'autorisation (Nouvel onglet)
                 </Button>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 <Button
                   variant="primary"
                   disabled={!isOwner || connectingProvider === 'linkedin'}
                   isLoading={connectingProvider === 'linkedin'}
                   onClick={() => handleStartOAuth('linkedin')}
-                  className="w-full justify-center text-xs"
+                  className="w-full justify-center text-xs min-h-[44px] font-medium"
                   title={!isOwner ? 'Réservé au rôle Owner' : "Ouvrir l'autorisation LinkedIn dans un autre onglet"}
                 >
                   <span>{t.connections.action_connect} LinkedIn (Onglet externe)</span>
@@ -367,10 +371,10 @@ export const ConnectionsScreen: React.FC = () => {
                   disabled={!isOwner || sandboxConnecting === 'linkedin'}
                   isLoading={sandboxConnecting === 'linkedin'}
                   onClick={() => handleSandboxConnect('linkedin')}
-                  className="w-full justify-center text-xs"
+                  className="w-full justify-center text-xs min-h-[44px] text-txt-secondary hover:text-txt"
                   title="Connecter un compte test en local sans redirection externe"
                 >
-                  <Zap className="h-3.5 w-3.5 mr-1 text-amber-400" />
+                  <Zap className="h-3.5 w-3.5 mr-1.5 text-accent" />
                   Connexion Immédiate Sandbox (Mode Test)
                 </Button>
               </div>
@@ -379,47 +383,51 @@ export const ConnectionsScreen: React.FC = () => {
         </div>
 
         {/* X (Twitter) Account Card */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 flex flex-col justify-between space-y-5">
+        <div className="rounded-xl border border-border bg-surface p-6 flex flex-col justify-between space-y-5 shadow-sm hover:border-border-focus transition-colors">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-800 text-white border border-slate-700">
-                  <span className="font-bold text-lg">𝕏</span>
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface-subtle text-txt border border-border-subtle">
+                  <span className="font-bold text-lg font-mono">𝕏</span>
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-base">X (Twitter)</h3>
-                  <span className="text-xs text-slate-400 font-mono">tweet.write, offline.access</span>
+                  <h3 className="font-semibold text-txt text-base">X (Twitter)</h3>
+                  <span className="text-xs text-txt-muted font-mono">tweet.write, offline.access</span>
                 </div>
               </div>
 
-              <Badge variant={xAccount ? 'success' : 'neutral'} className="text-xs">
+              <Badge
+                variant={xAccount ? 'success' : 'neutral'}
+                withDot
+                className="text-xs"
+              >
                 {xAccount ? t.connections.status_connected : t.connections.status_disconnected}
               </Badge>
             </div>
 
             {xAccount ? (
-              <div className="space-y-3 rounded-xl bg-slate-950/60 p-4 border border-slate-800 text-xs">
+              <div className="space-y-2.5 rounded-lg bg-surface-subtle p-4 border border-border-subtle text-xs">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Compte membre :</span>
-                  <span className="font-semibold text-slate-200">{xAccount.account_name}</span>
+                  <span className="text-txt-muted">Compte membre :</span>
+                  <span className="font-medium text-txt">{xAccount.account_name}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Identifiant :</span>
-                  <span className="font-mono text-sky-400">{xAccount.account_id}</span>
+                  <span className="text-txt-muted">Identifiant :</span>
+                  <span className="font-mono text-accent-txt">{xAccount.account_id}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Scopes autorisés :</span>
-                  <span className="text-sky-400">{xAccount.scopes?.join(', ') || 'N/A'}</span>
+                  <span className="text-txt-muted">Scopes autorisés :</span>
+                  <span className="text-txt-secondary font-mono">{xAccount.scopes?.join(', ') || 'N/A'}</span>
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-txt-secondary leading-relaxed">
                 Connectez votre compte X pour diffuser des posts concis et des threads validés en revue humaine.
               </p>
             )}
           </div>
 
-          <div className="pt-2 space-y-2">
+          <div className="pt-2 space-y-2.5">
             {xAccount ? (
               <div className="space-y-2">
                 <div className="flex gap-2">
@@ -428,10 +436,10 @@ export const ConnectionsScreen: React.FC = () => {
                     size="sm"
                     onClick={() => handleTestConnection('x')}
                     isLoading={testingProvider === 'x'}
-                    className="flex-1 text-xs"
+                    className="flex-1 text-xs min-h-[44px] font-medium"
                     title="Vérifier la validité du connecteur et tester la publication"
                   >
-                    <Zap className="h-3.5 w-3.5 mr-1" />
+                    <Zap className="h-3.5 w-3.5 mr-1.5" />
                     Tester le connecteur
                   </Button>
                   <Button
@@ -439,10 +447,10 @@ export const ConnectionsScreen: React.FC = () => {
                     size="sm"
                     disabled={!isOwner}
                     onClick={() => setDisconnectTarget(xAccount)}
-                    className="text-xs"
+                    className="text-xs min-h-[44px]"
                     title={!isOwner ? 'Réservé au rôle Owner' : 'Déconnecter le compte'}
                   >
-                    <Unlink className="h-3.5 w-3.5 mr-1" />
+                    <Unlink className="h-3.5 w-3.5 mr-1.5" />
                     Déconnecter
                   </Button>
                 </div>
@@ -451,21 +459,21 @@ export const ConnectionsScreen: React.FC = () => {
                   size="sm"
                   disabled={!isOwner}
                   onClick={() => handleStartOAuth('x')}
-                  className="w-full text-xs text-slate-400"
+                  className="w-full text-xs text-txt-muted hover:text-txt min-h-[40px]"
                   title="Ouvrir à nouveau la fenêtre d'autorisation dans un autre onglet"
                 >
-                  <ExternalLink className="h-3 w-3 mr-1" />
+                  <ExternalLink className="h-3 w-3 mr-1.5" />
                   Renouveler l'autorisation (Nouvel onglet)
                 </Button>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 <Button
                   variant="primary"
                   disabled={!isOwner || connectingProvider === 'x'}
                   isLoading={connectingProvider === 'x'}
                   onClick={() => handleStartOAuth('x')}
-                  className="w-full justify-center text-xs"
+                  className="w-full justify-center text-xs min-h-[44px] font-medium"
                   title={!isOwner ? 'Réservé au rôle Owner' : "Ouvrir l'autorisation X dans un autre onglet"}
                 >
                   <span>{t.connections.action_connect} X (Onglet externe)</span>
@@ -477,10 +485,10 @@ export const ConnectionsScreen: React.FC = () => {
                   disabled={!isOwner || sandboxConnecting === 'x'}
                   isLoading={sandboxConnecting === 'x'}
                   onClick={() => handleSandboxConnect('x')}
-                  className="w-full justify-center text-xs"
+                  className="w-full justify-center text-xs min-h-[44px] text-txt-secondary hover:text-txt"
                   title="Connecter un compte test en local sans redirection externe"
                 >
-                  <Zap className="h-3.5 w-3.5 mr-1 text-amber-400" />
+                  <Zap className="h-3.5 w-3.5 mr-1.5 text-accent" />
                   Connexion Immédiate Sandbox (Mode Test)
                 </Button>
               </div>
@@ -508,51 +516,51 @@ export const ConnectionsScreen: React.FC = () => {
         title={`Vérification du Connecteur ${testResult?.provider?.toUpperCase()}`}
       >
         <div className="space-y-4 text-xs">
-          <div className="flex items-center gap-2 p-3 bg-emerald-950/40 border border-emerald-500/30 rounded-xl text-emerald-200">
-            <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
+          <div className="flex items-center gap-3 p-3.5 bg-status-success-bg border border-status-success-border rounded-xl text-status-success-text">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-status-success-text" />
             <div>
-              <strong className="block text-white font-semibold">Connecteur 100% Opérationnel</strong>
-              <span>{testResult?.message}</span>
+              <strong className="block text-txt font-semibold">Connecteur 100% Opérationnel</strong>
+              <span className="text-status-success-text">{testResult?.message}</span>
             </div>
           </div>
 
-          <div className="space-y-2 bg-slate-950/80 p-4 rounded-xl border border-slate-800">
+          <div className="space-y-2.5 bg-surface-subtle p-4 rounded-xl border border-border-subtle">
             <div className="flex justify-between">
-              <span className="text-slate-400">Post ID Plateforme :</span>
-              <span className="font-mono text-sky-400">{testResult?.external_post_id}</span>
+              <span className="text-txt-muted">Post ID Plateforme :</span>
+              <span className="font-mono text-accent-txt">{testResult?.external_post_id}</span>
             </div>
             {testResult?.url && (
               <div className="flex justify-between items-center">
-                <span className="text-slate-400">Lien généré :</span>
+                <span className="text-txt-muted">Lien généré :</span>
                 <a
                   href={testResult.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-sky-400 underline flex items-center gap-1 hover:text-sky-300"
+                  className="text-accent underline flex items-center gap-1 hover:text-accent-hover font-mono"
                 >
                   Ouvrir le post <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
             )}
             <div className="flex justify-between">
-              <span className="text-slate-400">Horodatage vérifié :</span>
-              <span className="text-slate-300">{testResult?.verified_at}</span>
+              <span className="text-txt-muted">Horodatage vérifié :</span>
+              <span className="text-txt-secondary font-mono">{testResult?.verified_at}</span>
             </div>
           </div>
 
           {testResult?.receipt && (
             <div>
-              <span className="text-slate-400 block mb-1 font-semibold flex items-center gap-1">
-                <Terminal className="h-3.5 w-3.5" /> Reçu cryptographique :
+              <span className="text-txt-secondary block mb-1.5 font-semibold flex items-center gap-1.5 font-mono">
+                <Terminal className="h-3.5 w-3.5 text-accent" /> Reçu cryptographique :
               </span>
-              <pre className="p-3 bg-slate-950 rounded-lg text-slate-300 font-mono text-[11px] overflow-x-auto border border-slate-800">
+              <pre className="p-3.5 bg-surface-subtle rounded-lg text-txt font-mono text-[11px] overflow-x-auto border border-border-subtle">
                 {JSON.stringify(testResult.receipt, null, 2)}
               </pre>
             </div>
           )}
 
           <div className="pt-2 flex justify-end">
-            <Button variant="secondary" size="sm" onClick={() => setTestResult(null)}>
+            <Button variant="secondary" size="sm" onClick={() => setTestResult(null)} className="min-h-[40px]">
               Fermer
             </Button>
           </div>

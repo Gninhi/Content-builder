@@ -6,7 +6,11 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional, Callable
 import httpx
 
-from packages.connectors.social.base import BaseSocialConnector, SocialPublisher
+from packages.connectors.social.base import (
+    BaseSocialConnector,
+    BaseSocialPublisher,
+    SocialPublisherRegistry,
+)
 from packages.connectors.social.models import (
     PublicationResult,
     PublicationStatus,
@@ -24,7 +28,7 @@ from packages.connectors.social.exceptions import (
 )
 
 
-class XSocialPublisher(SocialPublisher):
+class XSocialPublisher(BaseSocialPublisher):
     """
     Production-ready X (Twitter) API v2 Social Publisher.
     
@@ -51,6 +55,7 @@ class XSocialPublisher(SocialPublisher):
         sandbox_mode: Optional[bool] = None,
         http_client: Optional[httpx.Client] = None,
     ):
+        super().__init__(sandbox_mode=sandbox_mode)
         self.access_token = access_token or os.getenv("X_ACCESS_TOKEN")
         self.refresh_token = refresh_token
         self.token_expires_at = token_expires_at
@@ -61,15 +66,6 @@ class XSocialPublisher(SocialPublisher):
         self.current_month_publications = current_month_publications
         self.on_token_refreshed = on_token_refreshed
         self._refresh_lock = threading.Lock()
-
-        if sandbox_mode is not None:
-            self._sandbox_mode = sandbox_mode
-        else:
-            live_enabled = os.getenv("LIVE_PUBLISHING_ENABLED", "false").lower() == "true"
-            global_sandbox = os.getenv("SOCIAL_SANDBOX_MODE", "true").lower() == "true"
-            self._sandbox_mode = global_sandbox or not live_enabled
-
-        self._sandbox_registry: Dict[str, PublicationStatus] = {}
         self._client = http_client or httpx.Client(timeout=15.0)
 
     @property
@@ -80,13 +76,32 @@ class XSocialPublisher(SocialPublisher):
     def sandbox_mode(self) -> bool:
         return self._sandbox_mode
 
+    @staticmethod
+    def compute_weighted_length(content: str) -> int:
+        """
+        Computes effective character length according to X (Twitter) API v2 rules:
+        Every URL (http:// or https://) is automatically transformed to a t.co link
+        and counts as exactly 23 characters, regardless of its raw character count.
+        """
+        import re
+        urls = re.findall(r"https?://\S+", content)
+        effective_len = len(content)
+        for u in urls:
+            # Replace length of actual URL string with standard 23 chars
+            effective_len = effective_len - len(u) + 23
+        return effective_len
+
     def validate_content(self, content: str) -> None:
-        """Validates body constraints for X posts (5 to max_text_length chars)."""
+        """Validates body constraints for X posts (5 to max_text_length chars with t.co weighting)."""
         body = content.strip()
         if len(body) < 5:
             raise ValueError("X post content cannot be empty or under 5 characters.")
-        if len(body) > self.max_text_length:
-            raise ValueError(f"X post content exceeds {self.max_text_length} characters limit ({len(body)} chars).")
+        weighted_len = self.compute_weighted_length(body)
+        if weighted_len > self.max_text_length:
+            raise ValueError(
+                f"X post content exceeds {self.max_text_length} characters limit "
+                f"({weighted_len} weighted chars, {len(body)} raw chars)."
+            )
 
     def ensure_valid_token(self) -> None:
         """
@@ -182,6 +197,21 @@ class XSocialPublisher(SocialPublisher):
                     f"X token refresh failed with HTTP {resp.status_code}: {resp.text}",
                     provider=self.provider.value
                 )
+
+    @classmethod
+    def estimate_post_cost_usd(cls, content: str, media_urls: Optional[List[str]] = None) -> float:
+        """
+        Estimates publishing cost in USD based on official X API tiers (REQ-20 / FND-06):
+        - Base text post: $0.001 nominal estimated API cost
+        - URL card processing: $0.0005
+        - Media asset processing: $0.005 per uploaded visual/video
+        """
+        base_cost = 0.001
+        has_url = "http://" in content or "https://" in content
+        url_cost = 0.0005 if has_url else 0.0
+        media_count = len(media_urls) if media_urls else 0
+        media_cost = media_count * 0.005
+        return round(base_cost + url_cost + media_cost, 4)
 
     def check_cost_guardrails(self) -> None:
         """Enforces monthly publishing ceiling to prevent runaway API billing."""
@@ -368,3 +398,7 @@ class XTwitterConnector(BaseSocialConnector):
             payload=payload,
             idempotency_key=idempotency_key
         )
+
+
+SocialPublisherRegistry.register("x", XSocialPublisher)
+SocialPublisherRegistry.register("twitter", XSocialPublisher)

@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from '../context/AuthContext';
 
 // Helper consumer component
 const TestAuthConsumer: React.FC = () => {
-  const { session, isAuthenticated, isOwner, canEdit, canApprove, loginWithDevToken, logout } = useAuth();
+  const { session, isAuthenticated, isOwner, canEdit, canApprove, login, loginWithDevToken, logout } = useAuth();
   return (
     <div>
       <span data-testid="auth-status">{isAuthenticated ? 'logged-in' : 'logged-out'}</span>
@@ -12,6 +12,7 @@ const TestAuthConsumer: React.FC = () => {
       <span data-testid="is-owner">{isOwner ? 'yes' : 'no'}</span>
       <span data-testid="can-edit">{canEdit ? 'yes' : 'no'}</span>
       <span data-testid="can-approve">{canApprove ? 'yes' : 'no'}</span>
+      <button onClick={() => login('enterprise@test.com', 'Pass1234!')}>Login Enterprise</button>
       <button onClick={() => loginWithDevToken('user_test', 'Owner', 'ws_test')}>Login Owner</button>
       <button onClick={() => loginWithDevToken('user_test', 'Editor', 'ws_test')}>Login Editor</button>
       <button onClick={() => loginWithDevToken('user_test', 'Viewer', 'ws_test')}>Login Viewer</button>
@@ -19,6 +20,7 @@ const TestAuthConsumer: React.FC = () => {
     </div>
   );
 };
+
 
 let setItemSpy: any;
 
@@ -104,6 +106,22 @@ describe('AuthContext Security & RBAC', () => {
     expect(screen.getByTestId('is-owner')).toHaveTextContent('no');
   });
 
+  it('logs in successfully via enterprise email and password', async () => {
+    render(
+      <AuthProvider>
+        <TestAuthConsumer />
+      </AuthProvider>
+    );
+
+    await act(async () => {
+      screen.getByText('Login Enterprise').click();
+    });
+
+    expect(screen.getByTestId('auth-status')).toHaveTextContent('logged-in');
+    expect(screen.getByTestId('user-role')).toHaveTextContent('Owner');
+    expect(setItemSpy).not.toHaveBeenCalledWith('jwt', expect.anything());
+  });
+
   it('clears session upon logout', async () => {
     render(
       <AuthProvider>
@@ -122,3 +140,4 @@ describe('AuthContext Security & RBAC', () => {
     expect(screen.getByTestId('auth-status')).toHaveTextContent('logged-out');
   });
 });
+

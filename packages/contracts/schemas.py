@@ -77,23 +77,29 @@ class EvidenceItem(BaseModel):
 
 
 class IdeaItem(BaseModel):
+    id: Optional[str] = None
     title: str
     angle: str
     target_audience: str
     recommended_formats: List[str] = Field(default_factory=lambda: ["linkedin", "x"])
     evidence: List[EvidenceItem]
-    novelty_score: float = Field(..., ge=0.0, le=10.0)
-    relevance_score: float = Field(..., ge=0.0, le=10.0)
-    effort_score: float = Field(..., ge=0.0, le=10.0)
+    novelty_score: float = Field(..., ge=0.0, le=100.0)
+    relevance_score: float = Field(..., ge=0.0, le=100.0)
+    effort_score: float = Field(..., ge=0.0, le=100.0)
+    total_score: Optional[float] = None
     priority: str = Field("high", description="high, medium, or low")
     risks: List[str] = Field(default_factory=list)
+    signal_id: Optional[str] = None
 
 
 class IdeaResearchRequest(BaseModel):
-    workspace_id: str
+    workspace_id: Optional[str] = None
     topic_or_brief: str
     pillars: Optional[List[str]] = None
+    audience: Optional[List[str]] = None
     target_count: int = Field(10, ge=1, le=25)
+    signal_id: Optional[str] = None
+    llm_override: Optional[Dict[str, Any]] = None
 
 
 class IdeaResearchResponse(BaseModel):

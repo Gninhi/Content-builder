@@ -1,53 +1,70 @@
-@import "@fontsource/inter/latin.css";
-@import "@fontsource/jetbrains-mono/latin.css";
+/* Import targeted Geist Sans and Geist Mono subsets (OFL) */
+@import "@fontsource/geist-sans/latin-400.css";
+@import "@fontsource/geist-sans/latin-500.css";
+@import "@fontsource/geist-sans/latin-600.css";
+@import "@fontsource/geist-sans/latin-700.css";
+@import "@fontsource/geist-mono/latin-400.css";
+@import "@fontsource/geist-mono/latin-600.css";
+
+/* Core Design System Tokens in OKLCH */
+@import "./styles/tokens.css";
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: dark;
-}
+@layer components {
+  /* Surface Paneling System (Unified semantic cards) */
+  .panel-surface {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    box-shadow: var(--shadow-sm);
+    color: var(--text-primary);
+    transition: border-color var(--duration-fast) var(--ease-standard),
+                background-color var(--duration-fast) var(--ease-standard);
+  }
 
-html.light {
-  color-scheme: light;
-}
+  .panel-surface-raised {
+    background-color: var(--bg-surface-raised);
+    border: 1px solid var(--border-default);
+    box-shadow: var(--shadow-md);
+    color: var(--text-primary);
+  }
 
-/* Accessible focus ring */
-:focus-visible {
-  outline: 2px solid #0284c7;
-  outline-offset: 2px;
-}
+  .panel-surface-interactive {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    box-shadow: var(--shadow-sm);
+    color: var(--text-primary);
+    transition: border-color var(--duration-fast) var(--ease-standard),
+                background-color var(--duration-fast) var(--ease-standard),
+                box-shadow var(--duration-fast) var(--ease-standard);
+  }
 
-/* Reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  ::before,
-  ::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  .panel-surface-interactive:hover {
+    border-color: var(--border-hover);
+    background-color: var(--bg-hover);
+  }
+
+  /* Backwards compatibility alias for panel-vault */
+  .panel-vault {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    box-shadow: var(--shadow-sm);
+    color: var(--text-primary);
+    transition: border-color var(--duration-fast) var(--ease-standard),
+                background-color var(--duration-fast) var(--ease-standard);
   }
 }
 
-/* Glassmorphism utility */
-.glass-panel {
-  background-color: rgba(17, 24, 39, 0.75);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(31, 41, 55, 0.8);
-}
+@layer utilities {
+  /* Tabular numbers for all KPIs and financial/metrics fields */
+  .font-tabular {
+    font-variant-numeric: tabular-nums;
+  }
 
-html.light .glass-panel {
-  background-color: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(226, 232, 240, 0.9);
-}
-
-/* Ambient glows */
-.ambient-orb {
-  position: absolute;
-  border-radius: 9999px;
-  filter: blur(90px);
-  pointer-events: none;
-  z-index: 0;
+  /* Text balance for clean headlines */
+  .text-balance {
+    text-wrap: balance;
+  }
 }

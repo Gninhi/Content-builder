@@ -28,13 +28,13 @@ describe('Button Component', () => {
   it('applies accessible high-contrast primary variant', () => {
     render(<Button variant="primary">Approuver</Button>);
     const button = screen.getByRole('button', { name: /Approuver/i });
-    expect(button).toHaveClass('bg-sky-700');
+    expect(button).toHaveClass('bg-accent');
   });
 
   it('applies accessible high-contrast danger variant', () => {
     render(<Button variant="danger">Supprimer</Button>);
     const button = screen.getByRole('button', { name: /Supprimer/i });
-    expect(button).toHaveClass('bg-rose-700');
+    expect(button).toHaveClass('bg-status-danger-bg');
   });
 
   it('meets minimum touch target size (>= 44px)', () => {
@@ -42,5 +42,17 @@ describe('Button Component', () => {
     const button = screen.getByRole('button');
     expect(button).toHaveClass('min-h-[44px]');
     expect(button).toHaveClass('min-w-[44px]');
+  });
+
+  it('passes axe accessibility audit without violations', async () => {
+    const axe = await import('axe-core');
+    const { container } = render(
+      <div>
+        <Button variant="primary">Confirmer</Button>
+        <Button variant="secondary">Annuler</Button>
+      </div>
+    );
+    const results = await axe.default.run(container);
+    expect(results.violations).toHaveLength(0);
   });
 });

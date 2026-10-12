@@ -16,18 +16,18 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
   onRetry,
 }) => {
   return (
-    <div className="glass-panel p-8 rounded-2xl text-center max-w-md mx-auto space-y-4 border border-rose-500/30 bg-rose-950/20">
-      <div className="w-14 h-14 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
-        <AlertCircle className="w-7 h-7" />
+    <div className="panel-surface p-6 sm:p-8 rounded-xl text-center max-w-md mx-auto space-y-4 border border-status-danger-border bg-status-danger-bg">
+      <div className="w-12 h-12 rounded-lg bg-status-danger-bg border border-status-danger-border text-status-danger-text flex items-center justify-center mx-auto">
+        <AlertCircle className="w-6 h-6" />
       </div>
       <div>
-        <h3 className="text-base font-bold text-white">{title}</h3>
-        <p className="text-xs text-rose-200/80 mt-1 leading-relaxed">{message}</p>
+        <h3 className="text-base font-bold text-status-danger-text">{title}</h3>
+        <p className="text-xs text-status-danger-text/90 mt-1 leading-relaxed">{message}</p>
       </div>
 
       {correlationId && (
-        <p className="text-[11px] font-mono text-slate-400 bg-slate-900/60 py-1 px-2.5 rounded-lg border border-slate-800">
-          ID de support : <span className="text-cyan-300">{correlationId}</span>
+        <p className="text-[11px] font-mono text-txt-secondary bg-surface py-1.5 px-3 rounded border border-border">
+          ID de support : <span className="font-semibold">{correlationId}</span>
         </p>
       )}
 

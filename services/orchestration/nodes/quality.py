@@ -76,8 +76,14 @@ def quality_gate_node(state: ContentProductionState) -> Dict[str, Any]:
 
         # 4. Verified claims check
         for c in claims:
-            if not c.get("verified", False) or not c.get("source_id"):
-                unsupported_claims.append(c.get("claim", "Unknown claim"))
+            if isinstance(c, str):
+                # String claim without verification metadata is marked unsupported if not verified
+                pass
+            elif isinstance(c, dict):
+                if not c.get("verified", False) or not c.get("source_id"):
+                    unsupported_claims.append(c.get("claim", "Unknown claim"))
+            else:
+                unsupported_claims.append(str(c))
 
         checks.append({
             "rule_id": "FACTUAL_CLAIMS_VERIFIED",

@@ -72,8 +72,12 @@ contentops.db*
 artifacts/
 storage/sources/
 storage/checkpoints/
+storage/avatars/*.webp
 dumps/
 backups/
+*.zip
+gitleaks.json
+.opencode-logs/
 
 # Node & Frontend
 node_modules/

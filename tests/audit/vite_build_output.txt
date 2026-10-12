@@ -1,0 +1,26 @@
+
+> contentops-web@2.0.0 build
+> tsc && vite build
+
+vite v5.4.21 building for production...
+transforming...
+[Browserslist] Could not parse /Users/seansiehigninhi/package.json. Ignoring it.
+✓ 1632 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                           3.87 kB │ gzip:   1.38 kB
+dist/assets/geist-mono-latin-400-normal-DTRLJnHl.woff2    9.86 kB
+dist/assets/geist-mono-latin-600-normal-V-KvD_pi.woff2   10.14 kB
+dist/assets/geist-mono-latin-400-normal-B2yvC1Cq.woff    13.04 kB
+dist/assets/geist-mono-latin-600-normal-bZn07FKM.woff    13.33 kB
+dist/assets/geist-sans-latin-400-normal-gapTbOY8.woff2   33.40 kB
+dist/assets/geist-sans-latin-500-normal-uokXdC-Q.woff2   34.72 kB
+dist/assets/geist-sans-latin-600-normal-DFOURf8L.woff2   35.29 kB
+dist/assets/geist-sans-latin-700-normal-BmN9tIp5.woff2   35.48 kB
+dist/assets/geist-sans-latin-400-normal-BOaIZNA2.woff    38.91 kB
+dist/assets/geist-sans-latin-500-normal-CN2lyvyL.woff    40.52 kB
+dist/assets/geist-sans-latin-600-normal-CA1yjETN.woff    41.20 kB
+dist/assets/geist-sans-latin-700-normal-CjScfYeH.woff    41.40 kB
+dist/assets/index-BgXLwIid.css                           53.42 kB │ gzip:   9.92 kB
+dist/assets/index-BpbQAxeO.js                           475.79 kB │ gzip: 122.41 kB │ map: 1,175.48 kB
+✓ built in 6.81s

@@ -1,3 +1,4 @@
+from typing import Optional
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, Float, DateTime, Text, JSON, ForeignKey, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
@@ -9,6 +10,15 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    """Ensures datetime is timezone-aware in UTC (compatible with SQLite naive datetimes)."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 class WorkspaceModel(Base):
     __tablename__ = "workspaces"
 
@@ -17,12 +27,33 @@ class WorkspaceModel(Base):
     timezone = Column(String(64), default="UTC")
     owner_id = Column(String(64), nullable=False)
     kill_switch_enabled = Column(Boolean, default=False, nullable=False)
+    is_demo = Column(Boolean, default=False, nullable=False)
+    expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utc_now)
 
     brand_profiles = relationship("BrandProfileModel", back_populates="workspace", cascade="all, delete-orphan")
     sources = relationship("ContentSourceModel", back_populates="workspace", cascade="all, delete-orphan")
+    veille_sources = relationship("VeilleSourceModel", back_populates="workspace", cascade="all, delete-orphan")
+    signals = relationship("SignalModel", back_populates="workspace", cascade="all, delete-orphan")
     ideas = relationship("IdeaModel", back_populates="workspace", cascade="all, delete-orphan")
     social_accounts = relationship("ConnectedSocialAccountModel", back_populates="workspace", cascade="all, delete-orphan")
+    llm_settings = relationship("WorkspaceLLMSettingsModel", uselist=False, back_populates="workspace", cascade="all, delete-orphan")
+    members = relationship("WorkspaceMemberModel", back_populates="workspace", cascade="all, delete-orphan")
+
+
+class WorkspaceLLMSettingsModel(Base):
+    __tablename__ = "workspace_llm_settings"
+
+    id = Column(String(64), primary_key=True)
+    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
+    default_provider_id = Column(String(64), nullable=False, default="nvidia")
+    default_model_id = Column(String(128), nullable=False, default="z-ai/glm-5.3-flash")
+    default_temperature = Column(Float, nullable=False, default=0.2)
+    task_overrides = Column(JSON, default=dict, nullable=False)
+    provider_settings = Column(JSON, default=dict, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+    workspace = relationship("WorkspaceModel", back_populates="llm_settings")
 
 
 class BrandProfileModel(Base):
@@ -73,10 +104,12 @@ class IdeaModel(Base):
     total_score = Column(Float, default=0.0)
     priority = Column(String(16), default="high")
     risks = Column(JSON, default=list, nullable=False)
+    signal_id = Column(String(64), ForeignKey("signals.id", ondelete="SET NULL"), nullable=True, index=True)
     status = Column(String(32), default="IDEA")
     created_at = Column(DateTime, default=utc_now)
 
     workspace = relationship("WorkspaceModel", back_populates="ideas")
+    signal = relationship("SignalModel", back_populates="ideas")
 
 
 class ContentBriefModel(Base):
@@ -233,4 +266,164 @@ class ConnectedSocialAccountModel(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
     workspace = relationship("WorkspaceModel", back_populates="social_accounts")
+
+
+class UserModel(Base):
+    __tablename__ = "users"
+
+    id = Column(String(64), primary_key=True)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    password_hash = Column(String(255), nullable=True)
+    full_name = Column(String(255), nullable=False, default="")
+    display_name = Column(String(255), nullable=True)
+    job_title = Column(String(255), nullable=True)
+    avatar_url = Column(Text, nullable=True)
+    timezone = Column(String(64), default="UTC", nullable=False)
+    language = Column(String(8), default="fr", nullable=False)
+    theme = Column(String(16), default="dark", nullable=False)
+    notification_preferences = Column(JSON, default=dict, nullable=False)
+    ui_preferences = Column(JSON, default=dict, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    email_verified = Column(Boolean, default=False, nullable=False)
+    email_verification_token_hash = Column(String(128), nullable=True, index=True)
+    email_verification_expires_at = Column(DateTime, nullable=True)
+    password_reset_token_hash = Column(String(128), nullable=True, index=True)
+    password_reset_expires_at = Column(DateTime, nullable=True)
+    cgu_accepted_at = Column(DateTime, nullable=True)
+    cgu_version = Column(String(32), nullable=True)
+    privacy_accepted_at = Column(DateTime, nullable=True)
+    privacy_version = Column(String(32), nullable=True)
+    failed_login_attempts = Column(Integer, default=0, nullable=False)
+    locked_until = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+    memberships = relationship("WorkspaceMemberModel", back_populates="user", cascade="all, delete-orphan")
+    sessions = relationship("UserSessionModel", back_populates="user", cascade="all, delete-orphan")
+    refresh_tokens = relationship("UserRefreshTokenModel", back_populates="user", cascade="all, delete-orphan")
+
+
+class UserRefreshTokenModel(Base):
+    __tablename__ = "user_refresh_tokens"
+
+    id = Column(String(64), primary_key=True)
+    user_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash = Column(String(128), unique=True, index=True, nullable=False)
+    family_id = Column(String(64), index=True, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    is_revoked = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+    user = relationship("UserModel", back_populates="refresh_tokens")
+
+
+class WorkspaceInvitationModel(Base):
+    __tablename__ = "workspace_invitations"
+
+    id = Column(String(64), primary_key=True)
+    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    email = Column(String(255), nullable=False, index=True)
+    role = Column(String(32), default="Editor", nullable=False)
+    invitation_code_hash = Column(String(128), unique=True, index=True, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    accepted_at = Column(DateTime, nullable=True)
+    created_by = Column(String(64), nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+    workspace = relationship("WorkspaceModel")
+
+
+class WorkspaceMemberModel(Base):
+    __tablename__ = "workspace_members"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "user_id", name="uq_workspace_member"),
+    )
+
+    id = Column(String(64), primary_key=True)
+    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(String(32), nullable=False, default="Viewer")
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+    workspace = relationship("WorkspaceModel", back_populates="members")
+    user = relationship("UserModel", back_populates="memberships")
+
+
+class UserSessionModel(Base):
+    __tablename__ = "user_sessions"
+
+    id = Column(String(64), primary_key=True)
+    user_id = Column(String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_jti = Column(String(64), unique=True, index=True, nullable=False)
+    user_agent = Column(Text, nullable=True)
+    ip_address = Column(String(64), nullable=True)
+    last_active_at = Column(DateTime, default=utc_now, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    is_revoked = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+    user = relationship("UserModel", back_populates="sessions")
+
+
+class AuditLogModel(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(String(64), primary_key=True)
+    workspace_id = Column(String(64), nullable=True, index=True)
+    user_id = Column(String(64), nullable=False, index=True)
+    event_type = Column(String(64), nullable=False, index=True)
+    severity = Column(String(16), default="INFO", nullable=False)
+    details = Column(JSON, default=dict, nullable=False)
+    ip_address = Column(String(64), nullable=True)
+    user_agent = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+class VeilleSourceModel(Base):
+    __tablename__ = "veille_sources"
+
+    id = Column(String(64), primary_key=True)
+    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    url = Column(Text, nullable=False)
+    axis = Column(String(64), nullable=False, index=True)  # "ia", "frameworks", "metiers"
+    trust_level = Column(String(8), nullable=False, default="B")  # "A", "B", "C"
+    source_type = Column(String(32), nullable=False, default="web")  # "rss", "arxiv", "github", "hackernews", "web", "serpapi"
+    is_active = Column(Boolean, default=True, nullable=False)
+    health_status = Column(String(32), default="HEALTHY", nullable=False)  # "HEALTHY", "DEGRADED", "ERROR"
+    last_polled_at = Column(DateTime, nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+    workspace = relationship("WorkspaceModel", back_populates="veille_sources")
+    signals = relationship("SignalModel", back_populates="source", cascade="all, delete-orphan")
+
+
+class SignalModel(Base):
+    __tablename__ = "signals"
+
+    id = Column(String(64), primary_key=True)
+    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    source_id = Column(String(64), ForeignKey("veille_sources.id", ondelete="SET NULL"), nullable=True, index=True)
+    canonical_url = Column(Text, nullable=True)
+    url_hash = Column(String(64), nullable=False, index=True)  # SHA-256 for 90-day dedup
+    title = Column(String(512), nullable=False)
+    title_hash = Column(String(64), nullable=False, index=True)  # Normalized title hash for dedup
+    summary = Column(Text, nullable=False)
+    axis = Column(String(64), nullable=False, index=True)  # "ia", "frameworks", "metiers"
+    trust_level = Column(String(8), nullable=False, default="B")  # "A", "B", "C"
+    qualification_score = Column(Float, nullable=False, default=3.0)  # 0.0 to 5.0
+    qualification_criteria = Column(JSON, default=dict, nullable=False)  # Authority, Freshness, Fact density, Impact, Exec relevance
+    facts = Column(JSON, default=list, nullable=False)  # [{"fact": "...", "source_url": "...", "quote": "..."}]
+    executive_takeaway = Column(Text, nullable=False)  # Why it matters for tech leaders / execs
+    raw_content_ref = Column(Text, nullable=True)
+    status = Column(String(32), default="QUALIFIED", nullable=False, index=True)  # "NEW", "QUALIFIED", "REJECTED", "CONVERTED"
+    is_synthetic = Column(Boolean, default=False, nullable=False)  # True for demo mode
+    created_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+
+    workspace = relationship("WorkspaceModel", back_populates="signals")
+    source = relationship("VeilleSourceModel", back_populates="signals")
+    ideas = relationship("IdeaModel", back_populates="signal")
+
 

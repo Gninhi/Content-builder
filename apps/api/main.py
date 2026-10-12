@@ -1,4 +1,5 @@
 import os
+import time
 import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -19,6 +20,11 @@ from infra.db.database import init_db, SessionLocal
 from infra.db.repository import ContentOpsRepository
 from packages.security.limiter import limiter
 from packages.observability.correlation import set_correlation_id
+from packages.observability.prometheus import (
+    get_prometheus_metrics_response,
+    HTTP_REQUESTS_TOTAL,
+    HTTP_REQUEST_DURATION_SECONDS,
+)
 from apps.api.routers import (
     workspaces,
     sources,
@@ -31,13 +37,16 @@ from apps.api.routers import (
     strategy,
     auth,
     oauth,
+    llm,
+    users,
+    signals,
 )
 
 logger = logging.getLogger("apps.api.main")
 
 
-# Max request body size: default 1 MB
-MAX_REQUEST_BODY_SIZE = int(os.getenv("MAX_REQUEST_BODY_SIZE_BYTES", str(1024 * 1024)))
+# Max request body size: default 5 MB to safely accommodate image uploads
+MAX_REQUEST_BODY_SIZE = int(os.getenv("MAX_REQUEST_BODY_SIZE_BYTES", str(5 * 1024 * 1024)))
 
 
 @asynccontextmanager
@@ -73,6 +82,7 @@ async def lifespan(app: FastAPI):
             db.commit()
 
         repo = ContentOpsRepository(db)
+        repo.ensure_default_users()
         default_ws = repo.get_workspace("ws_default")
         if not default_ws:
             ws = repo.create_workspace(name="Default Editorial Workspace", timezone="UTC", owner_id="owner_martial")
@@ -165,7 +175,21 @@ async def security_and_size_middleware(request: Request, call_next):
         except ValueError:
             pass
 
+    t0 = time.perf_counter()
     response = await call_next(request)
+
+    # Prometheus metrics tracking
+    if request.url.path != "/metrics":
+        duration = time.perf_counter() - t0
+        HTTP_REQUESTS_TOTAL.labels(
+            method=request.method,
+            endpoint=request.url.path,
+            status=str(response.status_code)
+        ).inc()
+        HTTP_REQUEST_DURATION_SECONDS.labels(
+            method=request.method,
+            endpoint=request.url.path
+        ).observe(duration)
 
     # Invert/inject robust security headers and correlation ID
     response.headers["X-Correlation-ID"] = corr_id
@@ -211,6 +235,9 @@ app.include_router(analytics.router)
 app.include_router(strategy.router)
 app.include_router(auth.router)
 app.include_router(oauth.router)
+app.include_router(llm.router)
+app.include_router(users.router)
+app.include_router(signals.router)
 
 web_dir = Path(__file__).resolve().parent.parent / "web"
 dist_dir = web_dir / "dist"
@@ -263,10 +290,12 @@ def readiness_check():
         checks["checkpointer"] = f"error: {str(e)}"
         is_ready = False
 
-    # 3. Google Gemini API Key
-    from services.orchestration.llm import is_gemini_available
-    has_llm = is_gemini_available()
-    checks["llm_key"] = "configured" if has_llm else "missing_or_placeholder"
+    # 3. LLM Providers Status
+    from services.orchestration.providers.registry import LLMProviderRegistry
+    providers_info = LLMProviderRegistry.get_all_provider_info()
+    configured_providers = [p.provider_id for p in providers_info if p.is_configured]
+    checks["llm_providers"] = configured_providers
+    checks["llm_key"] = "configured" if configured_providers else "missing_or_placeholder"
 
     status_code = 200 if is_ready else 503
     return JSONResponse(
@@ -279,6 +308,14 @@ def readiness_check():
     )
 
 
+@app.get("/metrics", tags=["System"])
+def prometheus_metrics(request: Request):
+    """
+    Standard Prometheus metrics export endpoint for monitoring, scraping, and alerting.
+    """
+    return get_prometheus_metrics_response(request)
+
+
 @app.get("/", tags=["System"])
 def root():
     return RedirectResponse(url="/ui")
@@ -286,4 +323,5 @@ def root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("apps.api.main:app", host="0.0.0.0", port=8000, reload=True)
+    host = os.getenv("API_HOST", "127.0.0.1")
+    uvicorn.run("apps.api.main:app", host=host, port=8000, reload=True)

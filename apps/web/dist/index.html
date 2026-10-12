@@ -1,15 +1,94 @@
 <!DOCTYPE html>
-<html lang="fr" class="dark">
+<html lang="fr" data-mode="dark" data-palette="graphite" data-density="comfortable" data-contrast="standard" data-motion="full" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ContentOps Harness — Gouvernance Éditoriale & Multi-Agents</title>
     <meta name="description" content="Système d'exploitation éditorial agentique gouverné basé sur LangGraph et FastAPI." />
+    <meta name="theme-color" content="#090D14" id="theme-color-meta" />
     <link rel="icon" type="image/svg+xml" href="/ui/favicon.svg" />
-    <script type="module" crossorigin src="/ui/assets/index-DFGrBRov.js"></script>
-    <link rel="stylesheet" crossorigin href="/ui/assets/index-C5EHYskj.css">
+
+    <!-- Anti-Flash of Unstyled Content (FOUC) Inline Resolver Script -->
+    <script>
+      (function() {
+        try {
+          var cookies = document.cookie.split(';');
+          var prefString = null;
+          for (var i = 0; i < cookies.length; i++) {
+            var c = cookies[i].trim();
+            if (c.indexOf('co_prefs=') === 0) {
+              prefString = decodeURIComponent(c.substring('co_prefs='.length));
+              break;
+            }
+          }
+
+          var prefs = null;
+          if (prefString) {
+            try { prefs = JSON.parse(prefString); } catch(e) {}
+          }
+          if (!prefs) {
+            try {
+              var local = localStorage.getItem('co_prefs');
+              if (local) prefs = JSON.parse(local);
+              else {
+                var legacy = localStorage.getItem('contentops_theme');
+                if (legacy) prefs = { mode: legacy };
+              }
+            } catch(e) {}
+          }
+
+          var mode = (prefs && prefs.mode) || 'system';
+          var palette = (prefs && prefs.palette) || 'graphite';
+          var density = (prefs && prefs.density) || 'comfortable';
+          var contrast = (prefs && prefs.contrast) || 'standard';
+          var motion = (prefs && prefs.motion) || 'system';
+
+          var resolvedMode = mode;
+          if (mode === 'system') {
+            resolvedMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+
+          var resolvedContrast = contrast;
+          if (contrast === 'system') {
+            resolvedContrast = window.matchMedia && window.matchMedia('(prefers-contrast: more)').matches ? 'high' : 'standard';
+          }
+
+          var resolvedMotion = motion;
+          if (motion === 'system') {
+            resolvedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'reduced' : 'full';
+          }
+
+          var root = document.documentElement;
+          root.setAttribute('data-mode', resolvedMode);
+          root.setAttribute('data-palette', palette);
+          root.setAttribute('data-density', density);
+          root.setAttribute('data-contrast', resolvedContrast);
+          root.setAttribute('data-motion', resolvedMotion);
+
+          if (resolvedMode === 'dark') {
+            root.classList.add('dark');
+            root.classList.remove('light');
+            root.style.colorScheme = 'dark';
+          } else {
+            root.classList.add('light');
+            root.classList.remove('dark');
+            root.style.colorScheme = 'light';
+          }
+
+          var themeMeta = document.getElementById('theme-color-meta');
+          if (themeMeta) {
+            themeMeta.content = resolvedMode === 'dark' ? '#090D14' : '#F6F8FA';
+          }
+        } catch (err) {
+          /* Fallback safe defaults */
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/ui/assets/index-BLECdDFL.js"></script>
+    <link rel="stylesheet" crossorigin href="/ui/assets/index-B3zEHQ90.css">
   </head>
-  <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
+  <body class="min-h-screen antialiased selection:bg-amber-500/30 selection:text-amber-200">
     <div id="root"></div>
   </body>
 </html>

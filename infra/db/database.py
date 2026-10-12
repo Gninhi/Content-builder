@@ -64,6 +64,11 @@ def init_db():
             if "kill_switch_enabled" not in columns:
                 with engine.begin() as conn:
                     conn.execute(text("ALTER TABLE workspaces ADD COLUMN kill_switch_enabled BOOLEAN DEFAULT 0"))
+        if "ideas" in inspector.get_table_names():
+            columns = [c["name"] for c in inspector.get_columns("ideas")]
+            if "signal_id" not in columns:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE ideas ADD COLUMN signal_id VARCHAR(64)"))
     except Exception:
         pass
 

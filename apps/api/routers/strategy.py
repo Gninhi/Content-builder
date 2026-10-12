@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Body, HTTPException
 from datetime import datetime, timezone
-from typing import cast, Dict, Any
+from typing import cast, Dict, Any, Optional
 from langchain_core.runnables import RunnableConfig
 from packages.contracts.schemas import StrategyInsightsResponse, StrategyInsight
 from services.orchestration.graphs.strategy_insights import graph as strategy_insights_graph
@@ -22,6 +22,7 @@ router = APIRouter(tags=["Strategy & Insights"])
 @router.post("/v1/strategy/insights", response_model=StrategyInsightsResponse)
 def generate_strategy_insights(
     workspace_id: str = Body("ws_default", embed=True),
+    llm_override: Optional[Dict[str, Any]] = Body(None, embed=True),
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor"))
 ):
@@ -54,6 +55,7 @@ def generate_strategy_insights(
         "hypotheses": [],
         "recommendations": [],
         "confidence_levels": {},
+        "llm_override": llm_override,
         "status": "PENDING"
     }
 

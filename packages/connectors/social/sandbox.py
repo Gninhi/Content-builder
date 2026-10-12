@@ -1,7 +1,10 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from packages.connectors.social.base import SocialPublisher
+from packages.connectors.social.base import (
+    BaseSocialPublisher,
+    SocialPublisherRegistry,
+)
 from packages.connectors.social.models import (
     PublicationResult,
     PublicationStatus,
@@ -9,13 +12,19 @@ from packages.connectors.social.models import (
 )
 
 
-class SandboxSocialPublisher(SocialPublisher):
+class SandboxSocialPublisher(BaseSocialPublisher):
     """
     Sandbox implementation of SocialPublisher for local testing and CI/CD pipelines.
     Simulates posting, scheduling, deletions, and status checks without contacting external APIs.
     """
 
-    def __init__(self, provider: SocialProvider = SocialProvider.LINKEDIN):
+    def __init__(
+        self,
+        provider: SocialProvider = SocialProvider.LINKEDIN,
+        sandbox_mode: Optional[bool] = None,
+        **kwargs: Any
+    ):
+        super().__init__(sandbox_mode=True)
         self._provider = provider
         # Simulated platform state: post_id -> post_dict
         self._registry: Dict[str, Dict[str, Any]] = {}
@@ -92,3 +101,6 @@ class SandboxSocialPublisher(SocialPublisher):
         if platform_post_id not in self._registry:
             return PublicationStatus.FAILED
         return self._registry[platform_post_id]["status"]
+
+
+SocialPublisherRegistry.register("sandbox", SandboxSocialPublisher)

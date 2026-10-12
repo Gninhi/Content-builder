@@ -7,33 +7,33 @@ describe('Badge & StatusBadge Components', () => {
     render(<Badge variant="success">Succès</Badge>);
     const badge = screen.getByText('Succès');
     expect(badge).toBeInTheDocument();
-    expect(badge).toHaveClass('text-emerald-300');
+    expect(badge).toHaveClass('text-status-success-text');
   });
 
   it('renders DEGRADED status badge accurately with warning styles', () => {
     render(<StatusBadge status="DEGRADED" />);
     const badge = screen.getByText('Mode Dégradé');
     expect(badge).toBeInTheDocument();
-    expect(badge).toHaveClass('text-orange-300');
+    expect(badge).toHaveClass('text-status-warning-text');
   });
 
   it('renders PENDING_REVIEW badge', () => {
     render(<StatusBadge status="PENDING_REVIEW" />);
     expect(screen.getByText('À Revoir (HITL)')).toBeInTheDocument();
-    expect(screen.getByText('À Revoir (HITL)')).toHaveClass('text-amber-300');
+    expect(screen.getByText('À Revoir (HITL)')).toHaveClass('text-status-warning-text');
   });
 
   it('renders PUBLISHED badge with emerald success style', () => {
     render(<StatusBadge status="PUBLISHED" />);
     const badge = screen.getByText('Publié');
     expect(badge).toBeInTheDocument();
-    expect(badge).toHaveClass('text-emerald-400');
+    expect(badge).toHaveClass('text-status-success-text');
   });
 
   it('renders FAILED badge with rose danger style', () => {
     render(<StatusBadge status="FAILED" />);
     const badge = screen.getByText('Échec');
     expect(badge).toBeInTheDocument();
-    expect(badge).toHaveClass('text-rose-300');
+    expect(badge).toHaveClass('text-status-danger-text');
   });
 });

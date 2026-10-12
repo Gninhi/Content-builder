@@ -84,3 +84,45 @@ def test_calendar_and_analytics_are_workspace_isolated():
     # Scheduled or published items must only belong to ws_tenant_2
     for item in cal_res.json().get("scheduled", []):
         assert item.get("workspace_id", "ws_tenant_2") == "ws_tenant_2"
+
+
+def test_ideas_unauthenticated_rejected_and_isolated():
+    """Unauthenticated calls to /v1/ideas must return 401, and cross-tenant access must return 403."""
+    # 1. Unauthenticated request
+    unauth_res = client.get("/v1/ideas?workspace_id=ws_tenant_1")
+    assert unauth_res.status_code == 401
+
+    # 2. Authenticated on ws_tenant_2 trying to read ws_tenant_1
+    token_tenant_2 = create_access_token(user_id="user_2", role=Role.EDITOR, workspace_id="ws_tenant_2")
+    cross_res = client.get(
+        "/v1/ideas?workspace_id=ws_tenant_1",
+        headers={"Authorization": f"Bearer {token_tenant_2}"}
+    )
+    assert cross_res.status_code == 403
+
+
+def test_owner_cannot_access_other_workspace_llm_config():
+    """An Owner of tenant 1 cannot read or modify tenant 2's LLM configuration (BOLA prevention)."""
+    owner_token_1 = create_access_token(user_id="owner_1", role=Role.OWNER, workspace_id="ws_tenant_1")
+
+    # Read attempt
+    res_get = client.get(
+        "/v1/llm/config/ws_tenant_2",
+        headers={"Authorization": f"Bearer {owner_token_1}"}
+    )
+    assert res_get.status_code == 403
+
+    # Update attempt
+    res_put = client.put(
+        "/v1/llm/config/ws_tenant_2",
+        headers={"Authorization": f"Bearer {owner_token_1}"},
+        json={
+            "default_provider_id": "gemini",
+            "default_model_id": "gemini-3.8-flash",
+            "default_temperature": 0.5,
+            "task_overrides": {},
+            "provider_settings": {}
+        }
+    )
+    assert res_put.status_code == 403
+

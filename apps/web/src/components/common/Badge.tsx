@@ -1,13 +1,15 @@
 import React from 'react';
 import clsx from 'clsx';
+import { useLanguage } from '../../context/LanguageContext';
 import { ContentStatus } from '../../types/api';
 
 export interface BadgeProps {
   status?: ContentStatus | 'DEGRADED' | string;
-  variant?: 'success' | 'warning' | 'danger' | 'info' | 'neutral' | string;
+  variant?: 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'accent' | 'brass' | 'vault' | string;
   label?: string;
   children?: React.ReactNode;
   className?: string;
+  withDot?: boolean;
 }
 
 export const Badge: React.FC<BadgeProps> = ({
@@ -16,72 +18,97 @@ export const Badge: React.FC<BadgeProps> = ({
   label,
   children,
   className,
+  withDot = false,
 }) => {
+  const { language } = useLanguage();
   const normStatus = (status || '').toUpperCase();
 
   const getBadgeStyle = () => {
     if (variant) {
       switch (variant) {
         case 'success':
-          return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40';
+          return 'bg-status-success-bg text-status-success-text border-status-success-border';
         case 'warning':
-          return 'bg-amber-500/15 text-amber-300 border-amber-500/40';
+          return 'bg-status-warning-bg text-status-warning-text border-status-warning-border';
         case 'danger':
-          return 'bg-rose-500/15 text-rose-300 border-rose-500/40';
+          return 'bg-status-danger-bg text-status-danger-text border-status-danger-border';
         case 'info':
-          return 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40';
+          return 'bg-status-info-bg text-status-info-text border-status-info-border';
+        case 'accent':
+        case 'brass':
+          return 'bg-accent-subtle text-accent-txt border-accent-border';
+        case 'vault':
+          return 'bg-surface text-txt-secondary border-border';
         case 'neutral':
         default:
-          return 'bg-slate-800 text-slate-300 border-slate-700';
+          return 'bg-surface-subtle text-txt-secondary border-border-subtle';
       }
     }
 
     switch (normStatus) {
       case 'DRAFT':
-        return 'bg-slate-800 text-slate-300 border-slate-700';
+        return 'bg-surface-subtle text-txt-secondary border-border-subtle';
       case 'PENDING_REVIEW':
-        return 'bg-amber-500/15 text-amber-300 border-amber-500/40 animate-pulse';
+        return 'bg-status-warning-bg text-status-warning-text border-status-warning-border';
       case 'APPROVED':
-        return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40';
+        return 'bg-status-success-bg text-status-success-text border-status-success-border';
       case 'SCHEDULED':
-        return 'bg-sky-500/15 text-sky-300 border-sky-500/40';
+        return 'bg-status-info-bg text-status-info-text border-status-info-border';
       case 'PUBLISHING':
-        return 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40 animate-pulse';
+        return 'bg-status-info-bg text-status-info-text border-status-info-border animate-pulse';
       case 'PUBLISHED':
-        return 'bg-emerald-600/20 text-emerald-400 border-emerald-600/50';
+        return 'bg-status-success-bg text-status-success-text border-status-success-border';
       case 'FAILED':
-        return 'bg-rose-500/15 text-rose-300 border-rose-500/40';
+        return 'bg-status-danger-bg text-status-danger-text border-status-danger-border';
       case 'PUBLISH_UNKNOWN':
-        return 'bg-purple-500/15 text-purple-300 border-purple-500/40';
+        return 'bg-status-warning-bg text-status-warning-text border-status-warning-border';
       case 'DEGRADED':
-        return 'bg-orange-500/20 text-orange-300 border-orange-500/40';
+        return 'bg-status-warning-bg text-status-warning-text border-status-warning-border';
       default:
-        return 'bg-slate-800 text-slate-300 border-slate-700';
+        return 'bg-surface-subtle text-txt-secondary border-border-subtle';
     }
+  };
+
+  const getDotColor = () => {
+    if (variant === 'success' || normStatus === 'PUBLISHED' || normStatus === 'APPROVED') {
+      return 'bg-status-success-text';
+    }
+    if (variant === 'danger' || normStatus === 'FAILED') {
+      return 'bg-status-danger-text';
+    }
+    if (variant === 'warning' || normStatus === 'PENDING_REVIEW' || normStatus === 'DEGRADED' || normStatus === 'PUBLISH_UNKNOWN') {
+      return 'bg-status-warning-text';
+    }
+    if (variant === 'accent' || variant === 'brass') {
+      return 'bg-accent';
+    }
+    return 'bg-txt-muted';
   };
 
   const getDisplayContent = () => {
     if (children) return children;
     if (label) return label;
+
+    const isEn = language === 'en';
     switch (normStatus) {
       case 'DRAFT':
-        return 'Brouillon';
+        return isEn ? 'Draft' : 'Brouillon';
       case 'PENDING_REVIEW':
-        return 'À Revoir (HITL)';
+        return isEn ? 'Pending Review (HITL)' : 'À Revoir (HITL)';
       case 'APPROVED':
-        return 'Approuvé';
+        return isEn ? 'Approved' : 'Approuvé';
       case 'SCHEDULED':
-        return 'Planifié';
+        return isEn ? 'Scheduled' : 'Planifié';
       case 'PUBLISHING':
-        return 'Publication en cours';
+        return isEn ? 'Publishing...' : 'Publication en cours';
       case 'PUBLISHED':
-        return 'Publié';
+        return isEn ? 'Published' : 'Publié';
       case 'FAILED':
-        return 'Échec';
+        return isEn ? 'Failed' : 'Échec';
       case 'PUBLISH_UNKNOWN':
-        return 'Statut Incertain';
+        return isEn ? 'Unknown Status' : 'Statut Incertain';
       case 'DEGRADED':
-        return 'Mode Dégradé';
+        return isEn ? 'Degraded Mode' : 'Mode Dégradé';
       default:
         return status || '';
     }
@@ -90,11 +117,17 @@ export const Badge: React.FC<BadgeProps> = ({
   return (
     <span
       className={clsx(
-        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-medium border select-none',
+        'inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border select-none transition-colors',
         getBadgeStyle(),
         className
       )}
     >
+      {withDot && (
+        <span
+          className={clsx('h-1.5 w-1.5 rounded-full shrink-0', getDotColor())}
+          aria-hidden="true"
+        />
+      )}
       {getDisplayContent()}
     </span>
   );

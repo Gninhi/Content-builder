@@ -2,6 +2,7 @@ import os
 import time
 import random
 import logging
+import threading
 from typing import Callable, Any, Type, Tuple, Optional
 from enum import Enum
 
@@ -174,3 +175,28 @@ class CycleBudget:
         except Exception as e:
             logger.warning(f"Failed to track cycle budget metrics in Langfuse: {e}")
             return False
+
+
+_CIRCUIT_BREAKERS: dict[str, CircuitBreaker] = {}
+_CB_LOCK = threading.Lock()
+
+
+def get_circuit_breaker(
+    provider_id: str,
+    model_id: Optional[str] = None,
+    failure_threshold: int = 3,
+    recovery_timeout: float = 30.0
+) -> CircuitBreaker:
+    """
+    Returns or creates a circuit breaker instance scoped per provider or per (provider, model).
+    """
+    key = f"{provider_id}:{model_id}" if model_id else provider_id
+    with _CB_LOCK:
+        if key not in _CIRCUIT_BREAKERS:
+            _CIRCUIT_BREAKERS[key] = CircuitBreaker(
+                failure_threshold=failure_threshold,
+                recovery_timeout=recovery_timeout,
+                name=f"cb_{key}"
+            )
+        return _CIRCUIT_BREAKERS[key]
+

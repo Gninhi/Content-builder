@@ -1,0 +1,161 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.4, pytest-9.0.2, pluggy-1.6.0
+rootdir: /Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.11.0, platformdirs-4.12.3, asyncio-1.3.0, cov-7.0.0, langsmith-0.7.30
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 180 items
+
+tests/contract/test_contracts.py ..                                      [  1%]
+tests/e2e/test_pipeline_e2e.py .                                         [  1%]
+tests/evals/test_quality_evaluator.py ....                               [  3%]
+tests/integration/test_alembic_migrations.py .                           [  4%]
+tests/integration/test_graphs.py ...                                     [  6%]
+tests/integration/test_llm_multi_provider.py .........                   [ 11%]
+tests/observability/test_correlation_and_routing.py ....                 [ 13%]
+tests/observability/test_json_logger.py ..                               [ 14%]
+tests/reliability/test_at_most_once_publishing.py ......                 [ 17%]
+tests/reliability/test_checkpointer_persistence.py .                     [ 18%]
+tests/reliability/test_concurrency_race.py .                             [ 18%]
+tests/reliability/test_degraded_mode.py ..                               [ 20%]
+tests/reliability/test_resilience_and_killswitch.py ......               [ 23%]
+tests/reliability/test_state_machine_and_concurrency.py ...              [ 25%]
+tests/security/test_api_surface.py ......                                [ 28%]
+tests/security/test_bola_idor.py .....                                   [ 31%]
+tests/security/test_complete_auth.py .........                           [ 36%]
+tests/security/test_jwt_auth.py ............                             [ 42%]
+tests/security/test_oauth_flow.py ........                               [ 47%]
+tests/security/test_oauth_vault_security.py ....                         [ 49%]
+tests/security/test_prompt_injection.py ....                             [ 51%]
+tests/security/test_reproduction_attacks.py ......                       [ 55%]
+tests/security/test_security.py ...                                      [ 56%]
+tests/security/test_security_components.py .....                         [ 59%]
+tests/security/test_user_profile.py ............                         [ 66%]
+tests/unit/test_connector_liskov_characterization.py ...                 [ 67%]
+tests/unit/test_gemini_and_langfuse.py .....                             [ 70%]
+tests/unit/test_idempotency.py ...                                       [ 72%]
+tests/unit/test_llm_cache.py ....                                        [ 74%]
+tests/unit/test_nvidia_integration.py .........                          [ 79%]
+tests/unit/test_pricing_config.py ...                                    [ 81%]
+tests/unit/test_qa_rules.py ....                                         [ 83%]
+tests/unit/test_readiness_probe.py ..                                    [ 84%]
+tests/unit/test_social_publishers.py ...................                 [ 95%]
+tests/unit/test_social_ready_contracts.py .....                          [ 97%]
+tests/unit/test_state_machine.py ....                                    [100%]
+
+=============================== warnings summary ===============================
+tests/e2e/test_pipeline_e2e.py::test_complete_contentops_pipeline_e2e
+  <frozen importlib._bootstrap>:488: DeprecationWarning: Type google.protobuf.pyext._message.ScalarMapContainer uses PyType_Spec with a metaclass that has custom tp_new. This is deprecated and will no longer be allowed in Python 3.14.
+
+tests/e2e/test_pipeline_e2e.py::test_complete_contentops_pipeline_e2e
+  <frozen importlib._bootstrap>:488: DeprecationWarning: Type google.protobuf.pyext._message.MessageMapContainer uses PyType_Spec with a metaclass that has custom tp_new. This is deprecated and will no longer be allowed in Python 3.14.
+
+tests/integration/test_llm_multi_provider.py::test_centralized_resolver_hierarchy
+  /opt/anaconda3/lib/python3.12/site-packages/langchain_nvidia_ai_endpoints/_common.py:243: UserWarning: Found nvidia/llama-3.1-nemotron-70b-instruct in available_models, but type is unknown and inference may fail.
+    warnings.warn(
+
+tests/security/test_complete_auth.py::test_login_and_refresh_token_rotation
+tests/security/test_complete_auth.py::test_login_and_refresh_token_rotation
+tests/security/test_complete_auth.py::test_login_and_refresh_token_rotation
+tests/security/test_complete_auth.py::test_logout_and_session_invalidation
+tests/security/test_complete_auth.py::test_logout_and_session_invalidation
+  /opt/anaconda3/lib/python3.12/site-packages/starlette/testclient.py:451: DeprecationWarning: Setting per-request cookies=<...> is being deprecated, because the expected behaviour on cookie persistence is ambiguous. Set cookies directly on the client instance instead.
+    return super().request(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================================ tests coverage ================================
+_______________ coverage: platform darwin, python 3.12.4-final-0 _______________
+
+Name                                                  Stmts   Miss  Cover
+-------------------------------------------------------------------------
+apps/api/dependencies.py                                 47      1    98%
+apps/api/main.py                                        143     41    71%
+apps/api/routers/analytics.py                            26     15    42%
+apps/api/routers/auth.py                                366     56    85%
+apps/api/routers/briefs.py                               11      0   100%
+apps/api/routers/calendar.py                              8      0   100%
+apps/api/routers/content.py                             105     49    53%
+apps/api/routers/ideas.py                                41     26    37%
+apps/api/routers/llm.py                                 101     18    82%
+apps/api/routers/oauth.py                               167     49    71%
+apps/api/routers/publications.py                         46     30    35%
+apps/api/routers/sources.py                              23      7    70%
+apps/api/routers/strategy.py                             26     13    50%
+apps/api/routers/users.py                               130     16    88%
+apps/api/routers/workspaces.py                           50     26    48%
+packages/cache/__init__.py                                5      0   100%
+packages/cache/base.py                                   15      4    73%
+packages/cache/factory.py                                25      3    88%
+packages/cache/redis_cache.py                            62     29    53%
+packages/cache/sqlite_cache.py                           77      4    95%
+packages/connectors/__init__.py                           7      0   100%
+packages/connectors/search/tavily.py                     19      7    63%
+packages/connectors/social/__init__.py                    8      0   100%
+packages/connectors/social/base.py                       82     23    72%
+packages/connectors/social/exceptions.py                 26      0   100%
+packages/connectors/social/linkedin.py                  155     29    81%
+packages/connectors/social/models.py                     42      0   100%
+packages/connectors/social/sandbox.py                    34      2    94%
+packages/connectors/social/vault.py                     155     18    88%
+packages/connectors/social/x_twitter.py                 181     28    85%
+packages/connectors/sources/rss.py                       15     10    33%
+packages/connectors/sources/web_extractor.py             31     10    68%
+packages/connectors/storage/local.py                     19     11    42%
+packages/contracts/__init__.py                            4      0   100%
+packages/contracts/events.py                             16      0   100%
+packages/contracts/llm.py                                85      0   100%
+packages/contracts/schemas.py                           169      1    99%
+packages/contracts/users.py                              72      1    99%
+packages/domain/__init__.py                               4      0   100%
+packages/domain/entities.py                             141      1    99%
+packages/domain/idempotency.py                           10      0   100%
+packages/domain/state_machine.py                         49      0   100%
+packages/observability/__init__.py                        4      0   100%
+packages/observability/correlation.py                    24     10    58%
+packages/observability/json_logger.py                    25      9    64%
+packages/observability/metrics.py                        52      8    85%
+packages/observability/pii.py                            11      1    91%
+packages/observability/tracing.py                        99     31    69%
+packages/prompts/__init__.py                              2      0   100%
+packages/prompts/registry.py                             14      1    93%
+packages/resilience/__init__.py                           2      0   100%
+packages/resilience/circuit_breaker.py                  107     12    89%
+packages/security/__init__.py                             0      0   100%
+packages/security/auth.py                                63      6    90%
+packages/security/email_service.py                       50      4    92%
+packages/security/limiter.py                             45      4    91%
+packages/security/oauth_state.py                         69      6    91%
+packages/security/passwords.py                           27      3    89%
+packages/security/tokens.py                              12      0   100%
+services/orchestration/__init__.py                        9      0   100%
+services/orchestration/checkpointer.py                   39     16    59%
+services/orchestration/graphs/analytics.py                8      0   100%
+services/orchestration/graphs/approval.py                18      0   100%
+services/orchestration/graphs/content_production.py      11      0   100%
+services/orchestration/graphs/idea_research.py           10      0   100%
+services/orchestration/graphs/publishing.py              30     17    43%
+services/orchestration/graphs/quality_review.py           8      0   100%
+services/orchestration/graphs/scheduling.py               8      0   100%
+services/orchestration/graphs/strategy_insights.py        8      0   100%
+services/orchestration/llm.py                           101     18    82%
+services/orchestration/nodes/analytics.py                14     11    21%
+services/orchestration/nodes/approval.py                 21      8    62%
+services/orchestration/nodes/insights.py                 42      9    79%
+services/orchestration/nodes/production.py               89     15    83%
+services/orchestration/nodes/quality.py                  59      1    98%
+services/orchestration/nodes/research.py                 75     13    83%
+services/orchestration/nodes/scheduling.py               16     10    38%
+services/orchestration/providers/__init__.py              5      0   100%
+services/orchestration/providers/base.py                 72     40    44%
+services/orchestration/providers/gemini.py               25      1    96%
+services/orchestration/providers/nvidia.py              109     10    91%
+services/orchestration/providers/registry.py             52     15    71%
+services/orchestration/resolver.py                      107     32    70%
+services/orchestration/state/base.py                     81      0   100%
+services/orchestration/structured_output.py             100      8    92%
+services/publisher/worker.py                            164     13    92%
+-------------------------------------------------------------------------
+TOTAL                                                  4685    860    82%
+Coverage JSON written to file tests/audit/coverage.json
+================= 180 passed, 8 warnings in 112.58s (0:01:52) ==================

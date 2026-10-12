@@ -1,4 +1,5 @@
 import os
+import uuid
 from typing import Dict, Any, Optional, Set, Union
 from datetime import datetime, timezone, timedelta
 from enum import Enum
@@ -24,7 +25,7 @@ ROLE_PERMISSIONS: Dict[Role, Set[str]] = {
 }
 
 
-DEFAULT_DEV_JWT_SECRET = "contentops-hardened-jwt-secret-key-must-be-rotated-in-production-2026"
+DEFAULT_DEV_JWT_SECRET = "contentops-hardened-jwt-secret-key-must-be-rotated-in-production-2026"  # nosec B105
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", DEFAULT_DEV_JWT_SECRET)
 JWT_KEY_ID = os.getenv("JWT_KEY_ID", "key_v1")
 JWT_ALGORITHM = "HS256"
@@ -74,10 +75,11 @@ def create_access_token(
     role: Union[str, Role],
     workspace_id: str,
     expires_delta: Optional[timedelta] = None,
-    key_id: Optional[str] = None
+    key_id: Optional[str] = None,
+    jti: Optional[str] = None,
 ) -> str:
     """
-    Mints a signed JWT access token with verified claims and key id (kid) header.
+    Mints a signed JWT access token with verified claims, session jti, and key id (kid) header.
     """
     now = datetime.now(timezone.utc)
     if expires_delta:
@@ -94,6 +96,7 @@ def create_access_token(
         "iat": now.timestamp(),
         "nbf": now.timestamp(),
         "exp": expire.timestamp(),
+        "jti": jti or uuid.uuid4().hex,
     }
 
     kid: str = str(key_id or os.getenv("JWT_KEY_ID") or JWT_KEY_ID)

@@ -16,7 +16,7 @@ from infra.db.models import (
 )
 from packages.domain.state_machine import ContentStatus, ContentStateMachine
 from packages.domain.idempotency import compute_payload_hash
-from packages.connectors.social.base import SocialPublisher
+from packages.connectors.social.base import SocialPublisher, SocialPublisherRegistry
 from packages.connectors.social.linkedin import LinkedInSocialPublisher, LinkedInConnector
 from packages.connectors.social.x_twitter import XSocialPublisher, XTwitterConnector
 from packages.connectors.social.vault import EncryptedOAuthTokenVault
@@ -60,11 +60,11 @@ class PublisherWorker:
         platform_clean = platform.lower().strip()
 
         if sandbox_mode:
-            if platform_clean == "linkedin":
-                return LinkedInSocialPublisher(sandbox_mode=True)
-            elif platform_clean in ("x", "twitter"):
-                return XSocialPublisher(sandbox_mode=True)
-            raise ValueError(f"Unsupported platform: {platform}")
+            try:
+                publisher_cls = SocialPublisherRegistry.get_publisher_class(platform_clean)
+                return publisher_cls(sandbox_mode=True)
+            except ValueError:
+                raise ValueError(f"Unsupported platform: {platform}")
 
         # Live publishing mode: load credentials from encrypted database vault
         account = (

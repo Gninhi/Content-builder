@@ -1,0 +1,628 @@
+/* ==========================================================================
+   ContentOps Harness — Design Tokens (3-Layer Architecture in OKLCH)
+   Layer 1: Primitives (Radii, Spacing, Transitions, Fonts)
+   Layer 2: Semantics (Surfaces, Text, Borders, Accents, States)
+   Layer 3: Themes & Palettes (Graphite, Paper, Slate, Night, High-Contrast)
+   ========================================================================== */
+
+:root {
+  /* --- Typography Primitives --- */
+  --font-sans: "Geist Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Fluid Font Scale (clamp-based) */
+  --text-2xs: clamp(0.6875rem, 0.65rem + 0.15vw, 0.75rem);   /* 11px -> 12px */
+  --text-xs: clamp(0.75rem, 0.72rem + 0.15vw, 0.8125rem);     /* 12px -> 13px */
+  --text-sm: clamp(0.8125rem, 0.78rem + 0.2vw, 0.875rem);     /* 13px -> 14px */
+  --text-base: clamp(0.875rem, 0.84rem + 0.25vw, 1rem);       /* 14px -> 16px */
+  --text-lg: clamp(1rem, 0.95rem + 0.35vw, 1.125rem);         /* 16px -> 18px */
+  --text-xl: clamp(1.125rem, 1.05rem + 0.5vw, 1.3125rem);     /* 18px -> 21px */
+  --text-2xl: clamp(1.375rem, 1.25rem + 0.75vw, 1.625rem);    /* 22px -> 26px */
+  --text-3xl: clamp(1.625rem, 1.45rem + 1vw, 2rem);           /* 26px -> 32px */
+
+  /* Tabular Numerics for KPIs */
+  font-variant-numeric: tabular-nums;
+
+  /* --- Spacing & Density Primitives (4px grid) --- */
+  --space-unit: 4px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Component Dimensions default (comfortable) */
+  --input-height: 42px;
+  --btn-height-sm: 36px;
+  --btn-height-md: 42px;
+  --btn-height-lg: 48px;
+  --touch-target-min: 44px;
+
+  /* --- Radii Primitives (Sober, Non-pill) --- */
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* --- Transitions & Timing Primitives --- */
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --duration-slow: 320ms;
+  --ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+
+  /* --- Z-Index Scale --- */
+  --z-base: 0;
+  --z-sticky: 20;
+  --z-header: 30;
+  --z-drawer: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+  --z-tooltip: 70;
+}
+
+/* ==========================================================================
+   PALETTE 1 : GRAPHITE & LAITON (Obsidienne titane & Laiton ambré)
+   ========================================================================== */
+html[data-palette="graphite"],
+html:not([data-palette]) {
+  /* SOMBRE (Dark) */
+  --bg-app: oklch(0.12 0.016 250);            /* #090D14 graphite obsidienne */
+  --bg-surface: oklch(0.16 0.020 250);        /* #101622 surface carte */
+  --bg-surface-raised: oklch(0.20 0.024 250); /* #161D2B popover / dialogue */
+  --bg-subtle: oklch(0.14 0.016 250);         /* fond secondaire */
+  --bg-hover: oklch(0.22 0.022 250);          /* survol neutre */
+  --bg-active: oklch(0.25 0.025 250);        /* sélection neutre */
+
+  --border-subtle: oklch(0.22 0.018 250);    /* bordure discrète */
+  --border-default: oklch(0.29 0.024 250);   /* bordure standard 3:1 */
+  --border-hover: oklch(0.38 0.028 250);     /* bordure survol */
+  --border-focus: oklch(0.76 0.16 76);       /* anneau focus laiton */
+
+  --text-primary: oklch(0.96 0.005 250);     /* texte contraste max */
+  --text-secondary: oklch(0.72 0.020 250);    /* texte atténué (WCAG AA >= 4.5:1) */
+  --text-muted: oklch(0.55 0.020 250);        /* métadonnées discrètes */
+  --text-inverse: oklch(0.12 0.016 250);     /* sur accent plein */
+
+  /* Accent Laiton (Brass) dosé et séparé de Warning */
+  --accent-solid: oklch(0.74 0.16 76);       /* bouton primaire laiton chaud */
+  --accent-hover: oklch(0.79 0.17 76);
+  --accent-active: oklch(0.68 0.15 76);
+  --accent-subtle: oklch(0.22 0.06 76);      /* fond léger sélection */
+  --accent-border: oklch(0.48 0.11 76);
+  --accent-text: oklch(0.85 0.14 76);
+
+  /* Statuts Universels (Icône + Texte obligatoire) */
+  --status-success-bg: oklch(0.20 0.05 152);
+  --status-success-border: oklch(0.38 0.10 152);
+  --status-success-text: oklch(0.84 0.13 152);
+
+  --status-warning-bg: oklch(0.22 0.06 55);  /* Ambre chaud distinct du laiton */
+  --status-warning-border: oklch(0.42 0.12 55);
+  --status-warning-text: oklch(0.85 0.14 55);
+
+  --status-danger-bg: oklch(0.20 0.07 25);
+  --status-danger-border: oklch(0.40 0.14 25);
+  --status-danger-text: oklch(0.82 0.15 25);
+
+  --status-info-bg: oklch(0.20 0.04 235);
+  --status-info-border: oklch(0.36 0.08 235);
+  --status-info-text: oklch(0.82 0.09 235);
+
+  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.4);
+  --shadow-md: 0 4px 12px -2px oklch(0 0 0 / 0.5), 0 0 0 1px var(--border-subtle);
+  --shadow-lg: 0 12px 32px -4px oklch(0 0 0 / 0.6), 0 0 0 1px var(--border-default);
+}
+
+html[data-palette="graphite"][data-mode="light"],
+html.light[data-palette="graphite"],
+html.light:not([data-palette]) {
+  /* CLAIR (Light) Titane minéral & Laiton bruni */
+  --bg-app: oklch(0.962 0.010 245);          /* #F2F5F8 fond titane soyeux */
+  --bg-surface: oklch(1.00 0.000 0);          /* #FFFFFF carte pure */
+  --bg-surface-raised: oklch(1.00 0.000 0);
+  --bg-subtle: oklch(0.935 0.012 245);        /* #E7ECF1 */
+  --bg-hover: oklch(0.910 0.015 245);
+  --bg-active: oklch(0.880 0.018 245);
+
+  --border-subtle: oklch(0.88 0.012 245);    /* #D9DFE7 */
+  --border-default: oklch(0.80 0.018 245);   /* #C2CCD7 contrast >= 3:1 */
+  --border-hover: oklch(0.68 0.022 245);
+  --border-focus: oklch(0.52 0.16 76);
+
+  --text-primary: oklch(0.16 0.020 250);     /* #0E141E contraste >= 13:1 */
+  --text-secondary: oklch(0.40 0.016 250);   /* #414E5E contraste >= 5.5:1 */
+  --text-muted: oklch(0.54 0.014 250);
+  --text-inverse: oklch(1.00 0.000 0);
+
+  /* Accent Laiton en mode clair : contraste texte AA garanti */
+  --accent-solid: oklch(0.52 0.16 76);       /* Laiton bruni noble */
+  --accent-hover: oklch(0.46 0.16 76);
+  --accent-active: oklch(0.40 0.15 76);
+  --accent-subtle: oklch(0.94 0.05 76);
+  --accent-border: oklch(0.74 0.11 76);
+  --accent-text: oklch(0.40 0.16 76);
+
+  --status-success-bg: oklch(0.95 0.04 152);
+  --status-success-border: oklch(0.76 0.10 152);
+  --status-success-text: oklch(0.32 0.12 152);
+
+  --status-warning-bg: oklch(0.95 0.05 55);
+  --status-warning-border: oklch(0.78 0.12 55);
+  --status-warning-text: oklch(0.38 0.14 55);
+
+  --status-danger-bg: oklch(0.95 0.05 25);
+  --status-danger-border: oklch(0.78 0.12 25);
+  --status-danger-text: oklch(0.38 0.15 25);
+
+  --status-info-bg: oklch(0.95 0.03 235);
+  --status-info-border: oklch(0.78 0.07 235);
+  --status-info-text: oklch(0.34 0.09 235);
+
+  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.05);
+  --shadow-md: 0 4px 12px -2px oklch(0 0 0 / 0.08), 0 0 0 1px var(--border-subtle);
+  --shadow-lg: 0 12px 32px -4px oklch(0 0 0 / 0.12), 0 0 0 1px var(--border-default);
+}
+
+/* ==========================================================================
+   PALETTE 2 : PAPIER & ENCRE (Édition littéraire, parchemin chaud & encre indigo)
+   ========================================================================== */
+html[data-palette="paper"] {
+  /* SOMBRE (Dark) Sepia torréfié & parchemin doré */
+  --bg-app: oklch(0.14 0.020 55);             /* #181310 café torréfié profond */
+  --bg-surface: oklch(0.19 0.024 55);         /* #241D17 surface carte chaude */
+  --bg-surface-raised: oklch(0.23 0.028 55);
+  --bg-subtle: oklch(0.16 0.022 55);
+  --bg-hover: oklch(0.25 0.026 55);
+  --bg-active: oklch(0.29 0.030 55);
+
+  --border-subtle: oklch(0.25 0.022 55);
+  --border-default: oklch(0.34 0.028 55);     /* Bordure sépia chaleureuse */
+  --border-hover: oklch(0.44 0.035 55);
+  --border-focus: oklch(0.70 0.18 260);
+
+  --text-primary: oklch(0.96 0.015 80);       /* Papier de riz ivoire chaud */
+  --text-secondary: oklch(0.76 0.018 75);
+  --text-muted: oklch(0.58 0.016 75);
+  --text-inverse: oklch(0.98 0.005 80);       /* Blanc éclatant sur encre indigo */
+
+  --accent-solid: oklch(0.66 0.18 260);       /* Encre de Chine bleue indigo cobalt */
+  --accent-hover: oklch(0.72 0.19 260);
+  --accent-active: oklch(0.58 0.17 260);
+  --accent-subtle: oklch(0.22 0.08 260);
+  --accent-border: oklch(0.48 0.14 260);
+  --accent-text: oklch(0.82 0.16 260);
+
+  --status-success-bg: oklch(0.20 0.05 145);
+  --status-success-border: oklch(0.38 0.09 145);
+  --status-success-text: oklch(0.84 0.12 145);
+
+  --status-warning-bg: oklch(0.22 0.06 65);
+  --status-warning-border: oklch(0.42 0.11 65);
+  --status-warning-text: oklch(0.85 0.13 65);
+
+  --status-danger-bg: oklch(0.20 0.07 28);
+  --status-danger-border: oklch(0.40 0.13 28);
+  --status-danger-text: oklch(0.82 0.14 28);
+
+  --status-info-bg: oklch(0.20 0.03 240);
+  --status-info-border: oklch(0.36 0.07 240);
+  --status-info-text: oklch(0.82 0.08 240);
+
+  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.4);
+  --shadow-md: 0 4px 12px -2px oklch(0 0 0 / 0.5), 0 0 0 1px var(--border-subtle);
+  --shadow-lg: 0 12px 32px -4px oklch(0 0 0 / 0.6), 0 0 0 1px var(--border-default);
+}
+
+html[data-palette="paper"][data-mode="light"],
+html.light[data-palette="paper"] {
+  /* CLAIR (Light) Vélin lin naturel & Encre littéraire indigo */
+  --bg-app: oklch(0.945 0.026 84);           /* #F5EFE6 Vélin lin tactile chaud */
+  --bg-surface: oklch(0.985 0.010 86);       /* #FCFAF6 Carte ivoire soyeuse */
+  --bg-surface-raised: oklch(1.00 0.005 86);
+  --bg-subtle: oklch(0.915 0.028 82);        /* #EDE4D6 */
+  --bg-hover: oklch(0.885 0.030 82);
+  --bg-active: oklch(0.855 0.032 82);
+
+  --border-subtle: oklch(0.87 0.020 80);     /* #E2D7C7 */
+  --border-default: oklch(0.77 0.028 78);    /* #C9BCAB contraste >= 3.2:1 */
+  --border-hover: oklch(0.64 0.035 78);
+  --border-focus: oklch(0.42 0.18 255);
+
+  --text-primary: oklch(0.18 0.022 45);      /* #201812 Encre calligraphique */
+  --text-secondary: oklch(0.38 0.022 50);    /* #56473B */
+  --text-muted: oklch(0.52 0.020 50);
+  --text-inverse: oklch(0.98 0.008 86);
+
+  /* Accent Encre Bleue Indigo de haute écriture */
+  --accent-solid: oklch(0.42 0.18 255);      /* #1D4ED8 Bleu encre noble */
+  --accent-hover: oklch(0.35 0.18 255);
+  --accent-active: oklch(0.30 0.17 255);
+  --accent-subtle: oklch(0.93 0.035 255);    /* Lavis indigo très subtil */
+  --accent-border: oklch(0.70 0.09 255);
+  --accent-text: oklch(0.36 0.18 255);
+
+  --status-success-bg: oklch(0.94 0.04 145);
+  --status-success-border: oklch(0.74 0.09 145);
+  --status-success-text: oklch(0.28 0.11 145);
+
+  --status-warning-bg: oklch(0.94 0.05 65);
+  --status-warning-border: oklch(0.76 0.11 65);
+  --status-warning-text: oklch(0.34 0.13 65);
+
+  --status-danger-bg: oklch(0.94 0.05 28);
+  --status-danger-border: oklch(0.76 0.12 28);
+  --status-danger-text: oklch(0.34 0.14 28);
+
+  --status-info-bg: oklch(0.94 0.03 240);
+  --status-info-border: oklch(0.76 0.07 240);
+  --status-info-text: oklch(0.30 0.08 240);
+
+  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.05);
+  --shadow-md: 0 4px 12px -2px oklch(0 0 0 / 0.08), 0 0 0 1px var(--border-subtle);
+  --shadow-lg: 0 12px 32px -4px oklch(0 0 0 / 0.12), 0 0 0 1px var(--border-default);
+}
+
+/* ==========================================================================
+   PALETTE 3 : ARDOISE & SAUGE (Nordique minéral, fjord profond & sauge fraîche)
+   ========================================================================== */
+html[data-palette="slate"] {
+  /* SOMBRE (Dark) Bleu ardoise fjord & sauge alpine */
+  --bg-app: oklch(0.13 0.028 225);            /* #0D1520 Fjord minéral profond */
+  --bg-surface: oklch(0.17 0.032 225);        /* #131E2D Surface ardoise bleutée */
+  --bg-surface-raised: oklch(0.21 0.038 225);
+  --bg-subtle: oklch(0.15 0.028 225);
+  --bg-hover: oklch(0.23 0.035 225);
+  --bg-active: oklch(0.27 0.040 225);
+
+  --border-subtle: oklch(0.24 0.028 225);
+  --border-default: oklch(0.31 0.035 225);    /* Bordure minérale 3:1 */
+  --border-hover: oklch(0.40 0.042 225);
+  --border-focus: oklch(0.74 0.16 155);
+
+  --text-primary: oklch(0.96 0.010 220);
+  --text-secondary: oklch(0.74 0.018 220);
+  --text-muted: oklch(0.56 0.018 220);
+  --text-inverse: oklch(0.11 0.015 225);
+
+  --accent-solid: oklch(0.73 0.16 155);       /* Vert sauge alpine vivace */
+  --accent-hover: oklch(0.78 0.17 155);
+  --accent-active: oklch(0.66 0.15 155);
+  --accent-subtle: oklch(0.23 0.06 155);      /* Voile sauge boréal */
+  --accent-border: oklch(0.46 0.11 155);
+  --accent-text: oklch(0.82 0.14 155);
+
+  --status-success-bg: oklch(0.20 0.05 145);
+  --status-success-border: oklch(0.38 0.10 145);
+  --status-success-text: oklch(0.84 0.12 145);
+
+  --status-warning-bg: oklch(0.22 0.06 60);
+  --status-warning-border: oklch(0.42 0.12 60);
+  --status-warning-text: oklch(0.85 0.13 60);
+
+  --status-danger-bg: oklch(0.20 0.07 25);
+  --status-danger-border: oklch(0.40 0.14 25);
+  --status-danger-text: oklch(0.82 0.15 25);
+
+  --status-info-bg: oklch(0.20 0.04 235);
+  --status-info-border: oklch(0.36 0.08 235);
+  --status-info-text: oklch(0.82 0.09 235);
+
+  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.4);
+  --shadow-md: 0 4px 12px -2px oklch(0 0 0 / 0.5), 0 0 0 1px var(--border-subtle);
+  --shadow-lg: 0 12px 32px -4px oklch(0 0 0 / 0.6), 0 0 0 1px var(--border-default);
+}
+
+html[data-palette="slate"][data-mode="light"],
+html.light[data-palette="slate"] {
+  /* CLAIR (Light) Brume glaciaire minérale & Sauge de forêt */
+  --bg-app: oklch(0.952 0.022 215);          /* #EBF1F6 Brume minérale nordique */
+  --bg-surface: oklch(0.995 0.006 215);      /* #FCFEFF Carte minérale pure */
+  --bg-surface-raised: oklch(1.00 0.000 0);
+  --bg-subtle: oklch(0.915 0.025 215);        /* #E0E9F0 */
+  --bg-hover: oklch(0.885 0.028 215);
+  --bg-active: oklch(0.855 0.032 215);
+
+  --border-subtle: oklch(0.87 0.020 215);    /* #D2DEE8 */
+  --border-default: oklch(0.78 0.028 215);   /* #B8CAD7 contraste >= 3:1 */
+  --border-hover: oklch(0.66 0.035 215);
+  --border-focus: oklch(0.46 0.16 155);
+
+  --text-primary: oklch(0.16 0.028 225);     /* #0F172A Ardoise sombre dense */
+  --text-secondary: oklch(0.38 0.022 225);   /* #3B4D61 */
+  --text-muted: oklch(0.52 0.018 225);
+  --text-inverse: oklch(1.00 0.000 0);
+
+  --accent-solid: oklch(0.46 0.16 155);       /* Vert pin / sauge sombre de forêt */
+  --accent-hover: oklch(0.40 0.16 155);
+  --accent-active: oklch(0.35 0.15 155);
+  --accent-subtle: oklch(0.93 0.045 155);     /* Teinte sauge fraîche */
+  --accent-border: oklch(0.72 0.11 155);
+  --accent-text: oklch(0.36 0.16 155);
+
+  --status-success-bg: oklch(0.94 0.04 145);
+  --status-success-border: oklch(0.74 0.09 145);
+  --status-success-text: oklch(0.28 0.11 145);
+
+  --status-warning-bg: oklch(0.94 0.05 60);
+  --status-warning-border: oklch(0.76 0.12 60);
+  --status-warning-text: oklch(0.34 0.13 60);
+
+  --status-danger-bg: oklch(0.94 0.05 25);
+  --status-danger-border: oklch(0.76 0.12 25);
+  --status-danger-text: oklch(0.34 0.14 25);
+
+  --status-info-bg: oklch(0.94 0.03 235);
+  --status-info-border: oklch(0.76 0.07 235);
+  --status-info-text: oklch(0.30 0.08 235);
+
+  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.05);
+  --shadow-md: 0 4px 12px -2px oklch(0 0 0 / 0.08), 0 0 0 1px var(--border-subtle);
+  --shadow-lg: 0 12px 32px -4px oklch(0 0 0 / 0.12), 0 0 0 1px var(--border-default);
+}
+
+/* ==========================================================================
+   PALETTE 4 : NUIT & CORAIL (Noir absolu OLED & Corail vermillon vibrant)
+   ========================================================================== */
+html[data-palette="night"] {
+  /* SOMBRE (Dark) Noir pur OLED & Corail éclatant */
+  --bg-app: oklch(0.08 0.012 285);            /* #040308 Noir absolu OLED */
+  --bg-surface: oklch(0.12 0.018 285);        /* #0B0A12 Surface carbone sombre */
+  --bg-surface-raised: oklch(0.16 0.022 285);
+  --bg-subtle: oklch(0.10 0.015 285);
+  --bg-hover: oklch(0.19 0.025 285);
+  --bg-active: oklch(0.24 0.030 285);
+
+  --border-subtle: oklch(0.20 0.020 285);
+  --border-default: oklch(0.27 0.028 285);    /* Démarcation précise */
+  --border-hover: oklch(0.37 0.035 285);
+  --border-focus: oklch(0.70 0.22 25);
+
+  --text-primary: oklch(0.98 0.005 285);     /* Blanc luminescent pur */
+  --text-secondary: oklch(0.74 0.018 285);
+  --text-muted: oklch(0.54 0.018 285);
+  --text-inverse: oklch(0.08 0.010 285);
+
+  --accent-solid: oklch(0.68 0.22 25);        /* Corail vermillon radiant sans néon */
+  --accent-hover: oklch(0.74 0.23 25);
+  --accent-active: oklch(0.62 0.21 25);
+  --accent-subtle: oklch(0.22 0.07 25);       /* Lueur corail feutrée */
+  --accent-border: oklch(0.46 0.14 25);
+  --accent-text: oklch(0.82 0.18 25);
+
+  --status-success-bg: oklch(0.20 0.05 150);
+  --status-success-border: oklch(0.38 0.10 150);
+  --status-success-text: oklch(0.84 0.13 150);
+
+  --status-warning-bg: oklch(0.22 0.06 60);
+  --status-warning-border: oklch(0.42 0.12 60);
+  --status-warning-text: oklch(0.85 0.13 60);
+
+  --status-danger-bg: oklch(0.20 0.08 20);
+  --status-danger-border: oklch(0.40 0.15 20);
+  --status-danger-text: oklch(0.82 0.16 20);
+
+  --status-info-bg: oklch(0.20 0.04 240);
+  --status-info-border: oklch(0.36 0.08 240);
+  --status-info-text: oklch(0.82 0.09 240);
+
+  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.5);
+  --shadow-md: 0 4px 12px -2px oklch(0 0 0 / 0.6), 0 0 0 1px var(--border-subtle);
+  --shadow-lg: 0 12px 32px -4px oklch(0 0 0 / 0.7), 0 0 0 1px var(--border-default);
+}
+
+html[data-palette="night"][data-mode="light"],
+html.light[data-palette="night"] {
+  /* CLAIR (Light) Porcelaine fraîche & Corail carmin intense */
+  --bg-app: oklch(0.965 0.012 285);          /* #F6F6FB Porcelaine nacrée */
+  --bg-surface: oklch(1.00 0.000 0);          /* #FFFFFF */
+  --bg-surface-raised: oklch(1.00 0.000 0);
+  --bg-subtle: oklch(0.935 0.015 285);
+  --bg-hover: oklch(0.905 0.018 285);
+  --bg-active: oklch(0.875 0.020 285);
+
+  --border-subtle: oklch(0.88 0.014 285);
+  --border-default: oklch(0.80 0.020 285);
+  --border-hover: oklch(0.68 0.025 285);
+  --border-focus: oklch(0.55 0.22 25);
+
+  --text-primary: oklch(0.16 0.020 285);     /* #13121E */
+  --text-secondary: oklch(0.38 0.020 285);
+  --text-muted: oklch(0.52 0.016 285);
+  --text-inverse: oklch(1.00 0.000 0);
+
+  --accent-solid: oklch(0.56 0.22 25);        /* Corail dense avec contraste fort */
+  --accent-hover: oklch(0.49 0.22 25);
+  --accent-active: oklch(0.43 0.20 25);
+  --accent-subtle: oklch(0.94 0.05 25);
+  --accent-border: oklch(0.76 0.12 25);
+  --accent-text: oklch(0.46 0.20 25);
+
+  --status-success-bg: oklch(0.94 0.04 150);
+  --status-success-border: oklch(0.74 0.10 150);
+  --status-success-text: oklch(0.28 0.12 150);
+
+  --status-warning-bg: oklch(0.94 0.05 60);
+  --status-warning-border: oklch(0.76 0.12 60);
+  --status-warning-text: oklch(0.34 0.13 60);
+
+  --status-danger-bg: oklch(0.94 0.05 20);
+  --status-danger-border: oklch(0.76 0.14 20);
+  --status-danger-text: oklch(0.34 0.15 20);
+
+  --status-info-bg: oklch(0.94 0.03 240);
+  --status-info-border: oklch(0.76 0.07 240);
+  --status-info-text: oklch(0.30 0.08 240);
+
+  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.05);
+  --shadow-md: 0 4px 12px -2px oklch(0 0 0 / 0.08), 0 0 0 1px var(--border-subtle);
+  --shadow-lg: 0 12px 32px -4px oklch(0 0 0 / 0.12), 0 0 0 1px var(--border-default);
+}
+
+/* ==========================================================================
+   PALETTE 5 : CONTRASTE RENFORCÉ (Accessible AAA / 7:1 minimum)
+   ========================================================================== */
+html[data-palette="contrast"],
+html[data-contrast="high"] {
+  --bg-app: #000000;
+  --bg-surface: #080808;
+  --bg-surface-raised: #121212;
+  --bg-subtle: #111111;
+  --bg-hover: #222222;
+  --bg-active: #333333;
+
+  --border-subtle: #555555;
+  --border-default: #888888;                  /* Contraste 5:1 sur fond noir */
+  --border-hover: #cccccc;
+  --border-focus: #ffffff;
+
+  --text-primary: #ffffff;                    /* 21:1 */
+  --text-secondary: #dddddd;                  /* > 10:1 */
+  --text-muted: #bbbbbb;                      /* > 7:1 */
+  --text-inverse: #000000;
+
+  --accent-solid: #f59e0b;
+  --accent-hover: #fbbf24;
+  --accent-active: #d97706;
+  --accent-subtle: #2e1f06;
+  --accent-border: #f59e0b;
+  --accent-text: #fde68a;
+
+  --status-success-bg: #062b16;
+  --status-success-border: #34d399;
+  --status-success-text: #a7f3d0;
+
+  --status-warning-bg: #381a02;
+  --status-warning-border: #fbbf24;
+  --status-warning-text: #fef08a;
+
+  --status-danger-bg: #3b0711;
+  --status-danger-border: #f87171;
+  --status-danger-text: #fecaca;
+
+  --status-info-bg: #08223d;
+  --status-info-border: #60a5fa;
+  --status-info-text: #bfdbfe;
+
+  --shadow-sm: none;
+  --shadow-md: 0 0 0 2px var(--border-default);
+  --shadow-lg: 0 0 0 3px var(--border-default);
+}
+
+html[data-palette="contrast"][data-mode="light"],
+html.light[data-palette="contrast"],
+html.light[data-contrast="high"] {
+  --bg-app: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-surface-raised: #ffffff;
+  --bg-subtle: #f0f0f0;
+  --bg-hover: #e4e4e4;
+  --bg-active: #d0d0d0;
+
+  --border-subtle: #777777;
+  --border-default: #222222;                  /* Contraste > 9:1 sur fond blanc */
+  --border-hover: #000000;
+  --border-focus: #000000;
+
+  --text-primary: #000000;                    /* 21:1 */
+  --text-secondary: #1a1a1a;                  /* > 12:1 */
+  --text-muted: #3a3a3a;                      /* > 8:1 */
+  --text-inverse: #ffffff;
+
+  --accent-solid: #0f52ba;                    /* Bleu saphir AAA 7:1 sur blanc */
+  --accent-hover: #0a3d8f;
+  --accent-active: #062963;
+  --accent-subtle: #e8f0fe;
+  --accent-border: #0f52ba;
+  --accent-text: #0a3d8f;
+
+  --status-success-bg: #ecfdf5;
+  --status-success-border: #047857;
+  --status-success-text: #064e3b;
+
+  --status-warning-bg: #fffbeb;
+  --status-warning-border: #b45309;
+  --status-warning-text: #78350f;
+
+  --status-danger-bg: #fff1f2;
+  --status-danger-border: #be123c;
+  --status-danger-text: #881337;
+
+  --status-info-bg: #eff6ff;
+  --status-info-border: #1d4ed8;
+  --status-info-text: #1e3a8a;
+
+  --shadow-sm: none;
+  --shadow-md: 0 0 0 2px var(--border-default);
+  --shadow-lg: 0 0 0 3px var(--border-default);
+}
+
+/* ==========================================================================
+   DENSITÉ D'INTERFACE (Comfortable vs Compact)
+   ========================================================================== */
+html[data-density="compact"] {
+  --space-unit: 3px;
+  --input-height: 36px;
+  --btn-height-sm: 30px;
+  --btn-height-md: 36px;
+  --btn-height-lg: 42px;
+  --text-sm: 0.78125rem;                      /* 12.5px */
+  --text-base: 0.84375rem;                    /* 13.5px */
+}
+
+/* ==========================================================================
+   GESTION DU MOUVEMENT (Fluidité & prefers-reduced-motion)
+   ========================================================================== */
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   GLOBAL BODY & ACCESSIBILITY FOCUS RULES
+   ========================================================================== */
+body {
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--duration-fast) var(--ease-standard),
+              color var(--duration-fast) var(--ease-standard);
+}
+
+/* Anneau de focus universel ultra-accessible */
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* Classe de transition View Transitions temporaire pour anti-flash */
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition: none !important;
+}

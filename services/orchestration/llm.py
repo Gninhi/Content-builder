@@ -16,16 +16,17 @@ class GeneratedIdeaEvidence(BaseModel):
 
 
 class GeneratedIdea(BaseModel):
-    title: str = Field(..., description="Titre percutant de l'idée")
+    title: str = Field(..., description="Titre éditorial percutant (sans préfixe de catégorie)")
     angle: str = Field(..., description="Angle éditorial précis et positionnement")
     target_audience: str = Field(..., description="Segment d'audience ciblée")
     recommended_formats: List[str] = Field(default_factory=lambda: ["linkedin", "x"])
     evidence: List[GeneratedIdeaEvidence] = Field(default_factory=list)
-    novelty_score: float = Field(..., ge=0.0, le=10.0, description="Nouveauté (0-10)")
-    relevance_score: float = Field(..., ge=0.0, le=10.0, description="Alignement marque (0-10)")
-    effort_score: float = Field(..., ge=0.0, le=10.0, description="Complexité de production (0-10)")
+    novelty_score: float = Field(..., ge=0.0, le=100.0, description="Nouveauté (0-100)")
+    relevance_score: float = Field(..., ge=0.0, le=100.0, description="Alignement marque (0-100)")
+    effort_score: float = Field(..., ge=0.0, le=100.0, description="Complexité de production (0-100)")
     priority: str = Field("high", description="'high', 'medium', ou 'low'")
     risks: List[str] = Field(default_factory=list, description="Risques identifiés")
+    signal_id: Optional[str] = None
 
 
 class GeneratedIdeasBatch(BaseModel):
@@ -74,7 +75,7 @@ class GeneratedStrategyBatch(BaseModel):
 
 
 # ------------------------------------------------------------------------------
-# Model Factory
+# Model Factory & Multi-Provider Resolution
 # ------------------------------------------------------------------------------
 def is_gemini_available() -> bool:
     """Checks if a valid Google Gemini API key is configured."""
@@ -82,11 +83,63 @@ def is_gemini_available() -> bool:
     return bool(key and not key.startswith("your_") and len(key) > 10)
 
 
-def get_gemini_model(model_type: str = "fast", temperature: float = 0.2):
+def is_nvidia_available() -> bool:
+    """Checks if a valid NVIDIA API key is configured."""
+    key = os.getenv("NVIDIA_API_KEY", "")
+    return bool(key and not key.startswith("your_") and len(key) > 10)
+
+
+def resolve_and_get_llm(
+    task_name: Optional[str] = None,
+    workspace_id: Optional[str] = None,
+    run_override: Optional[Dict[str, Any]] = None,
+    temperature: Optional[float] = None,
+    required_capability: Optional[str] = None,
+    allow_none_if_unconfigured: bool = True
+):
     """
-    Instantiates Google Gemini (gemini-3.8-flash) via langchain-google-genai.
-    Allows configuring fast vs reasoning model via environment variables.
+    Central resolution entrypoint for all pipeline tasks and agents.
+    Dispatches to LLMResolver to resolve provider and model according to the 5-tier hierarchy.
+    Freezes and returns the run context tuple (model_instance, resolved_context).
     """
+    from services.orchestration.resolver import LLMResolver
+    ctx = LLMResolver.resolve_model(
+        workspace_id=workspace_id,
+        task_name=task_name,
+        required_capability=required_capability,
+        run_override=run_override,
+        temperature=temperature,
+        allow_none_if_unconfigured=allow_none_if_unconfigured
+    )
+    if ctx is None:
+        return None, None
+    return ctx.model, ctx
+
+
+def get_gemini_model(
+    model_type: str = "fast",
+    temperature: float = 0.2,
+    workspace_id: Optional[str] = None,
+    task_name: Optional[str] = None,
+    run_override: Optional[Dict[str, Any]] = None
+):
+    """
+    Instantiates an LLM chat model.
+    Prioritizes the multi-provider resolver if custom workspace/task/run settings exist,
+    while maintaining 100% backward compatibility for direct Gemini callers.
+    """
+    # If run override or workspace is specified, route via resolver
+    if workspace_id or run_override:
+        model, _ = resolve_and_get_llm(
+            task_name=task_name or ("production" if model_type == "reasoning" else "ideation"),
+            workspace_id=workspace_id,
+            run_override=run_override,
+            temperature=temperature,
+            allow_none_if_unconfigured=True
+        )
+        if model is not None:
+            return model
+
     if not is_gemini_available():
         return None
 
@@ -113,17 +166,35 @@ def get_gemini_model(model_type: str = "fast", temperature: float = 0.2):
         return None
 
 
-def get_gemini_model_for_task(task_name: str, temperature: Optional[float] = None):
+def get_gemini_model_for_task(
+    task_name: str,
+    temperature: Optional[float] = None,
+    workspace_id: Optional[str] = None,
+    run_override: Optional[Dict[str, Any]] = None
+):
     """
-    Returns configured Gemini model for a specific pipeline task:
-    - 'ideation' (env: LLM_MODEL_FOR_IDEATION, default: gemini-3.8-flash)
-    - 'production' (env: LLM_MODEL_FOR_PRODUCTION, default: gemini-3.8-flash)
-    - 'qa_judge' (env: LLM_MODEL_FOR_QA_JUDGE, default: gemini-3.8-flash)
-    - 'strategy' (env: LLM_MODEL_FOR_STRATEGY, default: gemini-3.8-flash)
+    Returns configured model for a specific pipeline task:
+    - 'ideation'
+    - 'production'
+    - 'qa_judge'
+    - 'strategy'
+    - 'rewrite'
+    Routes through LLMResolver to honor workspace overrides, task overrides, and NVIDIA provider.
     """
+    temp = temperature if temperature is not None else 0.2
+    model, _ = resolve_and_get_llm(
+        task_name=task_name,
+        workspace_id=workspace_id,
+        run_override=run_override,
+        temperature=temp,
+        allow_none_if_unconfigured=True
+    )
+    if model is not None:
+        return model
+
+    # Fallback to direct Gemini task instantiation if available
     env_var_key = f"LLM_MODEL_FOR_{task_name.upper()}"
     model_name = os.getenv(env_var_key, os.getenv("GEMINI_MODEL", "gemini-3.8-flash"))
-    temp = temperature if temperature is not None else 0.2
 
     if not is_gemini_available():
         return None
