@@ -1,70 +1,56 @@
-# Guide de Contribution (CONTRIBUTING.md)
+# Contributing to ContentOps Harness
 
-Merci de votre intérêt pour **ContentOps Harness**. Ce projet applique des règles strictes de sécurité logicielle, de qualité de code et d'architecture pilotée par les tests (TDD).
+Thank you for contributing to ContentOps Harness. As a governed agentic editorial operating system handling multi-tenant workflows and social publishing, all contributions must uphold strict security, quality, and architecture standards.
 
----
+## Code of Conduct
 
-## 1. Principes Directeurs
+All contributors are expected to maintain a professional, respectful, and collaborative environment.
 
-1. **Sécurité d'Abord** :
-   - Aucun secret (clé d'API, mot de passe, jeton OAuth) ne doit jamais être commité.
-   - Les variables sensibles doivent transiter exclusivement par l'environnement (`.env` local ignoré).
-   - Tout flux réseau sortant vers les réseaux sociaux s'exécute par défaut en mode sandbox (`SOCIAL_SANDBOX_MODE=true`).
-2. **Gouvernance Humaine Obligatoire (HITL)** :
-   - Aucune publication directe sans validation humaine explicite par un utilisateur disposant du rôle approprié (`Owner` ou `Editor`).
-3. **Qualité et Typage Stricte** :
-   - Tout nouveau code Python doit respecter `ruff` et `mypy` sans avertissement.
-   - Tout nouveau code frontend React/TypeScript doit compiler sans erreur sous `tsc && vite build`.
+## Security First Guidelines
 
----
+1. **Never Commit Secrets**:
+   - Never commit API keys (`NVIDIA_API_KEY`, `GOOGLE_API_KEY`, `TAVILY_API_KEY`), tokens, private certificates, or `.env` files.
+   - All tests must use synthetic mock credentials or test doubles.
+   - Run `pre-commit run --all-files` before pushing any branch.
 
-## 2. Environnement de Développement
+2. **Data Isolation & Multi-Tenancy**:
+   - Every database query, repository call, and LangGraph workflow state MUST explicitly enforce `workspace_id` tenant scoping.
 
-### Prérequis
-- Python 3.12+
-- Node.js 20+ & npm 10+
-- Docker & Docker Compose (pour PostgreSQL & Redis optionnels)
+3. **Safe Outbound Calls**:
+   - All external HTTP calls must route through validated connectors with SSRF protection (`validate_target_url_security`).
 
-### Installation
-```bash
-# Cloner le dépôt
-git clone https://github.com/Gninhi/Content-builder.git
-cd Content-builder
+## Development Workflow
 
-# Environnement Python
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-# Frontend
-cd apps/web
-npm install
-npm run build
-cd ../..
-
-# Configuration de base
-cp .env.example .env
-```
-
----
-
-## 3. Workflow Git & Pull Requests
-
-1. Créez une branche dédiée : `git checkout -b feat/ma-fonctionnalite` ou `fix/mon-correctif`.
-2. Exécutez la suite de tests complète avant de commiter :
+1. **Clone & Set Up Environment**:
    ```bash
-   pytest
-   cd apps/web && npm run test && cd ../..
+   git clone https://github.com/Gninhi/Content-builder.git
+   cd Content-builder
+   python -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   pre-commit install
    ```
-3. Vérifiez l'absence de secrets :
+
+2. **Frontend Setup**:
    ```bash
-   gitleaks detect --source .
+   cd apps/web
+   npm ci
+   npm run build
    ```
-4. Ouvrez une Pull Request en remplissant scrupuleusement la checklist de sécurité du template de PR.
 
----
+3. **Running Quality Checks Locally**:
+   ```bash
+   # Backend linting & tests
+   ruff check .
+   mypy .
+   pytest tests/unit tests/security tests/integration
+   
+   # Frontend tests
+   cd apps/web && npm run test
+   ```
 
-## 4. Signalement de Bogues et Suggestions
+## Pull Request Process
 
-- Pour signaler un bogue régulier, ouvrez une issue en utilisant le template [Bug Report].
-- Pour toute faille de sécurité, suivez la politique définie dans [SECURITY.md](SECURITY.md).
+- Open PRs against `main`.
+- Ensure all CI workflow checks pass (Lint, Tests, Coverage >= 85%, Security Audit, Frontend Build).
+- Every PR must address an issue or feature specification with unit/integration tests included.

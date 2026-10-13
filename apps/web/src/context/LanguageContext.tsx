@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState } from 'react';
 import { Language, translations, TranslationDict } from '../i18n';
 
+export type { Language };
+
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
@@ -23,6 +25,12 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
 export const useLanguage = () => {
   const ctx = useContext(LanguageContext);
-  if (!ctx) throw new Error('useLanguage must be used within a LanguageProvider');
+  if (!ctx) {
+    return {
+      language: 'fr' as Language,
+      setLanguage: () => {},
+      t: translations.fr,
+    };
+  }
   return ctx;
 };

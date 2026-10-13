@@ -1,51 +1,41 @@
-# Politique de Sécurité (Security Policy)
+# Security Policy
 
-ContentOps Harness prend la sécurité très au sérieux. Ce document décrit notre politique de sécurité, les versions supportées et la procédure de signalement responsable des vulnérabilités.
+## Supported Versions
 
----
+Security updates and critical vulnerability patches are applied to the following versions of ContentOps Harness:
 
-## 1. Versions Supportées
+| Version | Supported          |
+| ------- | ------------------ |
+| 1.0.x   | :white_check_mark: |
+| < 1.0   | :x:                |
 
-Seules les versions suivantes reçoivent actuellement des correctifs de sécurité :
+## Reporting a Vulnerability
 
-| Version | Supportée | Statut |
-| :--- | :--- | :--- |
-| `2.0.x` (main) | :white_check_mark: Oui | Version active de production |
-| `< 2.0.0` | :x: Non | Obsolète |
+We take the security of ContentOps Harness seriously. If you discover a security vulnerability, please do NOT create a public GitHub issue.
 
----
+Instead, please report vulnerabilities privately:
 
-## 2. Signalement d'une Vulnérabilité
+1. **GitHub Private Vulnerability Reporting (Preferred)**:
+   Navigate to the repository's **Security** tab and click **Report a vulnerability** to submit an advisory draft.
 
-Si vous découvrez une faille de sécurité ou une vulnérabilité dans ContentOps Harness :
+2. **Email Security Contact**:
+   Send an encrypted or confidential report to `security@contentops.local` with the following details:
+   - Type of issue (e.g., SSRF, Prompt Injection, Insecure Deserialization, Secret Exposure, Auth bypass)
+   - Step-by-step reproduction instructions or Proof of Concept (PoC)
+   - Impact assessment on tenant isolation and data confidentiality
 
-> **IMPORTANT : NE DIVULGUEZ JAMAIS UNE VULNÉRABILITÉ DE MANIÈRE PUBLIQUE (ISSUES, DISCUSSIONS, PULL REQUESTS PUBLIQUES).**
+## Response Timeline
 
-### Canal Privé de Signalement
-1. **GitHub Private Vulnerability Reporting** (Recommandé) :
-   - Rendez-vous sur l'onglet **Security** du dépôt GitHub.
-   - Cliquez sur **Report a vulnerability** pour soumettre un rapport chiffré directement aux mainteneurs.
-2. **Contact Direct** :
-   - Si le signalement via GitHub n'est pas disponible, contactez directement l'équipe de sécurité à l'adresse du propriétaire du projet sur GitHub (`Gninhi`).
+- **Initial Acknowledgment**: Within 48 hours.
+- **Triage & Assessment**: Within 5 business days.
+- **Remediation & Patch**: Target within 14 calendar days for critical/high vulnerabilities.
+- **Responsible Disclosure**: Public disclosure occurs only after an advisory and mitigation patch have been released.
 
-### Contenu Attendu dans le Rapport
-- Une description claire du problème de sécurité (type de vulnérabilité, CWE / OWASP le cas échéant).
-- Les étapes reproductibles (Proof of Concept sans impact destructeur).
-- L'évaluation de l'impact potentiel (BOLA/IDOR, fuite d'informations, contournement d'authentification).
-- Toute proposition de remédiation ou de patch.
+## Security Practices
 
----
-
-## 3. Délais de Réponse et Traitement
-
-- **Accusé de réception** : sous 48 heures ouvrées.
-- **Évaluation et confirmation du triage** : sous 5 jours ouvrés.
-- **Mise à disposition d'un correctif (Security Advisory)** : sous 14 jours ouvrés.
-
----
-
-## 4. Politique Relative aux Secrets et Clés d'API
-
-- **Aucun secret dans le dépôt** : Aucun jeton d'API réel, secret OAuth ou mot de passe ne doit être commité dans ce dépôt.
-- Des scans pré-commit (`gitleaks`, `trufflehog`) et l'analyse continue par GitHub Secret Scanning sont activés.
-- Tout secret accidentellement commité doit être considéré comme immédiatement **compromis** et faire l'objet d'une rotation immédiate par son émetteur.
+ContentOps Harness enforces defense-in-depth principles:
+- Zero secrets committed to the repository (enforced via Gitleaks pre-commit hooks and CI detection).
+- Fail-closed OAuth token vault using authenticated AES-GCM-256 with key-id rotation.
+- Tenant isolation enforced on all database queries and LangGraph state checkpoints.
+- SSRF prevention on all outbound HTTP collectors and model endpoint resolvers.
+- Mandatory Human-in-the-Loop (HITL) gate before any social publishing action.

@@ -355,3 +355,44 @@ class TestLegacyConnectorWrappers:
         assert receipt["platform"] == "x"
         assert receipt["idempotency_key"] == "idemp_2"
 
+    def test_linkedin_organization_urn_support(self):
+        recorded_requests = []
+        def handler(request: httpx.Request):
+            recorded_requests.append(request)
+            return httpx.Response(201, headers={"x-restli-id": "urn:li:share:org_post_123"})
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        pub = LinkedInSocialPublisher(
+            access_token="valid_tok",
+            organization_urn="urn:li:organization:998877",
+            sandbox_mode=False,
+            http_client=client
+        )
+        res = pub.publish("Publication pour la page entreprise officielle.", options={"organization_urn": "urn:li:organization:998877"})
+        assert res.platform_post_id == "urn:li:share:org_post_123"
+        assert len(recorded_requests) == 1
+        import json
+        payload = json.loads(recorded_requests[0].content.decode("utf-8"))
+        assert payload["author"] == "urn:li:organization:998877"
+
+    def test_x_tco_url_weighting(self):
+        pub = XSocialPublisher(access_token="tok", sandbox_mode=True)
+        
+        # URL of 60 chars
+        long_url = "https://example.com/very/long/path/to/article/that/takes/many/chars/12345"
+        # 250 regular chars + 60 char url = 310 chars raw.
+        # Weighted: 250 + 23 = 273 chars <= 280 chars -> MUST BE VALID!
+        post_content = f"{'a' * 250} {long_url}"
+        assert len(post_content) > 280
+        effective_len = XSocialPublisher.compute_weighted_length(post_content)
+        assert effective_len <= 280
+        # Should not raise
+        pub.validate_content(post_content)
+
+        # Weighted length exceeding 280 (e.g. 260 chars + 23 = 283 chars)
+        excessive_post = f"{'a' * 260} {long_url}"
+        with pytest.raises(ValueError) as exc:
+            pub.validate_content(excessive_post)
+        assert "weighted chars" in str(exc.value)
+
+

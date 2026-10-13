@@ -1,0 +1,128 @@
+{
+  "benchmark_metadata": {
+    "version": "2026-10-12",
+    "description": "Jeu de référence de signaux de veille technologique (axes IA, Frameworks, Métiers - France/Europe)",
+    "target_detection_window_hours": 48
+  },
+  "major_anchor_events": [
+    {
+      "id": "EVT-2026-08-14-GLM53",
+      "title": "Sortie officielle du modèle de fondation GLM-5.3 (Z.ai / Tsinghua)",
+      "date": "2026-08-14",
+      "axis": "ia",
+      "trust_level": "A",
+      "primary_source_url": "https://z-ai.org/blog/glm-5-3-release",
+      "facts": ["Architecture MoE avec raisonnement profond natif", "Fenêtre de contexte 128k tokens", "Disponible via API NVIDIA et NIM microservice"],
+      "expected_in_cycle": true
+    },
+    {
+      "id": "EVT-2026-08-26-GLM53-FLASH",
+      "title": "Lancement de GLM-5.3-Flash pour inférence temps réel à faible latence",
+      "date": "2026-08-26",
+      "axis": "ia",
+      "trust_level": "A",
+      "primary_source_url": "https://z-ai.org/blog/glm-5-3-flash",
+      "facts": ["Latence p50 réduite de 65% par rapport à GLM-5.3", "Tarification 0.05$ / 1M tokens entrée"],
+      "expected_in_cycle": true
+    },
+    {
+      "id": "EVT-2026-09-18-GLM53-FLASHX",
+      "title": "Annonce de GLM-5.3-FlashX optimisé pour les systèmes agentiques et le tool-calling",
+      "date": "2026-09-18",
+      "axis": "ia",
+      "trust_level": "A",
+      "primary_source_url": "https://z-ai.org/blog/glm-5-3-flashx",
+      "facts": ["Taux de succès au function-calling 98.4%", "Support natif du format structuré JSON Pydantic"],
+      "expected_in_cycle": true
+    },
+    {
+      "id": "EVT-2026-10-06-SO-SURVEY",
+      "title": "Publication des résultats de la Stack Overflow Developer Survey 2026",
+      "date": "2026-10-06",
+      "axis": "frameworks",
+      "trust_level": "A",
+      "primary_source_url": "https://survey.stackoverflow.co/2026/",
+      "facts": ["82% des développeurs utilisent des assistants IA quotidiennement", "FastAPI et TypeScript restent les technologies les plus plébiscitées"],
+      "expected_in_cycle": true
+    },
+    {
+      "id": "EVT-2026-04-15-STANFORD-AI-INDEX",
+      "title": "Stanford AI Index Report 2026 : Volet Emploi et Compétences en Europe",
+      "date": "2026-04-15",
+      "axis": "metiers",
+      "trust_level": "A",
+      "primary_source_url": "https://aiindex.stanford.edu/report/2026/",
+      "facts": ["Demande de compétences IA en hausse de 42% en France", "Pénurie critique d'architectes en gouvernance et conformité EU AI Act"],
+      "expected_in_cycle": true
+    },
+    {
+      "id": "EVT-2026-05-20-FRANCE-TRAVAIL-TECH",
+      "title": "Baromètre France Travail & APEC 2026 : Mutation des métiers de l'ingénierie logicielle",
+      "date": "2026-05-20",
+      "axis": "metiers",
+      "trust_level": "A",
+      "primary_source_url": "https://corporate.francetravail.fr/barometre-tech-2026",
+      "facts": ["Transformation de 65% des postes de développeurs vers l'orchestration agentique", "15 000 postes d'ingénieurs en fiabilité IA à pourvoir en Europe"],
+      "expected_in_cycle": true
+    }
+  ],
+  "sample_50_signals": [
+    {
+      "id": "SIG-001",
+      "axis": "ia",
+      "title": "EU AI Act : Entrée en application des obligations pour les modèles d'IA à usage général (GPAI)",
+      "source_url": "https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai",
+      "trust_level": "A",
+      "date": "2026-08-02",
+      "facts": ["Obligations de transparence sur les données d'entraînement", "Évaluation des risques systémiques obligatoire pour les modèles > 10^25 FLOPs"],
+      "is_valid": true,
+      "attribution_correct": true
+    },
+    {
+      "id": "SIG-002",
+      "axis": "ia",
+      "title": "Attribution erronée test : 80% des projets IA échouent en production selon le rapport Gartner 2026",
+      "source_url": "https://gartner.com/fake-attribution-test",
+      "trust_level": "B",
+      "date": "2026-09-01",
+      "facts": ["80% des projets IA échouent"],
+      "is_valid": false,
+      "attribution_correct": false,
+      "expected_handling": "NEEDS_CONFIRMATION_OR_REJECTED",
+      "notes": "Statistique issue de l'édition 2022 réattribuée abusivement à l'édition 2026"
+    },
+    {
+      "id": "SIG-003",
+      "axis": "frameworks",
+      "title": "LangGraph v1.4 : Persistance asynchrone PostgreSQL haute cadence et réducteurs stricts",
+      "source_url": "https://github.com/langchain-ai/langgraph/releases/tag/v1.4.0",
+      "trust_level": "A",
+      "date": "2026-09-12",
+      "facts": ["Nouveau checkpointer PostgresSaver optimisé pour 10 000 req/s", "Validation Pydantic 2.13 des canaux d'état"],
+      "is_valid": true,
+      "attribution_correct": true
+    },
+    {
+      "id": "SIG-004",
+      "axis": "frameworks",
+      "title": "Pydantic v2.13 : Validation native en C Rust et typage strict des retours LLM",
+      "source_url": "https://docs.pydantic.dev/changelog/",
+      "trust_level": "A",
+      "date": "2026-09-20",
+      "facts": ["Gain de 35% sur le parsing JSON", "Support complet des types Union discriminés pour les tool calls"],
+      "is_valid": true,
+      "attribution_correct": true
+    },
+    {
+      "id": "SIG-005",
+      "axis": "metiers",
+      "title": "ANSSI & BSI : Guide conjoint de sécurisation des agents d'entreprise",
+      "source_url": "https://cert.ssi.gouv.fr/actualite/guide-agents-ia-2026/",
+      "trust_level": "A",
+      "date": "2026-07-15",
+      "facts": ["Principe de moindre privilège pour les outils d'agents", "Isolation obligatoire des environnements de navigation Playwright"],
+      "is_valid": true,
+      "attribution_correct": true
+    }
+  ]
+}

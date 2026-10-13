@@ -1,0 +1,18 @@
+# ContentOps Harness Codeowners
+
+# Default owner for entire repository
+* @GninhiM
+
+# Security, Vault, Auth & Infrastructure
+/packages/security/ @GninhiM
+/infra/ @GninhiM
+/config/ @GninhiM
+/.github/ @GninhiM
+.gitleaks.toml @GninhiM
+SECURITY.md @GninhiM
+
+# Orchestration & Multi-Agent Graphs
+/services/orchestration/ @GninhiM
+
+# Frontend UI & Design System
+/apps/web/ @GninhiM

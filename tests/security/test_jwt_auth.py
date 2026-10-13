@@ -178,3 +178,74 @@ def test_jwt_production_validation_fail_closed(monkeypatch):
     monkeypatch.setenv("JWT_SECRET_KEY", "a-very-strong-production-secret-key-for-contentops-2026-strict")
     validate_jwt_configuration()  # Must not raise
 
+
+def test_enterprise_login_with_valid_password():
+    """Enterprise login: Valid email and Argon2id password issues signed JWT."""
+    from infra.db.repository import ContentOpsRepository
+    from packages.security.passwords import hash_password
+
+    with SessionLocal() as db:
+        repo = ContentOpsRepository(db)
+        user = repo.get_user_by_email("login_test@contentops.internal")
+        if not user:
+            user = repo.create_user(
+                user_id="user_login_test",
+                email="login_test@contentops.internal",
+                full_name="Login Tester",
+                password_hash=hash_password("SecurePassword2026!"),
+            )
+            repo.add_workspace_member(
+                workspace_id="ws_default",
+                user_id="user_login_test",
+                role="Owner",
+            )
+        else:
+            repo.update_user_password(user.id, hash_password("SecurePassword2026!"))
+
+    res = client.post(
+        "/v1/auth/login",
+        json={
+            "email": "login_test@contentops.internal",
+            "password": "SecurePassword2026!",
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert "access_token" in data
+    assert data["user_id"] == "user_login_test"
+    assert data["role"] == "Owner"
+    assert data["workspace_id"] == "ws_default"
+
+    # Validate claims
+    claims = decode_access_token(data["access_token"])
+    assert claims["sub"] == "user_login_test"
+    assert claims["role"] == "Owner"
+    assert claims["workspace_id"] == "ws_default"
+    assert "jti" in claims
+
+
+def test_enterprise_login_with_invalid_password_returns_401():
+    """Enterprise login: Incorrect password returns 401 Unauthorized."""
+    res = client.post(
+        "/v1/auth/login",
+        json={
+            "email": "login_test@contentops.internal",
+            "password": "WrongPassword999!",
+        },
+    )
+    assert res.status_code == 401
+    assert "invalide" in res.json()["detail"].lower()
+
+
+def test_enterprise_login_with_unknown_email_returns_401():
+    """Enterprise login: Unknown email returns 401 Unauthorized without disclosing user existence."""
+    res = client.post(
+        "/v1/auth/login",
+        json={
+            "email": "nonexistent_user@contentops.internal",
+            "password": "SomePassword123!",
+        },
+    )
+    assert res.status_code == 401
+
+

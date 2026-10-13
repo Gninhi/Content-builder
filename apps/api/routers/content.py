@@ -1,4 +1,4 @@
-from typing import cast, Dict, Any
+from typing import cast, Dict, Any, Optional
 from datetime import datetime
 from langchain_core.runnables import RunnableConfig
 from fastapi import APIRouter, Depends, HTTPException, Body
@@ -13,7 +13,8 @@ from apps.api.dependencies import get_repository, UserContext, require_roles
 from infra.db.repository import ContentOpsRepository
 from infra.db.models import ContentVariantModel, ContentBriefModel
 from packages.domain.idempotency import compute_payload_hash
-from services.orchestration.llm import get_gemini_model, GeneratedVariant
+from services.orchestration.structured_output import invoke_structured_output
+from services.orchestration.llm import get_gemini_model, resolve_and_get_llm, GeneratedVariant
 
 router = APIRouter(tags=["Content Production & Approvals"])
 
@@ -22,6 +23,7 @@ router = APIRouter(tags=["Content Production & Approvals"])
 def generate_content_package(
     brief_id: str = Body(..., embed=True),
     workspace_id: str = Body("ws_default", embed=True),
+    llm_override: Optional[Dict[str, Any]] = Body(None, embed=True),
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor", "ServiceAgent"))
 ):
@@ -57,6 +59,7 @@ def generate_content_package(
         "requirements": dict(brief.requirements) if brief.requirements else {},
         "generated_variants": [],
         "qa_results": {},
+        "llm_override": llm_override,
         "status": ContentStatus.DRAFT,
         "run_id": "run_prod_1",
         "errors": []
@@ -116,7 +119,8 @@ def generate_content_package(
             "payload_hash": variant_model.payload_hash,
             "status": variant_model.status,
             "qa_score": var.get("qa_score", 100.0),
-            "checks": var.get("checks", [])
+            "checks": var.get("checks", []),
+            "provenance": var.get("provenance", {})
         })
 
     return {
@@ -202,8 +206,18 @@ def rewrite_content_variant(
         feedback=feedback
     )
 
-    # Invoke Gemini / LLM to rewrite based on user feedback
-    model = get_gemini_model(model_type="reasoning", temperature=0.3)
+    # Invoke configured multi-provider LLM to rewrite based on user feedback
+    model, _ = resolve_and_get_llm(
+        task_name="rewrite",
+        workspace_id=user.workspace_id,
+        temperature=0.3,
+        allow_none_if_unconfigured=True
+    )
+    if model is None:
+        try:
+            model = get_gemini_model(model_type="reasoning", temperature=0.3, workspace_id=user.workspace_id)
+        except Exception:
+            model = None
     revised_hook: str = str(variant.hook or "")
     revised_body: str = str(variant.body or "")
     revised_cta: str = str(variant.cta or "")
@@ -221,8 +235,7 @@ Call to Action (CTA) : {variant.cta}
 
 Mission : Réécris ce post en intégrant scrupuleusement le feedback du relecteur.
 Garde le style professionnel et direct. Ne génère aucune hallucination."""
-            structured_llm = model.with_structured_output(GeneratedVariant)
-            res = structured_llm.invoke(prompt)
+            res = invoke_structured_output(model=model, schema_cls=GeneratedVariant, prompt=prompt)
             if res and res.body:
                 revised_hook = str(res.hook or "")
                 revised_body = str(res.body or "")

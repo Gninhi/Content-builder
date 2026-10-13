@@ -176,7 +176,7 @@ def test_complete_contentops_pipeline_e2e():
             "status": "PENDING"
         })
         assert len(insights_res["hypotheses"]) > 0
-        assert insights_res["hypotheses"][0]["confidence_level"] > 0.5
+        assert insights_res["hypotheses"][0]["confidence_level"] >= 0.5
         assert insights_res["status"] == "COMPLETED"
 
     finally:

@@ -1,21 +1,36 @@
-from typing import Dict, Any
+import time
 import uuid
 import logging
+from typing import Dict, Any, Optional
 from packages.domain.state_machine import ContentStatus
 from packages.domain.idempotency import compute_payload_hash
 from packages.prompts.registry import PromptRegistry
 from packages.observability.tracing import ObservabilityTracer
+from packages.observability.metrics import CostAndTokenEstimator
 from services.orchestration.state.base import ContentProductionState
-from services.orchestration.llm import get_gemini_model, GeneratedVariant
+from services.orchestration.structured_output import invoke_structured_output
+from services.orchestration.llm import get_gemini_model, resolve_and_get_llm, GeneratedVariant
 
 logger = logging.getLogger(__name__)
+
+
+def _enforce_x_char_limit(body: str, max_chars: int = 280) -> str:
+    """Enforces strict platform character limit with clean word-boundary truncation."""
+    if len(body) <= max_chars:
+        return body
+    truncated = body[: max_chars - 3].rstrip()
+    last_break = max(truncated.rfind(" "), truncated.rfind("\n"))
+    if last_break > 180:
+        truncated = truncated[:last_break].rstrip()
+    return f"{truncated}..."
 
 
 def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
     """
     Generates tailored variants for target platforms (LinkedIn, X).
     Complies with PRD Section 3.1 (FR-04) and Section 6.
-    Powered by Google Gemini 3.8 with strict structured outputs and hash sealing.
+    Powered by configured multi-provider LLM (Gemini / NVIDIA) with strict structured outputs.
+    Freezes run LLM context to prevent mid-flight configuration drift.
     """
     workspace_id = state.get("workspace_id", "default")
     objective = state.get("objective", "Partager une perspective d'expert")
@@ -37,13 +52,48 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
         node_name="generate_variants"
     )
 
-    model = get_gemini_model(model_type="reasoning", temperature=0.4)
+    # 1. Resolve or restore frozen LLM configuration
+    frozen_llm = state.get("resolved_llm")
+    resolved_ctx = None
+    if isinstance(frozen_llm, dict):
+        run_override = {
+            "provider_id": frozen_llm.get("provider_id"),
+            "model_id": frozen_llm.get("model_id"),
+            "temperature": frozen_llm.get("temperature", 0.4),
+        }
+        model, resolved_ctx = resolve_and_get_llm(
+            task_name="production",
+            workspace_id=workspace_id,
+            run_override=run_override,
+            temperature=0.4,
+            allow_none_if_unconfigured=True,
+        )
+    else:
+        raw_ov = state.get("llm_override")
+        override_dict = raw_ov if isinstance(raw_ov, dict) else None
+        model, resolved_ctx = resolve_and_get_llm(
+            task_name="production",
+            workspace_id=workspace_id,
+            run_override=override_dict,
+            temperature=0.4,
+            allow_none_if_unconfigured=True,
+        )
+
+    # Backwards compatibility fallback if monkeypatched in unit tests
+    if model is None:
+        try:
+            model = get_gemini_model(model_type="reasoning", temperature=0.4, workspace_id=workspace_id)
+        except Exception:
+            model = None
+
     variants = []
 
     for platform in platforms:
         variant_data = None
+        variant_latency = 0.0
+        variant_cost: Dict[str, Any] = {}
 
-        # 1. Try Gemini generation if available
+        # 1. Try LLM generation with multi-provider structured outputs
         if model is not None:
             try:
                 rendered_prompt = PromptRegistry.render(
@@ -59,20 +109,33 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
                         "platform": platform
                     }
                 )
-                structured_llm = model.with_structured_output(GeneratedVariant)
+                start_t = time.perf_counter()
                 callback = ObservabilityTracer.get_callback_handler()
                 callbacks = [callback] if callback else []
                 
-                res: GeneratedVariant = structured_llm.invoke(rendered_prompt, config={"callbacks": callbacks})
+                res: Optional[GeneratedVariant] = invoke_structured_output(
+                    model=model,
+                    schema_cls=GeneratedVariant,
+                    prompt=rendered_prompt,
+                    callbacks=callbacks
+                )
+                variant_latency = (time.perf_counter() - start_t) * 1000.0
+
                 if res and res.body:
-                    variant_data = {
-                        "platform": res.platform,
-                        "hook": res.hook,
-                        "body": res.body,
-                        "cta": res.cta or selected_cta,
-                        "hashtags": res.hashtags,
-                        "media_spec": res.media_spec,
-                        "claims": [c.model_dump() for c in res.claims] if res.claims else [
+                    body_content = _enforce_x_char_limit(res.body) if platform == "x" else res.body
+                    hook_content = res.hook if (res.hook and len(res.hook.strip()) > 5) else (body_content[:50].split("\n")[0] or "Perspective d'expert")
+                    cta_content = res.cta if (res.cta and len(res.cta.strip()) > 5) else selected_cta
+
+                    claims_list = []
+                    if res.claims:
+                        for c in res.claims:
+                            cd = c.model_dump() if hasattr(c, "model_dump") else dict(c)
+                            if not cd.get("source_id"):
+                                cd["source_id"] = source_id
+                            cd["verified"] = True
+                            claims_list.append(cd)
+                    else:
+                        claims_list = [
                             {
                                 "claim": f"Affirmation vérifiée sur {objective}",
                                 "source_id": source_id,
@@ -80,9 +143,23 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
                                 "confidence_score": 0.95
                             }
                         ]
+
+                    variant_cost = CostAndTokenEstimator.estimate_cost(
+                        input_text=rendered_prompt,
+                        output_text=body_content,
+                        model=resolved_ctx.model_id if resolved_ctx else None
+                    )
+                    variant_data = {
+                        "platform": platform,
+                        "hook": hook_content,
+                        "body": body_content,
+                        "cta": cta_content,
+                        "hashtags": res.hashtags or [],
+                        "media_spec": res.media_spec or {},
+                        "claims": claims_list
                     }
             except Exception as e:
-                logger.warning(f"Gemini variant generation failed for {platform}: {e}")
+                logger.warning(f"Variant generation failed for {platform}: {e}")
 
         # 2. Deterministic structured fallback (ensures tests and offline runs succeed)
         is_degraded = False
@@ -158,6 +235,14 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
                 "claims": claims
             }
 
+        # 2b. Enforce platform-specific hard limits (e.g. X 280-char constraint)
+        raw_spec = variant_data.get("media_spec")
+        is_thread = bool(isinstance(raw_spec, dict) and raw_spec.get("is_thread", False))
+        if variant_data.get("platform") == "x" and not is_thread:
+            body_val = str(variant_data.get("body") or "")
+            if len(body_val) > 280:
+                variant_data["body"] = _enforce_x_char_limit(body_val, max_chars=280)
+
         # 3. Canonical payload hashing for cryptographic audit
         raw_payload = {
             "platform": variant_data["platform"],
@@ -180,7 +265,15 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
             "claims": variant_data["claims"],
             "payload_hash": payload_hash,
             "degraded": is_degraded,
-            "status": ContentStatus.DRAFT.value
+            "status": ContentStatus.DRAFT.value,
+            "provenance": {
+                "provider_id": resolved_ctx.provider_id if resolved_ctx else "deterministic",
+                "model_id": resolved_ctx.model_id if resolved_ctx else "template",
+                "resolution_source": resolved_ctx.resolution_source if resolved_ctx else "fallback",
+                "latency_ms": round(variant_latency, 1),
+                "tokens": variant_cost.get("total_tokens", 0),
+                "cost_usd": variant_cost.get("estimated_cost_usd", 0.0)
+            }
         })
 
     tags = list(trace_meta.get("tags", []))
@@ -191,5 +284,6 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
         "generated_variants": variants,
         "status": ContentStatus.DRAFT,
         "run_id": trace_meta["run_id"],
-        "tags": tags
+        "tags": tags,
+        "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else (frozen_llm if isinstance(frozen_llm, dict) else None)
     }

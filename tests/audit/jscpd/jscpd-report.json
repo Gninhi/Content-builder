@@ -1,0 +1,2637 @@
+{
+  "duplicates": [
+    {
+      "firstFile": {
+        "end": 30,
+        "endLoc": {
+          "column": 16,
+          "line": 30,
+          "position": 1168
+        },
+        "name": "api/routers/analytics.py",
+        "start": 24,
+        "startLoc": {
+          "column": 9,
+          "line": 24,
+          "position": 745
+        }
+      },
+      "format": "python",
+      "fragment": "    post = (\n        repo.db.query(PublishedPostModel)\n        .join(PublicationJobModel, PublishedPostModel.job_id == PublicationJobModel.id)\n        .join(ContentVariantModel, PublicationJobModel.variant_id == ContentVariantModel.id)\n        .join(ContentPackageModel, ContentVariantModel.package_id == ContentPackageModel.id)\n        .join(ContentBriefModel, ContentPackageModel.brief_id == ContentBriefModel.id)\n        .filter(",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 7,
+      "secondFile": {
+        "end": 61,
+        "endLoc": {
+          "column": 16,
+          "line": 61,
+          "position": 2483
+        },
+        "name": "api/routers/analytics.py",
+        "start": 55,
+        "startLoc": {
+          "column": 10,
+          "line": 55,
+          "position": 2060
+        }
+      },
+      "tokens": 69
+    },
+    {
+      "firstFile": {
+        "end": 30,
+        "endLoc": {
+          "column": 16,
+          "line": 30,
+          "position": 1168
+        },
+        "name": "api/routers/analytics.py",
+        "start": 25,
+        "startLoc": {
+          "column": 40,
+          "line": 25,
+          "position": 789
+        }
+      },
+      "format": "python",
+      "fragment": "        repo.db.query(PublishedPostModel)\n        .join(PublicationJobModel, PublishedPostModel.job_id == PublicationJobModel.id)\n        .join(ContentVariantModel, PublicationJobModel.variant_id == ContentVariantModel.id)\n        .join(ContentPackageModel, ContentVariantModel.package_id == ContentPackageModel.id)\n        .join(ContentBriefModel, ContentPackageModel.brief_id == ContentBriefModel.id)\n        .filter(",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 6,
+      "secondFile": {
+        "end": 43,
+        "endLoc": {
+          "column": 16,
+          "line": 43,
+          "position": 2114
+        },
+        "name": "api/routers/strategy.py",
+        "start": 38,
+        "startLoc": {
+          "column": 86,
+          "line": 38,
+          "position": 1735
+        }
+      },
+      "tokens": 60
+    },
+    {
+      "firstFile": {
+        "end": 30,
+        "endLoc": {
+          "column": 16,
+          "line": 30,
+          "position": 1168
+        },
+        "name": "api/routers/analytics.py",
+        "start": 25,
+        "startLoc": {
+          "column": 12,
+          "line": 25,
+          "position": 761
+        }
+      },
+      "format": "python",
+      "fragment": "        repo.db.query(PublishedPostModel)\n        .join(PublicationJobModel, PublishedPostModel.job_id == PublicationJobModel.id)\n        .join(ContentVariantModel, PublicationJobModel.variant_id == ContentVariantModel.id)\n        .join(ContentPackageModel, ContentVariantModel.package_id == ContentPackageModel.id)\n        .join(ContentBriefModel, ContentPackageModel.brief_id == ContentBriefModel.id)\n        .filter(",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 6,
+      "secondFile": {
+        "end": 219,
+        "endLoc": {
+          "column": 24,
+          "line": 219,
+          "position": 10299
+        },
+        "name": "publisher/worker.py",
+        "start": 214,
+        "startLoc": {
+          "column": 20,
+          "line": 214,
+          "position": 9852
+        }
+      },
+      "tokens": 66
+    },
+    {
+      "firstFile": {
+        "end": 436,
+        "endLoc": {
+          "column": 12,
+          "line": 436,
+          "position": 16366
+        },
+        "name": "api/routers/auth.py",
+        "start": 423,
+        "startLoc": {
+          "column": 54,
+          "line": 423,
+          "position": 15952
+        }
+      },
+      "format": "python",
+      "fragment": "    _set_refresh_cookie(response, raw_refresh, request)\n\n    client_ip = get_client_ip(request)\n    user_agent = request.headers.get(\"user-agent\") or \"ContentOps Client\"\n    try:\n        repo.create_session(\n            user_id=user.id,\n            token_jti=session_jti,\n            expires_at=utc_now() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),\n            user_agent=user_agent,\n            ip_address=client_ip,\n        )\n    except Exception:\n        pass",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 14,
+      "secondFile": {
+        "end": 594,
+        "endLoc": {
+          "column": 12,
+          "line": 594,
+          "position": 21656
+        },
+        "name": "api/routers/auth.py",
+        "start": 581,
+        "startLoc": {
+          "column": 4,
+          "line": 581,
+          "position": 21242
+        }
+      },
+      "tokens": 61
+    },
+    {
+      "firstFile": {
+        "end": 457,
+        "endLoc": {
+          "column": 5,
+          "line": 457,
+          "position": 16897
+        },
+        "name": "api/routers/auth.py",
+        "start": 444,
+        "startLoc": {
+          "column": 29,
+          "line": 444,
+          "position": 16572
+        }
+      },
+      "format": "python",
+      "fragment": "        user_agent=user_agent,\n    )\n\n    ws_list = [\n        WorkspaceMembershipSummary(\n            workspace_id=w[\"workspace_id\"],\n            name=w[\"name\"],\n            role=w[\"role\"],\n            timezone=w.get(\"timezone\", \"UTC\"),\n            is_owner=w.get(\"is_owner\", False),\n            is_demo=False,\n        )\n        for w in workspaces\n    ]",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 14,
+      "secondFile": {
+        "end": 755,
+        "endLoc": {
+          "column": 5,
+          "line": 755,
+          "position": 26937
+        },
+        "name": "api/routers/auth.py",
+        "start": 742,
+        "startLoc": {
+          "column": 23,
+          "line": 742,
+          "position": 26612
+        }
+      },
+      "tokens": 60
+    },
+    {
+      "firstFile": {
+        "end": 457,
+        "endLoc": {
+          "column": 5,
+          "line": 457,
+          "position": 16897
+        },
+        "name": "api/routers/auth.py",
+        "start": 445,
+        "startLoc": {
+          "column": 4,
+          "line": 445,
+          "position": 16578
+        }
+      },
+      "format": "python",
+      "fragment": "    )\n\n    ws_list = [\n        WorkspaceMembershipSummary(\n            workspace_id=w[\"workspace_id\"],\n            name=w[\"name\"],\n            role=w[\"role\"],\n            timezone=w.get(\"timezone\", \"UTC\"),\n            is_owner=w.get(\"is_owner\", False),\n            is_demo=False,\n        )\n        for w in workspaces\n    ]",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 13,
+      "secondFile": {
+        "end": 690,
+        "endLoc": {
+          "column": 5,
+          "line": 690,
+          "position": 24745
+        },
+        "name": "api/routers/auth.py",
+        "start": 679,
+        "startLoc": {
+          "column": 49,
+          "line": 679,
+          "position": 24427
+        }
+      },
+      "tokens": 59
+    },
+    {
+      "firstFile": {
+        "end": 457,
+        "endLoc": {
+          "column": 5,
+          "line": 457,
+          "position": 16897
+        },
+        "name": "api/routers/auth.py",
+        "start": 447,
+        "startLoc": {
+          "column": 4,
+          "line": 447,
+          "position": 16585
+        }
+      },
+      "format": "python",
+      "fragment": "    ws_list = [\n        WorkspaceMembershipSummary(\n            workspace_id=w[\"workspace_id\"],\n            name=w[\"name\"],\n            role=w[\"role\"],\n            timezone=w.get(\"timezone\", \"UTC\"),\n            is_owner=w.get(\"is_owner\", False),\n            is_demo=False,\n        )\n        for w in workspaces\n    ]",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 11,
+      "secondFile": {
+        "end": 606,
+        "endLoc": {
+          "column": 5,
+          "line": 606,
+          "position": 21974
+        },
+        "name": "api/routers/auth.py",
+        "start": 596,
+        "startLoc": {
+          "column": 4,
+          "line": 596,
+          "position": 21662
+        }
+      },
+      "tokens": 58
+    },
+    {
+      "firstFile": {
+        "end": 476,
+        "endLoc": {
+          "column": 16,
+          "line": 476,
+          "position": 17473
+        },
+        "name": "api/routers/auth.py",
+        "start": 459,
+        "startLoc": {
+          "column": 4,
+          "line": 459,
+          "position": 16903
+        }
+      },
+      "format": "python",
+      "fragment": "    return LoginResponse(\n        access_token=access_token,\n        token_type=\"bearer\",\n        user_id=user.id,\n        role=target_role,\n        workspace_id=target_ws,\n        user=UserSummary(\n            id=user.id,\n            email=user.email,\n            full_name=user.full_name or \"\",\n            display_name=user.display_name,\n            avatar_url=user.avatar_url,\n            email_verified=bool(user.email_verified),\n            language=user.language or \"fr\",\n            theme=user.theme or \"dark\",\n        ),\n        workspaces=ws_list,\n        is_demo=False,",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 18,
+      "secondFile": {
+        "end": 629,
+        "endLoc": {
+          "column": 16,
+          "line": 629,
+          "position": 22720
+        },
+        "name": "api/routers/auth.py",
+        "start": 612,
+        "startLoc": {
+          "column": 4,
+          "line": 612,
+          "position": 22150
+        }
+      },
+      "tokens": 94
+    },
+    {
+      "firstFile": {
+        "end": 476,
+        "endLoc": {
+          "column": 16,
+          "line": 476,
+          "position": 17473
+        },
+        "name": "api/routers/auth.py",
+        "start": 464,
+        "startLoc": {
+          "column": 30,
+          "line": 464,
+          "position": 17070
+        }
+      },
+      "format": "python",
+      "fragment": "        workspace_id=target_ws,\n        user=UserSummary(\n            id=user.id,\n            email=user.email,\n            full_name=user.full_name or \"\",\n            display_name=user.display_name,\n            avatar_url=user.avatar_url,\n            email_verified=bool(user.email_verified),\n            language=user.language or \"fr\",\n            theme=user.theme or \"dark\",\n        ),\n        workspaces=ws_list,\n        is_demo=False,",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 13,
+      "secondFile": {
+        "end": 777,
+        "endLoc": {
+          "column": 16,
+          "line": 777,
+          "position": 27669
+        },
+        "name": "api/routers/auth.py",
+        "start": 765,
+        "startLoc": {
+          "column": 43,
+          "line": 765,
+          "position": 27266
+        }
+      },
+      "tokens": 70
+    },
+    {
+      "firstFile": {
+        "end": 474,
+        "endLoc": {
+          "column": 10,
+          "line": 474,
+          "position": 17428
+        },
+        "name": "api/routers/auth.py",
+        "start": 465,
+        "startLoc": {
+          "column": 13,
+          "line": 465,
+          "position": 17085
+        }
+      },
+      "format": "python",
+      "fragment": "        user=UserSummary(\n            id=user.id,\n            email=user.email,\n            full_name=user.full_name or \"\",\n            display_name=user.display_name,\n            avatar_url=user.avatar_url,\n            email_verified=bool(user.email_verified),\n            language=user.language or \"fr\",\n            theme=user.theme or \"dark\",\n        ),",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 10,
+      "secondFile": {
+        "end": 706,
+        "endLoc": {
+          "column": 10,
+          "line": 706,
+          "position": 25338
+        },
+        "name": "api/routers/auth.py",
+        "start": 697,
+        "startLoc": {
+          "column": 16,
+          "line": 697,
+          "position": 24995
+        }
+      },
+      "tokens": 61
+    },
+    {
+      "firstFile": {
+        "end": 630,
+        "endLoc": {
+          "column": 19,
+          "line": 630,
+          "position": 22748
+        },
+        "name": "api/routers/auth.py",
+        "start": 621,
+        "startLoc": {
+          "column": 27,
+          "line": 621,
+          "position": 22426
+        }
+      },
+      "format": "python",
+      "fragment": "            full_name=user.full_name or \"\",\n            display_name=user.display_name,\n            avatar_url=user.avatar_url,\n            email_verified=bool(user.email_verified),\n            language=user.language or \"fr\",\n            theme=user.theme or \"dark\",\n        ),\n        workspaces=ws_list,\n        is_demo=is_demo,\n        expires_at=active_ws_record.expires_at.isoformat() if (active_ws_record and active_ws_record.expires_at) else None,",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 10,
+      "secondFile": {
+        "end": 778,
+        "endLoc": {
+          "column": 19,
+          "line": 778,
+          "position": 27697
+        },
+        "name": "api/routers/auth.py",
+        "start": 769,
+        "startLoc": {
+          "column": 27,
+          "line": 769,
+          "position": 27375
+        }
+      },
+      "tokens": 53
+    },
+    {
+      "firstFile": {
+        "end": 116,
+        "endLoc": {
+          "column": 52,
+          "line": 116,
+          "position": 4537
+        },
+        "name": "api/routers/ideas.py",
+        "start": 110,
+        "startLoc": {
+          "column": 14,
+          "line": 110,
+          "position": 4231
+        }
+      },
+      "format": "python",
+      "fragment": "def list_ideas(\n    workspace_id: Optional[str] = None,\n    repo: ContentOpsRepository = Depends(get_repository),\n    user: UserContext = Depends(require_roles(\"Owner\", \"Editor\", \"Viewer\", \"ServiceAgent\"))\n):\n    if workspace_id and workspace_id != user.workspace_id:\n        raise HTTPException(status_code=403, detail=\"Access to other workspace ideas is forbidden.\")",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 7,
+      "secondFile": {
+        "end": 59,
+        "endLoc": {
+          "column": 52,
+          "line": 59,
+          "position": 2311
+        },
+        "name": "api/routers/sources.py",
+        "start": 53,
+        "startLoc": {
+          "column": 16,
+          "line": 53,
+          "position": 2005
+        }
+      },
+      "tokens": 57
+    },
+    {
+      "firstFile": {
+        "end": 54,
+        "endLoc": {
+          "column": 115,
+          "line": 54,
+          "position": 2278
+        },
+        "name": "api/routers/publications.py",
+        "start": 47,
+        "startLoc": {
+          "column": 53,
+          "line": 47,
+          "position": 1796
+        }
+      },
+      "format": "python",
+      "fragment": "    user: UserContext = Depends(require_roles(\"Owner\"))\n):\n    job = repo.db.query(PublicationJobModel).filter(PublicationJobModel.id == job_id).first()\n    if not job:\n        raise HTTPException(status_code=404, detail=\"Publication job not found.\")\n    job_ws = job.variant.package.brief.workspace_id if (job.variant and job.variant.package and job.variant.package.brief) else None\n    if job_ws != user.workspace_id:\n        raise HTTPException(status_code=403, detail=\"Access to publication job in another workspace is forbidden.\")",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 8,
+      "secondFile": {
+        "end": 75,
+        "endLoc": {
+          "column": 115,
+          "line": 75,
+          "position": 3179
+        },
+        "name": "api/routers/publications.py",
+        "start": 68,
+        "startLoc": {
+          "column": 63,
+          "line": 68,
+          "position": 2697
+        }
+      },
+      "tokens": 95
+    },
+    {
+      "firstFile": {
+        "end": 61,
+        "endLoc": {
+          "column": 12,
+          "line": 61,
+          "position": 2072
+        },
+        "name": "api/routers/workspaces.py",
+        "start": 47,
+        "startLoc": {
+          "column": 4,
+          "line": 47,
+          "position": 1676
+        }
+      },
+      "format": "python",
+      "fragment": "    )\n    return BrandProfileResponse(\n        id=str(bp.id),\n        workspace_id=str(bp.workspace_id),\n        version=int(bp.version),\n        audience=list(bp.audience),\n        voice=str(bp.voice),\n        pillars=list(bp.pillars),\n        prohibited_topics=list(bp.prohibited_topics),\n        cta_policy=dict(bp.cta_policy),\n        created_at=cast(datetime, bp.created_at)\n    )\n\n\n@router.get(\"/v1/brand-profiles/{workspace_id}\", response_model=BrandProfileResponse)",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 15,
+      "secondFile": {
+        "end": 85,
+        "endLoc": {
+          "column": 12,
+          "line": 85,
+          "position": 3054
+        },
+        "name": "api/routers/workspaces.py",
+        "start": 71,
+        "startLoc": {
+          "column": 92,
+          "line": 71,
+          "position": 2658
+        }
+      },
+      "tokens": 92
+    },
+    {
+      "firstFile": {
+        "end": 68,
+        "endLoc": {
+          "column": 52,
+          "line": 68,
+          "position": 2439
+        },
+        "name": "api/routers/workspaces.py",
+        "start": 62,
+        "startLoc": {
+          "column": 21,
+          "line": 62,
+          "position": 2167
+        }
+      },
+      "format": "python",
+      "fragment": "def get_brand_profile(\n    workspace_id: str,\n    repo: ContentOpsRepository = Depends(get_repository),\n    user: UserContext = Depends(require_roles(\"Owner\", \"Editor\", \"Viewer\", \"ServiceAgent\"))\n):\n    if user.workspace_id != workspace_id:\n        raise HTTPException(status_code=403, detail=\"Access to other workspace's brand profile is forbidden.\")",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 7,
+      "secondFile": {
+        "end": 123,
+        "endLoc": {
+          "column": 52,
+          "line": 123,
+          "position": 4543
+        },
+        "name": "api/routers/workspaces.py",
+        "start": 117,
+        "startLoc": {
+          "column": 25,
+          "line": 117,
+          "position": 4271
+        }
+      },
+      "tokens": 50
+    },
+    {
+      "firstFile": {
+        "end": 34,
+        "endLoc": {
+          "column": 5,
+          "line": 34,
+          "position": 957
+        },
+        "name": "web/package-lock.json",
+        "start": 9,
+        "startLoc": {
+          "column": 24,
+          "line": 9,
+          "position": 178
+        }
+      },
+      "format": "json",
+      "fragment": "      \"version\": \"2.0.0\",\n      \"dependencies\": {\n        \"@fontsource/geist-mono\": \"^5.3.0\",\n        \"@fontsource/geist-sans\": \"^5.3.0\",\n        \"clsx\": \"^2.1.1\",\n        \"lucide-react\": \"^0.460.0\",\n        \"react\": \"^18.3.1\",\n        \"react-dom\": \"^18.3.1\",\n        \"tailwind-merge\": \"^2.5.4\"\n      },\n      \"devDependencies\": {\n        \"@testing-library/jest-dom\": \"^7.0.1\",\n        \"@testing-library/react\": \"^16.3.3\",\n        \"@types/react\": \"^18.3.12\",\n        \"@types/react-dom\": \"^18.3.1\",\n        \"@vitejs/plugin-react\": \"^4.3.3\",\n        \"autoprefixer\": \"^10.4.20\",\n        \"axe-core\": \"^4.14.0\",\n        \"happy-dom\": \"^20.14.5\",\n        \"postcss\": \"^8.4.47\",\n        \"tailwindcss\": \"^3.4.14\",\n        \"typescript\": \"^5.6.3\",\n        \"vite\": \"^5.4.10\",\n        \"vitest\": \"^2.1.4\"\n      }\n    },",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 26,
+      "secondFile": {
+        "end": 36,
+        "endLoc": {
+          "column": 1,
+          "line": 36,
+          "position": 897
+        },
+        "name": "web/package.json",
+        "start": 11,
+        "startLoc": {
+          "column": 3,
+          "line": 11,
+          "position": 218
+        }
+      },
+      "tokens": 89
+    },
+    {
+      "firstFile": {
+        "end": 74,
+        "endLoc": {
+          "column": 77,
+          "line": 74,
+          "position": 2642
+        },
+        "name": "web/src/__tests__/AuthContext.test.tsx",
+        "start": 63,
+        "startLoc": {
+          "column": 76,
+          "line": 63,
+          "position": 2373
+        }
+      },
+      "format": "tsx",
+      "fragment": "  it('stores JWT strictly in-memory and NEVER writes tokens to localStorage', async () => {\n    render(\n      <AuthProvider>\n        <TestAuthConsumer />\n      </AuthProvider>\n    );\n\n    await act(async () => {\n      screen.getByText('Login Owner').click();\n    });\n\n    expect(screen.getByTestId('auth-status')).toHaveTextContent('logged-in');",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 12,
+      "secondFile": {
+        "end": 135,
+        "endLoc": {
+          "column": 77,
+          "line": 135,
+          "position": 4793
+        },
+        "name": "web/src/__tests__/AuthContext.test.tsx",
+        "start": 125,
+        "startLoc": {
+          "column": 33,
+          "line": 125,
+          "position": 4525
+        }
+      },
+      "tokens": 60
+    },
+    {
+      "firstFile": {
+        "end": 100,
+        "endLoc": {
+          "column": 26,
+          "line": 100,
+          "position": 3006
+        },
+        "name": "web/src/__tests__/AuthFlows.test.tsx",
+        "start": 78,
+        "startLoc": {
+          "column": 13,
+          "line": 78,
+          "position": 2443
+        }
+      },
+      "format": "tsx",
+      "fragment": "            },\n            workspaces: [\n              {\n                workspace_id: 'ws_alice',\n                name: 'Alice WS',\n                role: 'Owner',\n                timezone: 'UTC',\n                is_owner: true,\n              },\n              {\n                workspace_id: 'ws_secondary',\n                name: 'Secondary WS',\n                role: 'Editor',\n                timezone: 'UTC',\n                is_owner: false,\n              },\n            ],\n            is_demo: false,\n          }),\n        } as Response;\n      }\n\n      if (urlStr.includes('/v1/auth/register')) {",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 23,
+      "secondFile": {
+        "end": 176,
+        "endLoc": {
+          "column": 26,
+          "line": 176,
+          "position": 5152
+        },
+        "name": "web/src/__tests__/AuthFlows.test.tsx",
+        "start": 154,
+        "startLoc": {
+          "column": 40,
+          "line": 154,
+          "position": 4589
+        }
+      },
+      "tokens": 70
+    },
+    {
+      "firstFile": {
+        "end": 208,
+        "endLoc": {
+          "column": 32,
+          "line": 208,
+          "position": 5813
+        },
+        "name": "web/src/__tests__/AuthFlows.test.tsx",
+        "start": 196,
+        "startLoc": {
+          "column": 58,
+          "line": 196,
+          "position": 5568
+        }
+      },
+      "format": "tsx",
+      "fragment": "  it('handles login with full user and workspaces profile', async () => {\n    render(\n      <AuthProvider>\n        <TestAuthDashboard />\n      </AuthProvider>\n    );\n\n    await act(async () => {\n      screen.getByText('Login').click();\n    });\n\n    await waitFor(() => {\n      expect(screen.getByTestId('auth-status')).toHaveTextContent('logged-in');",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 13,
+      "secondFile": {
+        "end": 227,
+        "endLoc": {
+          "column": 32,
+          "line": 227,
+          "position": 6475
+        },
+        "name": "web/src/__tests__/AuthFlows.test.tsx",
+        "start": 216,
+        "startLoc": {
+          "column": 38,
+          "line": 216,
+          "position": 6231
+        }
+      },
+      "tokens": 58
+    },
+    {
+      "firstFile": {
+        "end": 251,
+        "endLoc": {
+          "column": 79,
+          "line": 251,
+          "position": 7109
+        },
+        "name": "web/src/__tests__/AuthFlows.test.tsx",
+        "start": 239,
+        "startLoc": {
+          "column": 58,
+          "line": 239,
+          "position": 6812
+        }
+      },
+      "format": "tsx",
+      "fragment": "  it('starts ephemeral demo session with demo flag active', async () => {\n    render(\n      <AuthProvider>\n        <TestAuthDashboard />\n      </AuthProvider>\n    );\n\n    await act(async () => {\n      screen.getByText('Start Demo').click();\n    });\n\n    await waitFor(() => {\n      expect(screen.getByTestId('auth-status')).toHaveTextContent('logged-in');",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 13,
+      "secondFile": {
+        "end": 268,
+        "endLoc": {
+          "column": 79,
+          "line": 268,
+          "position": 7629
+        },
+        "name": "web/src/__tests__/AuthFlows.test.tsx",
+        "start": 257,
+        "startLoc": {
+          "column": 51,
+          "line": 257,
+          "position": 7333
+        }
+      },
+      "tokens": 67
+    },
+    {
+      "firstFile": {
+        "end": 22,
+        "endLoc": {
+          "column": 9,
+          "line": 22,
+          "position": 689
+        },
+        "name": "web/src/components/common/Input.tsx",
+        "start": 10,
+        "startLoc": {
+          "column": 66,
+          "line": 10,
+          "position": 263
+        }
+      },
+      "format": "tsx",
+      "fragment": "export const Input = React.forwardRef<HTMLInputElement, InputProps>(\n  ({ label, error, helperText, id, className, ...props }, ref) => {\n    const inputId = id || props.name;\n\n    return (\n      <div className=\"space-y-1.5 w-full\">\n        {label && (\n          <label htmlFor={inputId} className=\"block text-xs font-medium text-txt-secondary\">\n            {label}\n            {props.required && <span className=\"text-status-danger-text ml-1\">*</span>}\n          </label>\n        )}\n        <input",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 13,
+      "secondFile": {
+        "end": 22,
+        "endLoc": {
+          "column": 9,
+          "line": 22,
+          "position": 707
+        },
+        "name": "web/src/components/common/Textarea.tsx",
+        "start": 10,
+        "startLoc": {
+          "column": 75,
+          "line": 10,
+          "position": 281
+        }
+      },
+      "tokens": 86
+    },
+    {
+      "firstFile": {
+        "end": 48,
+        "endLoc": {
+          "column": 2,
+          "line": 48,
+          "position": 1734
+        },
+        "name": "web/src/components/common/Input.tsx",
+        "start": 28,
+        "startLoc": {
+          "column": 239,
+          "line": 28,
+          "position": 1140
+        }
+      },
+      "format": "tsx",
+      "fragment": "            'w-full bg-surface border rounded-md px-3.5 py-2 text-sm text-txt-primary placeholder:text-txt-muted transition-colors duration-150 min-h-[42px] focus:outline-none focus:ring-2 focus:ring-border-focus focus:border-border-focus',\n            error\n              ? 'border-status-danger-border text-status-danger-text focus:ring-status-danger-border'\n              : 'border-border hover:border-border-hover',\n            className\n          )}\n          {...props}\n        />\n        {error ? (\n          <p id={`${inputId}-error`} className=\"text-xs text-status-danger-text font-medium\" role=\"alert\">\n            {error}\n          </p>\n        ) : helperText ? (\n          <p id={`${inputId}-helper`} className=\"text-xs text-txt-muted\">\n            {helperText}\n          </p>\n        ) : null}\n      </div>\n    );\n  }\n);",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 21,
+      "secondFile": {
+        "end": 48,
+        "endLoc": {
+          "column": 2,
+          "line": 48,
+          "position": 1774
+        },
+        "name": "web/src/components/common/Textarea.tsx",
+        "start": 28,
+        "startLoc": {
+          "column": 258,
+          "line": 28,
+          "position": 1180
+        }
+      },
+      "tokens": 87
+    },
+    {
+      "firstFile": {
+        "end": 39,
+        "endLoc": {
+          "column": 19,
+          "line": 39,
+          "position": 1232
+        },
+        "name": "web/src/components/profile/NotificationsTab.tsx",
+        "start": 29,
+        "startLoc": {
+          "column": 21,
+          "line": 29,
+          "position": 809
+        }
+      },
+      "format": "tsx",
+      "fragment": "  onSaveNotifications,\n}) => {\n  const { language } = useLanguage();\n  const isEn = language === 'en';\n\n  return (\n    <div className=\"rounded-xl border border-border-default bg-surface p-6 lg:p-8 space-y-6 shadow-subtle transition-colors duration-150\">\n      <div className=\"flex items-start justify-between gap-4\">\n        <div>\n          <h2 className=\"text-base lg:text-lg font-semibold text-txt-primary tracking-tight\">\n            {isEn ? 'Notification Channels & Frequency' : 'Canaux & Fréquence de Notification'}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 11,
+      "secondFile": {
+        "end": 39,
+        "endLoc": {
+          "column": 19,
+          "line": 39,
+          "position": 1183
+        },
+        "name": "web/src/components/profile/PersonalInfoTab.tsx",
+        "start": 29,
+        "startLoc": {
+          "column": 8,
+          "line": 29,
+          "position": 760
+        }
+      },
+      "tokens": 51
+    },
+    {
+      "firstFile": {
+        "end": 39,
+        "endLoc": {
+          "column": 19,
+          "line": 39,
+          "position": 1232
+        },
+        "name": "web/src/components/profile/NotificationsTab.tsx",
+        "start": 30,
+        "startLoc": {
+          "column": 0,
+          "line": 30,
+          "position": 811
+        }
+      },
+      "format": "tsx",
+      "fragment": "}) => {\n  const { language } = useLanguage();\n  const isEn = language === 'en';\n\n  return (\n    <div className=\"rounded-xl border border-border-default bg-surface p-6 lg:p-8 space-y-6 shadow-subtle transition-colors duration-150\">\n      <div className=\"flex items-start justify-between gap-4\">\n        <div>\n          <h2 className=\"text-base lg:text-lg font-semibold text-txt-primary tracking-tight\">\n            {isEn ? 'Notification Channels & Frequency' : 'Canaux & Fréquence de Notification'}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 10,
+      "secondFile": {
+        "end": 20,
+        "endLoc": {
+          "column": 19,
+          "line": 20,
+          "position": 790
+        },
+        "name": "web/src/components/profile/WorkspacesTab.tsx",
+        "start": 11,
+        "startLoc": {
+          "column": 70,
+          "line": 11,
+          "position": 369
+        }
+      },
+      "tokens": 50
+    },
+    {
+      "firstFile": {
+        "end": 102,
+        "endLoc": {
+          "column": 21,
+          "line": 102,
+          "position": 3786
+        },
+        "name": "web/src/context/AuthContext.tsx",
+        "start": 92,
+        "startLoc": {
+          "column": 31,
+          "line": 92,
+          "position": 3418
+        }
+      },
+      "format": "tsx",
+      "fragment": "          const restoredSession: UserSession = {\n            user_id: data.user_id,\n            role: data.role,\n            workspace_id: data.workspace_id,\n            token: data.access_token,\n            user: data.user,\n            workspaces: data.workspaces || [],\n            is_demo: data.is_demo || false,\n            expires_at: data.expires_at || null,\n          };\n          setSession(restoredSession);",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 11,
+      "secondFile": {
+        "end": 164,
+        "endLoc": {
+          "column": 15,
+          "line": 164,
+          "position": 5350
+        },
+        "name": "web/src/context/AuthContext.tsx",
+        "start": 154,
+        "startLoc": {
+          "column": 20,
+          "line": 154,
+          "position": 5042
+        }
+      },
+      "tokens": 63
+    },
+    {
+      "firstFile": {
+        "end": 221,
+        "endLoc": {
+          "column": 35,
+          "line": 221,
+          "position": 7192
+        },
+        "name": "web/src/context/AuthContext.tsx",
+        "start": 213,
+        "startLoc": {
+          "column": 58,
+          "line": 213,
+          "position": 6955
+        }
+      },
+      "format": "tsx",
+      "fragment": "    const res = await fetch('/v1/auth/resend-verification', {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify({ email }),\n    });\n\n    if (!res.ok) {\n      const err = await res.json().catch(() => ({}));\n      throw new Error(err.detail || \"Erreur lors de l'envoi de l'email.\");",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 9,
+      "secondFile": {
+        "end": 237,
+        "endLoc": {
+          "column": 35,
+          "line": 237,
+          "position": 7701
+        },
+        "name": "web/src/context/AuthContext.tsx",
+        "start": 229,
+        "startLoc": {
+          "column": 54,
+          "line": 229,
+          "position": 7464
+        }
+      },
+      "tokens": 65
+    },
+    {
+      "firstFile": {
+        "end": 24,
+        "endLoc": {
+          "column": 74,
+          "line": 24,
+          "position": 878
+        },
+        "name": "web/src/index.css",
+        "start": 18,
+        "startLoc": {
+          "column": 17,
+          "line": 18,
+          "position": 578
+        }
+      },
+      "format": "css",
+      "fragment": "  .panel-surface {\n    background-color: var(--bg-surface);\n    border: 1px solid var(--border-default);\n    box-shadow: var(--shadow-sm);\n    color: var(--text-primary);\n    transition: border-color var(--duration-fast) var(--ease-standard),\n                background-color var(--duration-fast) var(--ease-standard);",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 7,
+      "secondFile": {
+        "end": 40,
+        "endLoc": {
+          "column": 74,
+          "line": 40,
+          "position": 1404
+        },
+        "name": "web/src/index.css",
+        "start": 34,
+        "startLoc": {
+          "column": 29,
+          "line": 34,
+          "position": 1104
+        }
+      },
+      "tokens": 93
+    },
+    {
+      "firstFile": {
+        "end": 25,
+        "endLoc": {
+          "column": 3,
+          "line": 25,
+          "position": 883
+        },
+        "name": "web/src/index.css",
+        "start": 18,
+        "startLoc": {
+          "column": 17,
+          "line": 18,
+          "position": 578
+        }
+      },
+      "format": "css",
+      "fragment": "  .panel-surface {\n    background-color: var(--bg-surface);\n    border: 1px solid var(--border-default);\n    box-shadow: var(--shadow-sm);\n    color: var(--text-primary);\n    transition: border-color var(--duration-fast) var(--ease-standard),\n                background-color var(--duration-fast) var(--ease-standard);\n  }",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 8,
+      "secondFile": {
+        "end": 57,
+        "endLoc": {
+          "column": 3,
+          "line": 57,
+          "position": 1975
+        },
+        "name": "web/src/index.css",
+        "start": 50,
+        "startLoc": {
+          "column": 15,
+          "line": 50,
+          "position": 1670
+        }
+      },
+      "tokens": 95
+    },
+    {
+      "firstFile": {
+        "end": 27,
+        "endLoc": {
+          "column": 3,
+          "line": 27,
+          "position": 888
+        },
+        "name": "web/src/index.css",
+        "start": 22,
+        "startLoc": {
+          "column": 14,
+          "line": 22,
+          "position": 714
+        }
+      },
+      "format": "css",
+      "fragment": "    color: var(--text-primary);\n    transition: border-color var(--duration-fast) var(--ease-standard),\n                background-color var(--duration-fast) var(--ease-standard);\n  }\n\n  .panel-surface-raised {",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 6,
+      "secondFile": {
+        "end": 58,
+        "endLoc": {
+          "column": 1,
+          "line": 58,
+          "position": 1977
+        },
+        "name": "web/src/index.css",
+        "start": 54,
+        "startLoc": {
+          "column": 14,
+          "line": 54,
+          "position": 1806
+        }
+      },
+      "tokens": 51
+    },
+    {
+      "firstFile": {
+        "end": 528,
+        "endLoc": {
+          "column": 15,
+          "line": 528,
+          "position": 18910
+        },
+        "name": "web/src/screens/AuthScreen.tsx",
+        "start": 517,
+        "startLoc": {
+          "column": 18,
+          "line": 517,
+          "position": 18473
+        }
+      },
+      "format": "tsx",
+      "fragment": "                  className=\"pr-10\"\n                />\n                <button\n                  type=\"button\"\n                  onClick={() => setShowPassword(!showPassword)}\n                  className=\"absolute right-3 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt\"\n                >\n                  {showPassword ? <EyeOff className=\"h-4 w-4\" /> : <Eye className=\"h-4 w-4\" />}\n                </button>\n              </div>\n\n              {/* Password strength meter */}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 12,
+      "secondFile": {
+        "end": 712,
+        "endLoc": {
+          "column": 15,
+          "line": 712,
+          "position": 25971
+        },
+        "name": "web/src/screens/AuthScreen.tsx",
+        "start": 701,
+        "startLoc": {
+          "column": 18,
+          "line": 701,
+          "position": 25534
+        }
+      },
+      "tokens": 59
+    },
+    {
+      "firstFile": {
+        "end": 666,
+        "endLoc": {
+          "column": 24,
+          "line": 666,
+          "position": 24254
+        },
+        "name": "web/src/screens/AuthScreen.tsx",
+        "start": 645,
+        "startLoc": {
+          "column": 40,
+          "line": 645,
+          "position": 23424
+        }
+      },
+      "format": "tsx",
+      "fragment": "              {t.auth.reset_password_btn}\n            </Button>\n\n            <button\n              type=\"button\"\n              onClick={() => {\n                setCurrentView('login');\n                setErrorMessage(null);\n                setSuccessMessage(null);\n              }}\n              className=\"flex items-center justify-center gap-2 w-full py-2 text-xs text-txt-secondary hover:text-txt transition-colors min-h-[40px]\"\n            >\n              <ArrowLeft className=\"h-3.5 w-3.5\" />\n              <span>{t.auth.back_to_login}</span>\n            </button>\n          </form>\n        )}\n\n        {/* ================================================================= */}\n        {/* VIEW: RESET PASSWORD                                              */}\n        {/* ================================================================= */}\n        {currentView === 'reset_password' && (",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 22,
+      "secondFile": {
+        "end": 754,
+        "endLoc": {
+          "column": 24,
+          "line": 754,
+          "position": 27709
+        },
+        "name": "web/src/screens/AuthScreen.tsx",
+        "start": 733,
+        "startLoc": {
+          "column": 35,
+          "line": 733,
+          "position": 26879
+        }
+      },
+      "tokens": 88
+    },
+    {
+      "firstFile": {
+        "end": 308,
+        "endLoc": {
+          "column": 15,
+          "line": 308,
+          "position": 12206
+        },
+        "name": "web/src/screens/BrandProfileScreen.tsx",
+        "start": 294,
+        "startLoc": {
+          "column": 32,
+          "line": 294,
+          "position": 11726
+        }
+      },
+      "format": "tsx",
+      "fragment": "                    setNewPillar('');\n                  }\n                }}\n              >\n                <Plus className=\"h-4 w-4\" />\n              </Button>\n            </div>\n          )}\n        </div>\n\n        {/* Prohibited Topics */}\n        <div className=\"rounded-xl border border-border-default bg-surface p-5 sm:p-6 space-y-4 shadow-subtle\">\n          <div className=\"flex items-center justify-between\">\n            <label className=\"block text-xs font-semibold text-txt-secondary\">\n              {t.brand.prohibited_label}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 15,
+      "secondFile": {
+        "end": 366,
+        "endLoc": {
+          "column": 15,
+          "line": 366,
+          "position": 14653
+        },
+        "name": "web/src/screens/BrandProfileScreen.tsx",
+        "start": 352,
+        "startLoc": {
+          "column": 36,
+          "line": 352,
+          "position": 14180
+        }
+      },
+      "tokens": 59
+    },
+    {
+      "firstFile": {
+        "end": 210,
+        "endLoc": {
+          "column": 11,
+          "line": 210,
+          "position": 8044
+        },
+        "name": "web/src/screens/CalendarScreen.tsx",
+        "start": 197,
+        "startLoc": {
+          "column": 51,
+          "line": 197,
+          "position": 7561
+        }
+      },
+      "format": "tsx",
+      "fragment": "                onClick={() => setPlatformFilter(p)}\n                className={`rounded px-2.5 py-1 font-medium transition-colors ${\n                  platformFilter === p\n                    ? 'bg-accent text-txt-inverse font-bold shadow-xs'\n                    : 'text-txt-muted hover:text-txt-primary'\n                }`}\n              >\n                {p === 'all' ? (isEn ? 'All' : 'Toutes') : p.toUpperCase()}\n              </button>\n            ))}\n          </div>\n\n          {/* Month / Week / List Switcher */}\n          <div className=\"flex items-center rounded-md border border-border-default bg-surface-subtle p-0.5 text-xs\">",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 14,
+      "secondFile": {
+        "end": 251,
+        "endLoc": {
+          "column": 11,
+          "line": 251,
+          "position": 9079
+        },
+        "name": "web/src/screens/InboxScreen.tsx",
+        "start": 238,
+        "startLoc": {
+          "column": 17,
+          "line": 238,
+          "position": 8598
+        }
+      },
+      "tokens": 53
+    },
+    {
+      "firstFile": {
+        "end": 8,
+        "endLoc": {
+          "column": 8,
+          "line": 8,
+          "position": 366
+        },
+        "name": "web/src/screens/ConnectionsScreen.tsx",
+        "start": 1,
+        "startLoc": {
+          "column": 0,
+          "line": 1,
+          "position": 0
+        }
+      },
+      "format": "tsx",
+      "fragment": "import React, { useState, useEffect } from 'react';\nimport { useLanguage } from '../context/LanguageContext';\nimport { useAuth } from '../context/AuthContext';\nimport { useToast } from '../context/ToastContext';\nimport { apiClient } from '../lib/api';\nimport { Button } from '../components/common/Button';\nimport { Badge } from '../components/common/Badge';\nimport { Skeleton } from '../components/common/Skeleton';",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 8,
+      "secondFile": {
+        "end": 8,
+        "endLoc": {
+          "column": 8,
+          "line": 8,
+          "position": 366
+        },
+        "name": "web/src/screens/IdeationScreen.tsx",
+        "start": 1,
+        "startLoc": {
+          "column": 0,
+          "line": 1,
+          "position": 0
+        }
+      },
+      "tokens": 55
+    },
+    {
+      "firstFile": {
+        "end": 9,
+        "endLoc": {
+          "column": 8,
+          "line": 9,
+          "position": 424
+        },
+        "name": "web/src/screens/ConnectionsScreen.tsx",
+        "start": 1,
+        "startLoc": {
+          "column": 0,
+          "line": 1,
+          "position": 0
+        }
+      },
+      "format": "tsx",
+      "fragment": "import React, { useState, useEffect } from 'react';\nimport { useLanguage } from '../context/LanguageContext';\nimport { useAuth } from '../context/AuthContext';\nimport { useToast } from '../context/ToastContext';\nimport { apiClient } from '../lib/api';\nimport { Button } from '../components/common/Button';\nimport { Badge } from '../components/common/Badge';\nimport { Skeleton } from '../components/common/Skeleton';\nimport { ErrorState } from '../components/common/ErrorState';",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 9,
+      "secondFile": {
+        "end": 9,
+        "endLoc": {
+          "column": 8,
+          "line": 9,
+          "position": 424
+        },
+        "name": "web/src/screens/InsightsScreen.tsx",
+        "start": 1,
+        "startLoc": {
+          "column": 0,
+          "line": 1,
+          "position": 0
+        }
+      },
+      "tokens": 62
+    },
+    {
+      "firstFile": {
+        "end": 347,
+        "endLoc": {
+          "column": 50,
+          "line": 347,
+          "position": 13391
+        },
+        "name": "web/src/screens/ConnectionsScreen.tsx",
+        "start": 335,
+        "startLoc": {
+          "column": 63,
+          "line": 335,
+          "position": 12902
+        }
+      },
+      "format": "tsx",
+      "fragment": "                    onClick={() => setDisconnectTarget(linkedIn)}\n                    className=\"text-xs min-h-[44px]\"\n                    title={!isOwner ? 'Réservé au rôle Owner' : 'Déconnecter le compte'}\n                  >\n                    <Unlink className=\"h-3.5 w-3.5 mr-1.5\" />\n                    Déconnecter\n                  </Button>\n                </div>\n                <Button\n                  variant=\"ghost\"\n                  size=\"sm\"\n                  disabled={!isOwner}\n                  onClick={() => handleStartOAuth('linkedin')}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 13,
+      "secondFile": {
+        "end": 461,
+        "endLoc": {
+          "column": 50,
+          "line": 461,
+          "position": 18896
+        },
+        "name": "web/src/screens/ConnectionsScreen.tsx",
+        "start": 449,
+        "startLoc": {
+          "column": 63,
+          "line": 449,
+          "position": 18407
+        }
+      },
+      "tokens": 57
+    },
+    {
+      "firstFile": {
+        "end": 359,
+        "endLoc": {
+          "column": 62,
+          "line": 359,
+          "position": 13955
+        },
+        "name": "web/src/screens/ConnectionsScreen.tsx",
+        "start": 347,
+        "startLoc": {
+          "column": 60,
+          "line": 347,
+          "position": 13401
+        }
+      },
+      "format": "tsx",
+      "fragment": "                  onClick={() => handleStartOAuth('linkedin')}\n                  className=\"w-full text-xs text-txt-muted hover:text-txt min-h-[40px]\"\n                  title=\"Ouvrir à nouveau la fenêtre d'autorisation dans un autre onglet\"\n                >\n                  <ExternalLink className=\"h-3 w-3 mr-1.5\" />\n                  Renouveler l'autorisation (Nouvel onglet)\n                </Button>\n              </div>\n            ) : (\n              <div className=\"space-y-2.5\">\n                <Button\n                  variant=\"primary\"\n                  disabled={!isOwner || connectingProvider === 'linkedin'}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 13,
+      "secondFile": {
+        "end": 473,
+        "endLoc": {
+          "column": 62,
+          "line": 473,
+          "position": 19453
+        },
+        "name": "web/src/screens/ConnectionsScreen.tsx",
+        "start": 461,
+        "startLoc": {
+          "column": 53,
+          "line": 461,
+          "position": 18899
+        }
+      },
+      "tokens": 50
+    },
+    {
+      "firstFile": {
+        "end": 123,
+        "endLoc": {
+          "column": 18,
+          "line": 123,
+          "position": 4994
+        },
+        "name": "web/src/styles/tokens.css",
+        "start": 108,
+        "startLoc": {
+          "column": 43,
+          "line": 108,
+          "position": 4485
+        }
+      },
+      "format": "css",
+      "fragment": "  --status-warning-text: oklch(0.85 0.14 55);\n\n  --status-danger-bg: oklch(0.20 0.07 25);\n  --status-danger-border: oklch(0.40 0.14 25);\n  --status-danger-text: oklch(0.82 0.15 25);\n\n  --status-info-bg: oklch(0.20 0.04 235);\n  --status-info-border: oklch(0.36 0.08 235);\n  --status-info-text: oklch(0.82 0.09 235);\n\n  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.4);\n  --shadow-md: 0 4px 12px -2px oklch(0 0 0 / 0.5), 0 0 0 1px var(--border-subtle);\n  --shadow-lg: 0 12px 32px -4px oklch(0 0 0 / 0.6), 0 0 0 1px var(--border-default);\n}\n\nhtml[data-palette=\"graphite\"][data-mode=\"light\"],",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 16,
+      "secondFile": {
+        "end": 322,
+        "endLoc": {
+          "column": 18,
+          "line": 322,
+          "position": 13373
+        },
+        "name": "web/src/styles/tokens.css",
+        "start": 307,
+        "startLoc": {
+          "column": 43,
+          "line": 307,
+          "position": 12864
+        }
+      },
+      "tokens": 194
+    },
+    {
+      "firstFile": {
+        "end": 123,
+        "endLoc": {
+          "column": 18,
+          "line": 123,
+          "position": 4994
+        },
+        "name": "web/src/styles/tokens.css",
+        "start": 116,
+        "startLoc": {
+          "column": 41,
+          "line": 116,
+          "position": 4754
+        }
+      },
+      "format": "css",
+      "fragment": "  --status-info-text: oklch(0.82 0.09 235);\n\n  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.4);\n  --shadow-md: 0 4px 12px -2px oklch(0 0 0 / 0.5), 0 0 0 1px var(--border-subtle);\n  --shadow-lg: 0 12px 32px -4px oklch(0 0 0 / 0.6), 0 0 0 1px var(--border-default);\n}\n\nhtml[data-palette=\"graphite\"][data-mode=\"light\"],",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 8,
+      "secondFile": {
+        "end": 223,
+        "endLoc": {
+          "column": 18,
+          "line": 223,
+          "position": 9207
+        },
+        "name": "web/src/styles/tokens.css",
+        "start": 216,
+        "startLoc": {
+          "column": 41,
+          "line": 216,
+          "position": 8967
+        }
+      },
+      "tokens": 104
+    },
+    {
+      "firstFile": {
+        "end": 174,
+        "endLoc": {
+          "column": 11,
+          "line": 174,
+          "position": 7122
+        },
+        "name": "web/src/styles/tokens.css",
+        "start": 166,
+        "startLoc": {
+          "column": 41,
+          "line": 166,
+          "position": 6808
+        }
+      },
+      "format": "css",
+      "fragment": "  --status-info-text: oklch(0.34 0.09 235);\n\n  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.05);\n  --shadow-md: 0 4px 12px -2px oklch(0 0 0 / 0.08), 0 0 0 1px var(--border-subtle);\n  --shadow-lg: 0 12px 32px -4px oklch(0 0 0 / 0.12), 0 0 0 1px var(--border-default);\n}\n\n/* ==========================================================================\n   PALETTE 2 : PAPIER & ENCRE (Édition littéraire, parchemin chaud & encre indigo)",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 9,
+      "secondFile": {
+        "end": 273,
+        "endLoc": {
+          "column": 11,
+          "line": 273,
+          "position": 11347
+        },
+        "name": "web/src/styles/tokens.css",
+        "start": 265,
+        "startLoc": {
+          "column": 41,
+          "line": 265,
+          "position": 11033
+        }
+      },
+      "tokens": 185
+    },
+    {
+      "firstFile": {
+        "end": 174,
+        "endLoc": {
+          "column": 11,
+          "line": 174,
+          "position": 7122
+        },
+        "name": "web/src/styles/tokens.css",
+        "start": 166,
+        "startLoc": {
+          "column": 38,
+          "line": 166,
+          "position": 6805
+        }
+      },
+      "format": "css",
+      "fragment": "  --status-info-text: oklch(0.34 0.09 235);\n\n  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.05);\n  --shadow-md: 0 4px 12px -2px oklch(0 0 0 / 0.08), 0 0 0 1px var(--border-subtle);\n  --shadow-lg: 0 12px 32px -4px oklch(0 0 0 / 0.12), 0 0 0 1px var(--border-default);\n}\n\n/* ==========================================================================\n   PALETTE 2 : PAPIER & ENCRE (Édition littéraire, parchemin chaud & encre indigo)",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 9,
+      "secondFile": {
+        "end": 371,
+        "endLoc": {
+          "column": 11,
+          "line": 371,
+          "position": 15466
+        },
+        "name": "web/src/styles/tokens.css",
+        "start": 363,
+        "startLoc": {
+          "column": 38,
+          "line": 363,
+          "position": 15149
+        }
+      },
+      "tokens": 186
+    },
+    {
+      "firstFile": {
+        "end": 255,
+        "endLoc": {
+          "column": 38,
+          "line": 255,
+          "position": 10667
+        },
+        "name": "web/src/styles/tokens.css",
+        "start": 249,
+        "startLoc": {
+          "column": 36,
+          "line": 249,
+          "position": 10483
+        }
+      },
+      "format": "css",
+      "fragment": "  --accent-text: oklch(0.36 0.18 255);\n\n  --status-success-bg: oklch(0.94 0.04 145);\n  --status-success-border: oklch(0.74 0.09 145);\n  --status-success-text: oklch(0.28 0.11 145);\n\n  --status-warning-bg: oklch(0.94 0.05 65);",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 7,
+      "secondFile": {
+        "end": 353,
+        "endLoc": {
+          "column": 38,
+          "line": 353,
+          "position": 14786
+        },
+        "name": "web/src/styles/tokens.css",
+        "start": 347,
+        "startLoc": {
+          "column": 36,
+          "line": 347,
+          "position": 14602
+        }
+      },
+      "tokens": 59
+    },
+    {
+      "firstFile": {
+        "end": 273,
+        "endLoc": {
+          "column": 11,
+          "line": 273,
+          "position": 11347
+        },
+        "name": "web/src/styles/tokens.css",
+        "start": 261,
+        "startLoc": {
+          "column": 42,
+          "line": 261,
+          "position": 10900
+        }
+      },
+      "format": "css",
+      "fragment": "  --status-danger-text: oklch(0.34 0.14 28);\n\n  --status-info-bg: oklch(0.94 0.03 240);\n  --status-info-border: oklch(0.76 0.07 240);\n  --status-info-text: oklch(0.30 0.08 240);\n\n  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.05);\n  --shadow-md: 0 4px 12px -2px oklch(0 0 0 / 0.08), 0 0 0 1px var(--border-subtle);\n  --shadow-lg: 0 12px 32px -4px oklch(0 0 0 / 0.12), 0 0 0 1px var(--border-default);\n}\n\n/* ==========================================================================\n   PALETTE 3 : ARDOISE & SAUGE (Nordique minéral, fjord profond & sauge fraîche)",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 13,
+      "secondFile": {
+        "end": 469,
+        "endLoc": {
+          "column": 11,
+          "line": 469,
+          "position": 19434
+        },
+        "name": "web/src/styles/tokens.css",
+        "start": 457,
+        "startLoc": {
+          "column": 42,
+          "line": 457,
+          "position": 18987
+        }
+      },
+      "tokens": 230
+    },
+    {
+      "firstFile": {
+        "end": 309,
+        "endLoc": {
+          "column": 32,
+          "line": 309,
+          "position": 12900
+        },
+        "name": "web/src/styles/tokens.css",
+        "start": 303,
+        "startLoc": {
+          "column": 44,
+          "line": 303,
+          "position": 12725
+        }
+      },
+      "format": "css",
+      "fragment": "  --status-success-text: oklch(0.84 0.12 145);\n\n  --status-warning-bg: oklch(0.22 0.06 60);\n  --status-warning-border: oklch(0.42 0.12 60);\n  --status-warning-text: oklch(0.85 0.13 60);\n\n  --status-danger-bg: oklch(0.20 0.07 25);",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 7,
+      "secondFile": {
+        "end": 407,
+        "endLoc": {
+          "column": 32,
+          "line": 407,
+          "position": 17042
+        },
+        "name": "web/src/styles/tokens.css",
+        "start": 401,
+        "startLoc": {
+          "column": 44,
+          "line": 401,
+          "position": 16867
+        }
+      },
+      "tokens": 58
+    },
+    {
+      "firstFile": {
+        "end": 357,
+        "endLoc": {
+          "column": 37,
+          "line": 357,
+          "position": 14924
+        },
+        "name": "web/src/styles/tokens.css",
+        "start": 351,
+        "startLoc": {
+          "column": 44,
+          "line": 351,
+          "position": 14744
+        }
+      },
+      "format": "css",
+      "fragment": "  --status-success-text: oklch(0.28 0.11 145);\n\n  --status-warning-bg: oklch(0.94 0.05 60);\n  --status-warning-border: oklch(0.76 0.12 60);\n  --status-warning-text: oklch(0.34 0.13 60);\n\n  --status-danger-bg: oklch(0.94 0.05 25);",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 7,
+      "secondFile": {
+        "end": 455,
+        "endLoc": {
+          "column": 37,
+          "line": 455,
+          "position": 18892
+        },
+        "name": "web/src/styles/tokens.css",
+        "start": 449,
+        "startLoc": {
+          "column": 44,
+          "line": 449,
+          "position": 18712
+        }
+      },
+      "tokens": 59
+    },
+    {
+      "firstFile": {
+        "end": 516,
+        "endLoc": {
+          "column": 1,
+          "line": 516,
+          "position": 20828
+        },
+        "name": "web/src/styles/tokens.css",
+        "start": 511,
+        "startLoc": {
+          "column": 29,
+          "line": 511,
+          "position": 20707
+        }
+      },
+      "format": "css",
+      "fragment": "  --status-info-text: #bfdbfe;\n\n  --shadow-sm: none;\n  --shadow-md: 0 0 0 2px var(--border-default);\n  --shadow-lg: 0 0 0 3px var(--border-default);\n}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 6,
+      "secondFile": {
+        "end": 564,
+        "endLoc": {
+          "column": 1,
+          "line": 564,
+          "position": 22208
+        },
+        "name": "web/src/styles/tokens.css",
+        "start": 559,
+        "startLoc": {
+          "column": 29,
+          "line": 559,
+          "position": 22087
+        }
+      },
+      "tokens": 50
+    },
+    {
+      "firstFile": {
+        "end": 22,
+        "endLoc": {
+          "column": 25,
+          "line": 22,
+          "position": 551
+        },
+        "name": "connectors/social/linkedin.py",
+        "start": 6,
+        "startLoc": {
+          "column": 0,
+          "line": 6,
+          "position": 138
+        }
+      },
+      "format": "python",
+      "fragment": "import httpx\n\nfrom packages.connectors.social.base import (\n    BaseSocialConnector,\n    SocialPublisher,\n    BaseSocialPublisher,\n    SocialPublisherRegistry,\n)\nfrom packages.connectors.social.models import (\n    PublicationResult,\n    PublicationStatus,\n    SocialProvider,\n)\nfrom packages.connectors.social.exceptions import (\n    SocialAuthenticationError,\n    SocialPermissionError,\n    SocialRateLimitError,",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 17,
+      "secondFile": {
+        "end": 23,
+        "endLoc": {
+          "column": 25,
+          "line": 23,
+          "position": 570
+        },
+        "name": "connectors/social/x_twitter.py",
+        "start": 7,
+        "startLoc": {
+          "column": 0,
+          "line": 7,
+          "position": 157
+        }
+      },
+      "tokens": 54
+    },
+    {
+      "firstFile": {
+        "end": 247,
+        "endLoc": {
+          "column": 38,
+          "line": 247,
+          "position": 10381
+        },
+        "name": "connectors/social/linkedin.py",
+        "start": 236,
+        "startLoc": {
+          "column": 90,
+          "line": 236,
+          "position": 10070
+        }
+      },
+      "format": "python",
+      "fragment": "                f\"Unexpected LinkedIn API response (HTTP {resp.status_code}): {resp.text}\",\n                provider=self.provider.value\n            )\n\n    def schedule(\n        self,\n        content: str,\n        scheduled_at: datetime,\n        media_urls: Optional[List[str]] = None,\n        options: Optional[Dict[str, Any]] = None\n    ) -> PublicationResult:\n        self.validate_content(content)",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 12,
+      "secondFile": {
+        "end": 287,
+        "endLoc": {
+          "column": 38,
+          "line": 287,
+          "position": 12197
+        },
+        "name": "connectors/social/x_twitter.py",
+        "start": 276,
+        "startLoc": {
+          "column": 83,
+          "line": 276,
+          "position": 11886
+        }
+      },
+      "tokens": 58
+    },
+    {
+      "firstFile": {
+        "end": 265,
+        "endLoc": {
+          "column": 13,
+          "line": 265,
+          "position": 11159
+        },
+        "name": "connectors/social/linkedin.py",
+        "start": 250,
+        "startLoc": {
+          "column": 8,
+          "line": 250,
+          "position": 10556
+        }
+      },
+      "format": "python",
+      "fragment": "        if self.sandbox_mode:\n            self._sandbox_registry[post_id] = PublicationStatus.SCHEDULED\n        return PublicationResult(\n            platform_post_id=post_id,\n            provider=self.provider,\n            status=PublicationStatus.SCHEDULED,\n            scheduled_at=scheduled_at,\n            metadata={\"scheduler\": \"internal_contentops\", \"target_time\": scheduled_at.isoformat()}\n        )\n\n    def delete(self, platform_post_id: str) -> bool:\n        if self.sandbox_mode:\n            self._sandbox_registry[platform_post_id] = PublicationStatus.DELETED\n            return True\n\n        self.check_token_liveness()",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 16,
+      "secondFile": {
+        "end": 304,
+        "endLoc": {
+          "column": 13,
+          "line": 304,
+          "position": 12862
+        },
+        "name": "connectors/social/x_twitter.py",
+        "start": 289,
+        "startLoc": {
+          "column": 8,
+          "line": 289,
+          "position": 12259
+        }
+      },
+      "tokens": 86
+    },
+    {
+      "firstFile": {
+        "end": 273,
+        "endLoc": {
+          "column": 32,
+          "line": 273,
+          "position": 11508
+        },
+        "name": "connectors/social/linkedin.py",
+        "start": 265,
+        "startLoc": {
+          "column": 8,
+          "line": 265,
+          "position": 11154
+        }
+      },
+      "format": "python",
+      "fragment": "        self.check_token_liveness()\n        encoded_urn = urllib.parse.quote(platform_post_id, safe=\"\")\n        headers = {\n            \"Authorization\": f\"Bearer {self.access_token or ''}\",\n            \"LinkedIn-Version\": str(self.api_version or \"202601\"),\n            \"X-Restli-Protocol-Version\": \"2.0.0\",\n        }\n        try:\n            resp = self._client.delete(",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 9,
+      "secondFile": {
+        "end": 293,
+        "endLoc": {
+          "column": 32,
+          "line": 293,
+          "position": 12290
+        },
+        "name": "connectors/social/linkedin.py",
+        "start": 285,
+        "startLoc": {
+          "column": 8,
+          "line": 285,
+          "position": 11936
+        }
+      },
+      "tokens": 51
+    },
+    {
+      "firstFile": {
+        "end": 327,
+        "endLoc": {
+          "column": 30,
+          "line": 327,
+          "position": 13619
+        },
+        "name": "connectors/social/linkedin.py",
+        "start": 314,
+        "startLoc": {
+          "column": 48,
+          "line": 314,
+          "position": 13113
+        }
+      },
+      "format": "python",
+      "fragment": "        self.publisher = LinkedInSocialPublisher(sandbox_mode=sandbox_mode)\n\n    def validate_payload(self, payload: Dict[str, Any]) -> tuple[bool, str]:\n        body = payload.get(\"body\", \"\")\n        try:\n            self.publisher.validate_content(body)\n            return True, \"\"\n        except ValueError as err:\n            return False, str(err)\n\n    def publish(self, payload: Dict[str, Any], idempotency_key: str) -> Dict[str, Any]:\n        is_valid, error = self.validate_payload(payload)\n        if not is_valid:\n            raise ValueError(f\"LinkedIn validation error: {error}\")",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 14,
+      "secondFile": {
+        "end": 359,
+        "endLoc": {
+          "column": 30,
+          "line": 359,
+          "position": 15021
+        },
+        "name": "connectors/social/x_twitter.py",
+        "start": 346,
+        "startLoc": {
+          "column": 41,
+          "line": 346,
+          "position": 14515
+        }
+      },
+      "tokens": 109
+    },
+    {
+      "firstFile": {
+        "end": 29,
+        "endLoc": {
+          "column": 14,
+          "line": 29,
+          "position": 798
+        },
+        "name": "connectors/social/vault.py",
+        "start": 19,
+        "startLoc": {
+          "column": 4,
+          "line": 19,
+          "position": 472
+        }
+      },
+      "format": "python",
+      "fragment": "    def store_token(\n        self,\n        workspace_id: str,\n        provider: str,\n        account_id: str,\n        access_token: str,\n        refresh_token: Optional[str] = None,\n        expires_at: Optional[datetime] = None,\n        scopes: Optional[List[str]] = None,\n        account_name: Optional[str] = None\n    ) -> None:",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 11,
+      "secondFile": {
+        "end": 142,
+        "endLoc": {
+          "column": 14,
+          "line": 142,
+          "position": 4819
+        },
+        "name": "connectors/social/vault.py",
+        "start": 132,
+        "startLoc": {
+          "column": 4,
+          "line": 132,
+          "position": 4493
+        }
+      },
+      "tokens": 64
+    },
+    {
+      "firstFile": {
+        "end": 187,
+        "endLoc": {
+          "column": 18,
+          "line": 187,
+          "position": 6684
+        },
+        "name": "connectors/social/vault.py",
+        "start": 174,
+        "startLoc": {
+          "column": 8,
+          "line": 174,
+          "position": 6085
+        }
+      },
+      "format": "python",
+      "fragment": "        session = self._get_session()\n        if session is not None:\n            try:\n                from infra.db.models import ConnectedSocialAccountModel\n                account = (\n                    session.query(ConnectedSocialAccountModel)\n                    .filter(\n                        ConnectedSocialAccountModel.workspace_id == workspace_id,\n                        ConnectedSocialAccountModel.provider == provider.lower(),\n                        ConnectedSocialAccountModel.account_id == account_id\n                    )\n                    .first()\n                )\n                if not account:",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 14,
+      "secondFile": {
+        "end": 238,
+        "endLoc": {
+          "column": 22,
+          "line": 238,
+          "position": 8878
+        },
+        "name": "connectors/social/vault.py",
+        "start": 225,
+        "startLoc": {
+          "column": 12,
+          "line": 225,
+          "position": 8227
+        }
+      },
+      "tokens": 66
+    },
+    {
+      "firstFile": {
+        "end": 187,
+        "endLoc": {
+          "column": 18,
+          "line": 187,
+          "position": 6684
+        },
+        "name": "connectors/social/vault.py",
+        "start": 174,
+        "startLoc": {
+          "column": 8,
+          "line": 174,
+          "position": 6085
+        }
+      },
+      "format": "python",
+      "fragment": "        session = self._get_session()\n        if session is not None:\n            try:\n                from infra.db.models import ConnectedSocialAccountModel\n                account = (\n                    session.query(ConnectedSocialAccountModel)\n                    .filter(\n                        ConnectedSocialAccountModel.workspace_id == workspace_id,\n                        ConnectedSocialAccountModel.provider == provider.lower(),\n                        ConnectedSocialAccountModel.account_id == account_id\n                    )\n                    .first()\n                )\n                if not account:",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 14,
+      "secondFile": {
+        "end": 320,
+        "endLoc": {
+          "column": 18,
+          "line": 320,
+          "position": 12020
+        },
+        "name": "connectors/social/vault.py",
+        "start": 307,
+        "startLoc": {
+          "column": 8,
+          "line": 307,
+          "position": 11421
+        }
+      },
+      "tokens": 66
+    },
+    {
+      "firstFile": {
+        "end": 238,
+        "endLoc": {
+          "column": 30,
+          "line": 238,
+          "position": 8886
+        },
+        "name": "connectors/social/vault.py",
+        "start": 228,
+        "startLoc": {
+          "column": 30,
+          "line": 228,
+          "position": 8344
+        }
+      },
+      "format": "python",
+      "fragment": "                    from infra.db.models import ConnectedSocialAccountModel\n                    account = (\n                        session.query(ConnectedSocialAccountModel)\n                        .filter(\n                            ConnectedSocialAccountModel.workspace_id == workspace_id,\n                            ConnectedSocialAccountModel.provider == provider.lower(),\n                            ConnectedSocialAccountModel.account_id == account_id\n                        )\n                        .first()\n                    )\n                    if account and account.status != \"REVOKED\" and account.encrypted_token_blob:",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 11,
+      "secondFile": {
+        "end": 320,
+        "endLoc": {
+          "column": 26,
+          "line": 320,
+          "position": 12028
+        },
+        "name": "connectors/social/vault.py",
+        "start": 310,
+        "startLoc": {
+          "column": 26,
+          "line": 310,
+          "position": 11526
+        }
+      },
+      "tokens": 50
+    },
+    {
+      "firstFile": {
+        "end": 159,
+        "endLoc": {
+          "column": 24,
+          "line": 159,
+          "position": 6016
+        },
+        "name": "orchestration/llm.py",
+        "start": 150,
+        "startLoc": {
+          "column": 4,
+          "line": 150,
+          "position": 5646
+        }
+      },
+      "format": "python",
+      "fragment": "    api_key = os.getenv(\"GOOGLE_API_KEY\")\n\n    try:\n        from langchain_google_genai import ChatGoogleGenerativeAI\n        timeout = float(os.getenv(\"LLM_TIMEOUT_SECONDS\", \"30.0\"))\n        max_retries = int(os.getenv(\"LLM_MAX_RETRIES\", \"3\"))\n        return ChatGoogleGenerativeAI(\n            model=model_name,\n            google_api_key=api_key,\n            temperature=temperature,",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 10,
+      "secondFile": {
+        "end": 209,
+        "endLoc": {
+          "column": 24,
+          "line": 209,
+          "position": 7623
+        },
+        "name": "orchestration/llm.py",
+        "start": 201,
+        "startLoc": {
+          "column": 4,
+          "line": 201,
+          "position": 7254
+        }
+      },
+      "tokens": 53
+    },
+    {
+      "firstFile": {
+        "end": 39,
+        "endLoc": {
+          "column": 25,
+          "line": 39,
+          "position": 1354
+        },
+        "name": "orchestration/providers/gemini.py",
+        "start": 25,
+        "startLoc": {
+          "column": 61,
+          "line": 25,
+          "position": 741
+        }
+      },
+      "format": "python",
+      "fragment": "                display_name=\"Gemini 3.8 Flash (Recommandé)\",\n                capabilities={\n                    LLMCapability.TEXT_GENERATION.value: True,\n                    LLMCapability.STRUCTURED_OUTPUT.value: True,\n                    LLMCapability.TOOL_CALLING.value: True,\n                    LLMCapability.STREAMING.value: True,\n                    LLMCapability.VISION.value: True,\n                },\n                parameters={\"temperature\": {\"min\": 0.0, \"max\": 2.0, \"default\": 0.2}},\n                provenance=\"catalog\",\n                is_available=True\n            ),\n            LLMModelInfo(\n                provider_id=\"gemini\",\n                model_id=\"gemini-1.5-flash\",",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 15,
+      "secondFile": {
+        "end": 54,
+        "endLoc": {
+          "column": 25,
+          "line": 54,
+          "position": 2034
+        },
+        "name": "orchestration/providers/gemini.py",
+        "start": 40,
+        "startLoc": {
+          "column": 47,
+          "line": 40,
+          "position": 1421
+        }
+      },
+      "tokens": 83
+    },
+    {
+      "firstFile": {
+        "end": 36,
+        "endLoc": {
+          "column": 14,
+          "line": 36,
+          "position": 1264
+        },
+        "name": "orchestration/providers/gemini.py",
+        "start": 25,
+        "startLoc": {
+          "column": 61,
+          "line": 25,
+          "position": 741
+        }
+      },
+      "format": "python",
+      "fragment": "                display_name=\"Gemini 3.8 Flash (Recommandé)\",\n                capabilities={\n                    LLMCapability.TEXT_GENERATION.value: True,\n                    LLMCapability.STRUCTURED_OUTPUT.value: True,\n                    LLMCapability.TOOL_CALLING.value: True,\n                    LLMCapability.STREAMING.value: True,\n                    LLMCapability.VISION.value: True,\n                },\n                parameters={\"temperature\": {\"min\": 0.0, \"max\": 2.0, \"default\": 0.2}},\n                provenance=\"catalog\",\n                is_available=True\n            ),",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 12,
+      "secondFile": {
+        "end": 66,
+        "endLoc": {
+          "column": 14,
+          "line": 66,
+          "position": 2643
+        },
+        "name": "orchestration/providers/gemini.py",
+        "start": 55,
+        "startLoc": {
+          "column": 68,
+          "line": 55,
+          "position": 2120
+        }
+      },
+      "tokens": 75
+    },
+    {
+      "firstFile": {
+        "end": 33,
+        "endLoc": {
+          "column": 62,
+          "line": 33,
+          "position": 1154
+        },
+        "name": "orchestration/providers/gemini.py",
+        "start": 25,
+        "startLoc": {
+          "column": 61,
+          "line": 25,
+          "position": 741
+        }
+      },
+      "format": "python",
+      "fragment": "                display_name=\"Gemini 3.8 Flash (Recommandé)\",\n                capabilities={\n                    LLMCapability.TEXT_GENERATION.value: True,\n                    LLMCapability.STRUCTURED_OUTPUT.value: True,\n                    LLMCapability.TOOL_CALLING.value: True,\n                    LLMCapability.STREAMING.value: True,\n                    LLMCapability.VISION.value: True,\n                },\n                parameters={\"temperature\": {\"min\": 0.0, \"max\": 2.0, \"default\": 0.2}},",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 9,
+      "secondFile": {
+        "end": 82,
+        "endLoc": {
+          "column": 54,
+          "line": 82,
+          "position": 3300
+        },
+        "name": "orchestration/providers/nvidia.py",
+        "start": 73,
+        "startLoc": {
+          "column": 81,
+          "line": 73,
+          "position": 2866
+        }
+      },
+      "tokens": 58
+    },
+    {
+      "firstFile": {
+        "end": 33,
+        "endLoc": {
+          "column": 62,
+          "line": 33,
+          "position": 1154
+        },
+        "name": "orchestration/providers/gemini.py",
+        "start": 25,
+        "startLoc": {
+          "column": 61,
+          "line": 25,
+          "position": 741
+        }
+      },
+      "format": "python",
+      "fragment": "                display_name=\"Gemini 3.8 Flash (Recommandé)\",\n                capabilities={\n                    LLMCapability.TEXT_GENERATION.value: True,\n                    LLMCapability.STRUCTURED_OUTPUT.value: True,\n                    LLMCapability.TOOL_CALLING.value: True,\n                    LLMCapability.STREAMING.value: True,\n                    LLMCapability.VISION.value: True,\n                },\n                parameters={\"temperature\": {\"min\": 0.0, \"max\": 2.0, \"default\": 0.2}},",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 9,
+      "secondFile": {
+        "end": 120,
+        "endLoc": {
+          "column": 54,
+          "line": 120,
+          "position": 5115
+        },
+        "name": "orchestration/providers/nvidia.py",
+        "start": 111,
+        "startLoc": {
+          "column": 60,
+          "line": 111,
+          "position": 4681
+        }
+      },
+      "tokens": 58
+    },
+    {
+      "firstFile": {
+        "end": 83,
+        "endLoc": {
+          "column": 70,
+          "line": 83,
+          "position": 3393
+        },
+        "name": "orchestration/providers/nvidia.py",
+        "start": 75,
+        "startLoc": {
+          "column": 55,
+          "line": 75,
+          "position": 2954
+        }
+      },
+      "format": "python",
+      "fragment": "                    LLMCapability.TEXT_GENERATION.value: True,\n                    LLMCapability.STRUCTURED_OUTPUT.value: True,\n                    LLMCapability.TOOL_CALLING.value: True,\n                    LLMCapability.STREAMING.value: True,\n                    LLMCapability.VISION.value: True,\n                },\n                parameters={\n                    \"temperature\": {\"min\": 0.0, \"max\": 1.0, \"default\": 0.2},\n                    \"top_p\": {\"min\": 0.0, \"max\": 1.0, \"default\": 0.7},",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 9,
+      "secondFile": {
+        "end": 121,
+        "endLoc": {
+          "column": 70,
+          "line": 121,
+          "position": 5208
+        },
+        "name": "orchestration/providers/nvidia.py",
+        "start": 113,
+        "startLoc": {
+          "column": 55,
+          "line": 113,
+          "position": 4769
+        }
+      },
+      "tokens": 72
+    },
+    {
+      "firstFile": {
+        "end": 91,
+        "endLoc": {
+          "column": 25,
+          "line": 91,
+          "position": 3664
+        },
+        "name": "orchestration/providers/nvidia.py",
+        "start": 79,
+        "startLoc": {
+          "column": 52,
+          "line": 79,
+          "position": 3196
+        }
+      },
+      "format": "python",
+      "fragment": "                    LLMCapability.VISION.value: True,\n                },\n                parameters={\n                    \"temperature\": {\"min\": 0.0, \"max\": 1.0, \"default\": 0.2},\n                    \"top_p\": {\"min\": 0.0, \"max\": 1.0, \"default\": 0.7},\n                    \"max_tokens\": {\"min\": 1, \"max\": 4096, \"default\": 1024}\n                },\n                provenance=\"catalog\",\n                is_available=True\n            ),\n            LLMModelInfo(\n                provider_id=\"nvidia\",\n                model_id=\"nvidia/llama-3.1-nemotron-70b-instruct\",",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 13,
+      "secondFile": {
+        "end": 110,
+        "endLoc": {
+          "column": 25,
+          "line": 110,
+          "position": 4583
+        },
+        "name": "orchestration/providers/nvidia.py",
+        "start": 98,
+        "startLoc": {
+          "column": 53,
+          "line": 98,
+          "position": 4115
+        }
+      },
+      "tokens": 72
+    },
+    {
+      "firstFile": {
+        "end": 102,
+        "endLoc": {
+          "column": 70,
+          "line": 102,
+          "position": 4312
+        },
+        "name": "orchestration/providers/nvidia.py",
+        "start": 92,
+        "startLoc": {
+          "column": 78,
+          "line": 92,
+          "position": 3784
+        }
+      },
+      "format": "python",
+      "fragment": "                display_name=\"Llama 3.1 Nemotron 70B Instruct (NVIDIA, Actif)\",\n                capabilities={\n                    LLMCapability.TEXT_GENERATION.value: True,\n                    LLMCapability.STRUCTURED_OUTPUT.value: True,\n                    LLMCapability.TOOL_CALLING.value: True,\n                    LLMCapability.STREAMING.value: True,\n                    LLMCapability.VISION.value: False,\n                },\n                parameters={\n                    \"temperature\": {\"min\": 0.0, \"max\": 1.0, \"default\": 0.2},\n                    \"top_p\": {\"min\": 0.0, \"max\": 1.0, \"default\": 0.7},",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 11,
+      "secondFile": {
+        "end": 139,
+        "endLoc": {
+          "column": 70,
+          "line": 139,
+          "position": 6024
+        },
+        "name": "orchestration/providers/nvidia.py",
+        "start": 129,
+        "startLoc": {
+          "column": 52,
+          "line": 129,
+          "position": 5496
+        }
+      },
+      "tokens": 81
+    },
+    {
+      "firstFile": {
+        "end": 102,
+        "endLoc": {
+          "column": 70,
+          "line": 102,
+          "position": 4312
+        },
+        "name": "orchestration/providers/nvidia.py",
+        "start": 92,
+        "startLoc": {
+          "column": 78,
+          "line": 92,
+          "position": 3784
+        }
+      },
+      "format": "python",
+      "fragment": "                display_name=\"Llama 3.1 Nemotron 70B Instruct (NVIDIA, Actif)\",\n                capabilities={\n                    LLMCapability.TEXT_GENERATION.value: True,\n                    LLMCapability.STRUCTURED_OUTPUT.value: True,\n                    LLMCapability.TOOL_CALLING.value: True,\n                    LLMCapability.STREAMING.value: True,\n                    LLMCapability.VISION.value: False,\n                },\n                parameters={\n                    \"temperature\": {\"min\": 0.0, \"max\": 1.0, \"default\": 0.2},\n                    \"top_p\": {\"min\": 0.0, \"max\": 1.0, \"default\": 0.7},",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 11,
+      "secondFile": {
+        "end": 157,
+        "endLoc": {
+          "column": 70,
+          "line": 157,
+          "position": 6838
+        },
+        "name": "orchestration/providers/nvidia.py",
+        "start": 147,
+        "startLoc": {
+          "column": 55,
+          "line": 147,
+          "position": 6310
+        }
+      },
+      "tokens": 81
+    },
+    {
+      "firstFile": {
+        "end": 128,
+        "endLoc": {
+          "column": 25,
+          "line": 128,
+          "position": 5404
+        },
+        "name": "orchestration/providers/nvidia.py",
+        "start": 117,
+        "startLoc": {
+          "column": 52,
+          "line": 117,
+          "position": 5011
+        }
+      },
+      "format": "python",
+      "fragment": "                    LLMCapability.VISION.value: True,\n                },\n                parameters={\n                    \"temperature\": {\"min\": 0.0, \"max\": 1.0, \"default\": 0.2},\n                    \"top_p\": {\"min\": 0.0, \"max\": 1.0, \"default\": 0.7},\n                },\n                provenance=\"catalog\",\n                is_available=True\n            ),\n            LLMModelInfo(\n                provider_id=\"nvidia\",\n                model_id=\"mistralai/mixtral-8x7b-instruct-v0.1\",",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 12,
+      "secondFile": {
+        "end": 146,
+        "endLoc": {
+          "column": 25,
+          "line": 146,
+          "position": 6220
+        },
+        "name": "orchestration/providers/nvidia.py",
+        "start": 135,
+        "startLoc": {
+          "column": 53,
+          "line": 135,
+          "position": 5827
+        }
+      },
+      "tokens": 57
+    },
+    {
+      "firstFile": {
+        "end": 143,
+        "endLoc": {
+          "column": 14,
+          "line": 143,
+          "position": 6130
+        },
+        "name": "orchestration/providers/nvidia.py",
+        "start": 134,
+        "startLoc": {
+          "column": 44,
+          "line": 134,
+          "position": 5761
+        }
+      },
+      "format": "python",
+      "fragment": "                    LLMCapability.STREAMING.value: True,\n                    LLMCapability.VISION.value: False,\n                },\n                parameters={\n                    \"temperature\": {\"min\": 0.0, \"max\": 1.0, \"default\": 0.2},\n                    \"top_p\": {\"min\": 0.0, \"max\": 1.0, \"default\": 0.7},\n                },\n                provenance=\"catalog\",\n                is_available=True\n            ),",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 10,
+      "secondFile": {
+        "end": 161,
+        "endLoc": {
+          "column": 14,
+          "line": 161,
+          "position": 6944
+        },
+        "name": "orchestration/providers/nvidia.py",
+        "start": 152,
+        "startLoc": {
+          "column": 44,
+          "line": 152,
+          "position": 6575
+        }
+      },
+      "tokens": 60
+    }
+  ],
+  "statistics": {
+    "detectionDate": "2026-10-11T23:45:13.444Z",
+    "formats": {
+      "css": {
+        "clones": 12,
+        "duplicatedLines": 103,
+        "duplicatedTokens": 1364,
+        "lines": 792,
+        "newClones": 0,
+        "newDuplicatedLines": 0,
+        "percentage": 13.005050505050505,
+        "percentageTokens": 10.60983198506534,
+        "sources": 3,
+        "tokens": 12856
+      },
+      "javascript": {
+        "clones": 0,
+        "duplicatedLines": 0,
+        "duplicatedTokens": 0,
+        "lines": 909,
+        "newClones": 0,
+        "newDuplicatedLines": 0,
+        "percentage": 0.0,
+        "percentageTokens": 0.0,
+        "sources": 2,
+        "tokens": 2627
+      },
+      "json": {
+        "clones": 1,
+        "duplicatedLines": 26,
+        "duplicatedTokens": 89,
+        "lines": 3623,
+        "newClones": 0,
+        "newDuplicatedLines": 0,
+        "percentage": 0.7176373171404914,
+        "percentageTokens": 0.7945009819675058,
+        "sources": 3,
+        "tokens": 11202
+      },
+      "markdown": {
+        "clones": 0,
+        "duplicatedLines": 0,
+        "duplicatedTokens": 0,
+        "lines": 117,
+        "newClones": 0,
+        "newDuplicatedLines": 0,
+        "percentage": 0.0,
+        "percentageTokens": 0.0,
+        "sources": 1,
+        "tokens": 1062
+      },
+      "markup": {
+        "clones": 0,
+        "duplicatedLines": 0,
+        "duplicatedTokens": 0,
+        "lines": 93,
+        "newClones": 0,
+        "newDuplicatedLines": 0,
+        "percentage": 0.0,
+        "percentageTokens": 0.0,
+        "sources": 1,
+        "tokens": 733
+      },
+      "python": {
+        "clones": 35,
+        "duplicatedLines": 398,
+        "duplicatedTokens": 2359,
+        "lines": 10561,
+        "newClones": 0,
+        "newDuplicatedLines": 0,
+        "percentage": 3.7685825205946406,
+        "percentageTokens": 4.0226454990365434,
+        "sources": 82,
+        "tokens": 58643
+      },
+      "text": {
+        "clones": 0,
+        "duplicatedLines": 0,
+        "duplicatedTokens": 0,
+        "lines": 19,
+        "newClones": 0,
+        "newDuplicatedLines": 0,
+        "percentage": 0.0,
+        "percentageTokens": 0.0,
+        "sources": 1,
+        "tokens": 215
+      },
+      "tsx": {
+        "clones": 18,
+        "duplicatedLines": 242,
+        "duplicatedTokens": 1140,
+        "lines": 12798,
+        "newClones": 0,
+        "newDuplicatedLines": 0,
+        "percentage": 1.8909204563213002,
+        "percentageTokens": 1.6064030662570807,
+        "sources": 57,
+        "tokens": 70966
+      },
+      "typescript": {
+        "clones": 0,
+        "duplicatedLines": 0,
+        "duplicatedTokens": 0,
+        "lines": 973,
+        "newClones": 0,
+        "newDuplicatedLines": 0,
+        "percentage": 0.0,
+        "percentageTokens": 0.0,
+        "sources": 7,
+        "tokens": 4018
+      }
+    },
+    "total": {
+      "clones": 66,
+      "duplicatedLines": 769,
+      "duplicatedTokens": 4952,
+      "lines": 29885,
+      "newClones": 0,
+      "newDuplicatedLines": 0,
+      "percentage": 2.5731972561485694,
+      "percentageTokens": 3.0507263340767117,
+      "sources": 157,
+      "tokens": 162322
+    }
+  }
+}

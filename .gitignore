@@ -22,7 +22,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+!apps/web/src/lib/
 lib64/
 parts/
 sdist/
@@ -70,16 +70,22 @@ Thumbs.db
 *.sqlite3
 contentops.db*
 artifacts/
+scratch/
 storage/sources/
 storage/checkpoints/
+storage/avatars/*.webp
 dumps/
 backups/
+*.zip
+gitleaks.json
+.opencode-logs/
 
 # Node & Frontend
 node_modules/
 .vite/
+dist/
+apps/web/dist/
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*

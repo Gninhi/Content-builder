@@ -5,7 +5,11 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional
 import httpx
 
-from packages.connectors.social.base import BaseSocialConnector, SocialPublisher
+from packages.connectors.social.base import (
+    BaseSocialConnector,
+    BaseSocialPublisher,
+    SocialPublisherRegistry,
+)
 from packages.connectors.social.models import (
     PublicationResult,
     PublicationStatus,
@@ -22,7 +26,7 @@ from packages.connectors.social.exceptions import (
 )
 
 
-class LinkedInSocialPublisher(SocialPublisher):
+class LinkedInSocialPublisher(BaseSocialPublisher):
     """
     Production-ready LinkedIn Social Publisher targeting personal member profiles.
     
@@ -42,24 +46,17 @@ class LinkedInSocialPublisher(SocialPublisher):
         access_token: Optional[str] = None,
         token_expires_at: Optional[datetime] = None,
         author_urn: Optional[str] = None,
+        organization_urn: Optional[str] = None,
         api_version: Optional[str] = None,
         sandbox_mode: Optional[bool] = None,
         http_client: Optional[httpx.Client] = None,
     ):
+        super().__init__(sandbox_mode=sandbox_mode)
         self.access_token = access_token or os.getenv("LINKEDIN_ACCESS_TOKEN")
         self.token_expires_at = token_expires_at
         self.author_urn = author_urn
+        self.organization_urn = organization_urn or os.getenv("LINKEDIN_ORGANIZATION_URN")
         self.api_version = api_version or os.getenv("LINKEDIN_API_VERSION", "202601")
-        
-        # Explicit sandbox resolution: fail closed if live publishing is disabled
-        if sandbox_mode is not None:
-            self._sandbox_mode = sandbox_mode
-        else:
-            live_enabled = os.getenv("LIVE_PUBLISHING_ENABLED", "false").lower() == "true"
-            global_sandbox = os.getenv("SOCIAL_SANDBOX_MODE", "true").lower() == "true"
-            self._sandbox_mode = global_sandbox or not live_enabled
-
-        self._sandbox_registry: Dict[str, PublicationStatus] = {}
         self._client = http_client or httpx.Client(timeout=15.0)
 
     @property
@@ -163,7 +160,14 @@ class LinkedInSocialPublisher(SocialPublisher):
 
         # 2. Live publication
         self.check_token_liveness()
-        author = self.resolve_author_urn()
+        target_org = (options.get("organization_urn") if options else None) or self.organization_urn
+        if target_org:
+            if not target_org.startswith("urn:li:organization:"):
+                author = f"urn:li:organization:{target_org}"
+            else:
+                author = target_org
+        else:
+            author = self.resolve_author_urn()
 
         headers = {
             "Authorization": f"Bearer {self.access_token or ''}",
@@ -184,6 +188,32 @@ class LinkedInSocialPublisher(SocialPublisher):
             "lifecycleState": "PUBLISHED",
             "isReshareDisabledByAuthor": False,
         }
+
+        # Media and Carousel Support (FND-05)
+        if media_urls:
+            valid_extensions = (".pdf", ".png", ".jpg", ".jpeg", ".webp")
+            for m_url in media_urls:
+                lower_m = m_url.lower()
+                if not lower_m.startswith(("http://", "https://", "urn:li:")):
+                    raise ValueError(f"URL de média invalide pour LinkedIn : {m_url}")
+                if not any(lower_m.endswith(ext) or lower_m.startswith("urn:li:") or "?" in lower_m for ext in valid_extensions):
+                    raise ValueError(f"Format de média non supporté sur LinkedIn (formats autorisés : PDF, PNG, JPG, WEBP) : {m_url}")
+
+            if len(media_urls) == 1:
+                is_pdf = media_urls[0].lower().endswith(".pdf")
+                media_title = (options.get("media_title") if options else None) or ("Document de présentation" if is_pdf else "Visuel attaché")
+                payload["content"] = {
+                    "media": {
+                        "title": media_title,
+                        "id": media_urls[0]
+                    }
+                }
+            else:
+                payload["content"] = {
+                    "multiImage": {
+                        "images": [{"id": m_url} for m_url in media_urls]
+                    }
+                }
 
         try:
             resp = self._client.post(
@@ -337,3 +367,6 @@ class LinkedInConnector(BaseSocialConnector):
             payload=payload,
             idempotency_key=idempotency_key
         )
+
+
+SocialPublisherRegistry.register("linkedin", LinkedInSocialPublisher)

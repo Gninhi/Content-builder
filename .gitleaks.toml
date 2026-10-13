@@ -8,6 +8,7 @@ useDefault = true
 description = "Global allowlists for test mocks and fixtures"
 paths = [
   '''tests/unit/.*''',
+  '''tests/integration/.*''',
   '''tests/security/.*''',
   '''evals/datasets/.*''',
   '''\.env\.example''',

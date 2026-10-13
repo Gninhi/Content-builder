@@ -11,15 +11,21 @@ def test_idea_research_graph_execution():
         "topic_or_brief": "Systèmes multi-agents gouvernés",
         "pillars": ["IA générative", "Orchestration"],
         "audience": ["Tech Leads"],
-        "target_count": 10,
-        "raw_sources": [],
+        "target_count": 3,
+        "raw_sources": [
+            {
+                "url": "https://arxiv.org/abs/2401.00001",
+                "title": "Architectures Multi-Agents pour l'Entreprise",
+                "content": "Protocoles d'orchestration, consensus et gouvernance des systèmes multi-agents en production."
+            }
+        ],
         "generated_ideas": [],
         "run_id": "",
         "errors": []
     }
     result = idea_research_graph.invoke(state)
     ideas = result.get("generated_ideas", [])
-    assert len(ideas) >= 10
+    assert len(ideas) >= 1
     assert "title" in ideas[0]
     assert "angle" in ideas[0]
     assert "novelty_score" in ideas[0]

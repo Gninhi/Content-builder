@@ -1,0 +1,98 @@
+flowchart TD
+    subgraph SOURCING ["1. SOURCING & ACQUISITION"]
+        direction TB
+        subgraph CATALOG ["Sources Déclarées"]
+            SRC_ARXIV["ArXiv API"]
+            SRC_GH["GitHub Releases"]
+            SRC_HN["Hacker News"]
+            SRC_HF["Hugging Face Hub"]
+            SRC_RSS["RSS Institutionnels"]
+        end
+        subgraph ENGINES ["Moteurs de Recherche"]
+            ENG_SERP["SerpAPI (Google, News, Scholar)"]
+            ENG_DDG["DuckDuckGo (ddgs fallback)"]
+            CACHE_SQLITE[("Cache SQLite\nsearch_cache.sqlite")]
+        end
+    end
+
+    subgraph PIPELINE ["2. PIPELINE DE VEILLE (pipeline.py)"]
+        CONN_OFFICIAL["OfficialDataConnectors\n(data_connectors.py)"]
+        GAP_DISCONNECTED{{"⚠️ ÉCART MAJEUR :\nConnecteurs officiels instanciés\nmais JAMAIS APPELÉS dans le cycle !"}}
+        WST["WebSearchTool\n(web_search.py)"]
+        GAP_ATTR_BUG{{"🚨 BUG RUNTIME CRITIQUE :\nsearch_resp.items au lieu de .results\nitem.canonical_url & item.domain invalides\n-> Mode Live retourne 0 signal !"}}
+        GUARD_DEFANG["PromptInjectionGuard\ndefang_text & wrap untrusted"]
+        QUALIF["compute_qualification_score\nSeuil code: 3.0 vs spec: 3.2\n(Fact density = digits dans texte)"]
+        GAP_QUALIF_BLIND{{"⚠️ FAIBLESSE QUALIF :\nPas de vérification de source primaire\nStatistique erronée = 4.7/5.0"}}
+        DEDUP_90["Déduplication 90j\nSHA256(canonical_url) / SHA256(title)"]
+    end
+
+    subgraph STORAGE ["3. PERSISTANCE & BASE DE DONNÉES"]
+        DB_SIGNALS[("Table signals\nSignalModel")]
+        DB_SOURCES[("Table veille_sources\nVeilleSourceModel")]
+        DB_IDEAS[("Table ideas\nIdeaModel (signal_id nullable)")]
+        DB_VAULT[("Table connected_social_accounts\nToken Vault AES-256-GCM (AAD=workspace_id)")]
+    end
+
+    subgraph IDEATION ["4. ORCHESTRATION LANGGRAPH IDÉATION (research.py)"]
+        NODE_COLLECT["collect_sources_node\n(Bug .items identique sur live search)"]
+        POOL_BUILD["Construction evidence_pool"]
+        GAP_FABRICATED_SOURCES{{"🚨 HALLUCINATION PAR DÉFAUT :\nSi evidence_pool vide :\nInjection sources fictives ec.europa.eu / arxiv.org"}}
+        RESOLVE_LLM["resolve_and_get_llm\n(Défaut: NVIDIA GLM-5.3-flash)"]
+        FALLBACK_GEMINI["Fallback get_gemini_model\n(Appel externe direct vers Google)"]
+        NODE_IDEATION["ideation_and_scoring_node"]
+        GAP_FALLBACK_IDEAS{{"🚨 HALLUCINATION DÉTERMINISTE :\nSi LLM indisponible :\nProduction de 12 idées codées en dur\nAU LIEU DE 'pas assez de signaux' (NO_DATA)"}}
+        OUTPUT_PARSER["invoke_structured_output\nStripping &lt;think&gt; + 1 réparation unique Pydantic"]
+    end
+
+    subgraph PRODUCTION ["5. PRODUCTION ÉDITORIALE & HITL"]
+        NODE_PROD["generate_variants_node\n(production.py)"]
+        QUALITY_GATE["quality_gate_node\n(Vérification règles QA)"]
+        HITL["Revue Humaine Obligatoire\n(ApprovalModel + Sceau SHA-256)"]
+        WORKER["PublisherWorker\n(services/publisher/worker.py)"]
+    end
+
+    subgraph CONNECTORS ["6. CONNECTEURS SOCIAUX"]
+        CONN_LI["LinkedInSocialPublisher\n- OAuth2 OpenID\n- 10 à 3000 chars\n- At-most-once\n⚠️ media_urls ignoré / 0 carrousel"]
+        CONN_X["XSocialPublisher\n- OAuth2 PKCE\n- Pondération t.co 23 chars\n- Plafond mensuel\n⚠️ Coût non affiché avant diffusion"]
+        SAFE_AT_MOST_ONCE{{"✅ SÉCURITÉ PUBLICATION :\nTransition atomique PUBLISHING avant réseau\nTimeout -> PUBLISH_UNKNOWN sans rejeu"}}
+    end
+
+    %% Relations Sourcing -> Pipeline
+    SRC_ARXIV -.-> CONN_OFFICIAL
+    SRC_GH -.-> CONN_OFFICIAL
+    SRC_HN -.-> CONN_OFFICIAL
+    SRC_HF -.-> CONN_OFFICIAL
+    SRC_RSS -.-> CONN_OFFICIAL
+    CONN_OFFICIAL --- GAP_DISCONNECTED
+
+    ENG_SERP --> WST
+    ENG_DDG --> WST
+    CACHE_SQLITE <--> WST
+    WST --> GAP_ATTR_BUG
+
+    GAP_ATTR_BUG --> GUARD_DEFANG
+    GUARD_DEFANG --> QUALIF
+    QUALIF --- GAP_QUALIF_BLIND
+    QUALIF --> DEDUP_90
+    DEDUP_90 --> DB_SIGNALS
+
+    %% Relations Storage -> Ideation
+    DB_SIGNALS --> NODE_COLLECT
+    NODE_COLLECT --> POOL_BUILD
+    POOL_BUILD --- GAP_FABRICATED_SOURCES
+    POOL_BUILD --> RESOLVE_LLM
+    RESOLVE_LLM -.->|Si échec NVIDIA| FALLBACK_GEMINI
+    RESOLVE_LLM --> NODE_IDEATION
+    NODE_IDEATION --- GAP_FALLBACK_IDEAS
+    NODE_IDEATION --> OUTPUT_PARSER
+    OUTPUT_PARSER --> DB_IDEAS
+
+    %% Relations Ideation -> Production -> Connectors
+    DB_IDEAS --> NODE_PROD
+    NODE_PROD --> QUALITY_GATE
+    QUALITY_GATE --> HITL
+    HITL --> WORKER
+    WORKER --> SAFE_AT_MOST_ONCE
+    SAFE_AT_MOST_ONCE --> CONN_LI
+    SAFE_AT_MOST_ONCE --> CONN_X
+    DB_VAULT <--> WORKER

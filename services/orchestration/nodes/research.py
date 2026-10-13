@@ -1,42 +1,79 @@
 from typing import Dict, Any, List
 import logging
-from packages.connectors.search.tavily import TavilySearchConnector
+import re
 from packages.observability.tracing import ObservabilityTracer
 from packages.prompts.registry import PromptRegistry
 from packages.cache.factory import get_llm_cache, compute_cache_key
+from packages.tools.web_search import WebSearchTool
 from services.orchestration.state.base import IdeaResearchState
-from services.orchestration.llm import get_gemini_model, GeneratedIdeasBatch
+from services.orchestration.structured_output import invoke_structured_output
+from services.orchestration.llm import resolve_and_get_llm, GeneratedIdeasBatch
 
 logger = logging.getLogger(__name__)
 
 
 def collect_sources_node(state: IdeaResearchState) -> Dict[str, Any]:
-    """Collects and supplements sources via Tavily search."""
+    """
+    Collects and grounds research sources using verified workspace signals or WebSearchTool.
+    Never fabricates sources if web queries fail.
+    """
     topic = state.get("topic_or_brief", "")
     existing_sources = state.get("raw_sources", [])
+    workspace_id = state.get("workspace_id", "default")
 
     if len(existing_sources) < 2 and topic:
-        searcher = TavilySearchConnector()
-        found_sources = searcher.search(topic, max_results=3)
-        existing_sources.extend(found_sources)
+        try:
+            searcher = WebSearchTool()
+            search_res = searcher.search(query=topic, max_results=3, workspace_id=workspace_id)
+            for item in search_res.results:
+                existing_sources.append({
+                    "url": item.url,
+                    "content": item.snippet or item.title,
+                    "title": item.title,
+                })
+        except Exception as e:
+            logger.warning(f"Web search collection failed for topic '{topic}': {e}")
 
     return {"raw_sources": existing_sources}
 
 
+def _clean_title(title: str, pillars: List[str]) -> str:
+    """Strips any category/pillar prefixes (e.g. 'IA générative : ...') from idea titles."""
+    clean = title.strip()
+    for p in pillars:
+        prefix_pattern = re.compile(rf"^{re.escape(p)}\s*:\s*", re.IGNORECASE)
+        clean = prefix_pattern.sub("", clean).strip()
+    return clean
+
+
+def _normalize_score_100(val: Any, default: float = 50.0) -> float:
+    """Normalizes score to a strict 0.0 - 100.0 scale."""
+    try:
+        num = float(val)
+    except (TypeError, ValueError):
+        return default
+    # If score is on 0-10 scale (<= 10.0 and positive), multiply by 10
+    if 0.0 < num <= 10.0:
+        num = num * 10.0
+    return round(min(100.0, max(0.0, num)), 1)
+
+
 def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
     """
-    Generates structured ideas (at least 10) with angle, format, novelty, relevance, effort, priority, and risks.
-    Backed by a deterministic LLM cache (SQLite/Redis) to prevent redundant API expenditure.
-    Powered by Google Gemini 3.8 Flash with structured Pydantic schema validation.
+    Generates structured ideas strictly grounded on monitoring signals and sources.
+    - No category prefixes in titles.
+    - Explicit 0 to 100 scoring (Novelty, Relevance, Effort, Total).
+    - Backed by LLM cache and multi-provider resolver (NVIDIA GLM-5.3-flash / Gemini).
     """
-    topic = state.get("topic_or_brief", "Intelligence Artificielle & Automatisation")
-    pillars = state.get("pillars", ["IA générative", "Systèmes multi-agents", "Automatisation d'entreprise"])
-    target_count = max(10, state.get("target_count", 10))
+    topic = state.get("topic_or_brief", "Agents IA et automatisation en entreprise")
+    pillars = state.get("pillars", ["IA générative", "Systèmes multi-agents", "Automatisation"])
+    target_count = max(1, min(10, int(state.get("target_count") or 5)))
     sources = state.get("raw_sources", [])
-    audience = state.get("audience", ["Tech Leads", "Entrepreneurs"])
+    audience = state.get("audience", ["Tech Leads", "DSI", "Architectes Logiciels"])
+    workspace_id = state.get("workspace_id", "default")
 
     trace_meta = ObservabilityTracer.get_run_metadata(
-        workspace_id=state.get("workspace_id", "default"),
+        workspace_id=workspace_id,
         graph_name="idea_research_graph",
         node_name="ideation_and_scoring"
     )
@@ -44,7 +81,7 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
     # 1. Check deterministic LLM cache
     cache = get_llm_cache()
     cache_payload = {
-        "workspace_id": state.get("workspace_id", "default"),
+        "workspace_id": workspace_id,
         "topic": topic.strip().lower(),
         "pillars": sorted([p.strip().lower() for p in pillars]),
         "audience": sorted([a.strip().lower() for a in audience]),
@@ -61,88 +98,183 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
             "cached": True
         }
 
-    # 2. Prepare evidence pool
+    # 2. Build verified evidence pool from signals / sources (FND-02)
     evidence_pool = []
     for idx, src in enumerate(sources):
+        src_url = src.get("url") or f"src_{idx + 1}"
+        claim_text = src.get("content") or src.get("title") or f"Signal vérifié sur {topic}"
         evidence_pool.append({
-            "source_id": src.get("url") or f"src_{idx + 1}",
-            "claim": src.get("content", "")[:120] or f"Donnée probante sur {topic}"
+            "source_id": src_url,
+            "claim": claim_text[:140],
         })
+
+    # Strict grounding check: NEVER fabricate fake default sources (FND-02)
     if not evidence_pool:
-        evidence_pool = [
-            {"source_id": "src_default_1", "claim": f"Benchmark industriel 2026 sur {topic}"},
-            {"source_id": "src_default_2", "claim": "Retour d'expérience de déploiements en production"}
-        ]
+        logger.info(f"No grounded evidence available for topic '{topic}'. Returning NO_DATA.")
+        no_data_res = {
+            "status": "NO_DATA",
+            "reason": "Aucun signal ou source exploitable trouvé pour étayer la recherche d'idées.",
+            "generated_ideas": [],
+            "run_id": trace_meta["run_id"],
+            "resolved_llm": None,
+        }
+        cache.set(cache_key, no_data_res)
+        return no_data_res
 
-    # 3. Try Gemini 3.8 Flash LLM invocation with structured outputs
-    model = get_gemini_model(model_type="fast", temperature=0.3)
-    if model is not None:
-        try:
-            rendered_prompt = PromptRegistry.render(
-                "idea_research",
-                {
-                    "pillars": ", ".join(pillars),
-                    "audience": ", ".join(audience),
-                    "topic_or_brief": topic,
-                    "sources": str(evidence_pool[:4]),
-                    "target_count": target_count
-                }
-            )
-            structured_llm = model.with_structured_output(GeneratedIdeasBatch)
-            callback = ObservabilityTracer.get_callback_handler()
-            callbacks = [callback] if callback else []
+    # 3. Resolve LLM configuration (NVIDIA GLM-5.3-flash default, no silent fallback - FND-08)
+    frozen_llm = state.get("resolved_llm")
+    if isinstance(frozen_llm, dict):
+        run_override = {
+            "provider_id": frozen_llm.get("provider_id"),
+            "model_id": frozen_llm.get("model_id"),
+            "temperature": frozen_llm.get("temperature", 0.3),
+        }
+        model, resolved_ctx = resolve_and_get_llm(
+            task_name="ideation",
+            workspace_id=workspace_id,
+            run_override=run_override,
+            temperature=0.3,
+            allow_none_if_unconfigured=True
+        )
+    else:
+        raw_ov = state.get("llm_override")
+        override_dict = raw_ov if isinstance(raw_ov, dict) else None
+        model, resolved_ctx = resolve_and_get_llm(
+            task_name="ideation",
+            workspace_id=workspace_id,
+            run_override=override_dict,
+            temperature=0.3,
+            allow_none_if_unconfigured=True
+        )
 
-            result: GeneratedIdeasBatch = structured_llm.invoke(rendered_prompt, config={"callbacks": callbacks})
-            if result and result.ideas:
-                ideas_list = [idea.model_dump() for idea in result.ideas]
-                res = {
-                    "generated_ideas": ideas_list,
-                    "run_id": trace_meta["run_id"]
-                }
-                cache.set(cache_key, res)
-                ObservabilityTracer.tag_trace(trace_meta["run_id"], ["cache_miss"])
-                return res
-        except Exception as e:
-            logger.warning(f"Gemini LLM invocation failed, using deterministic fallback: {e}")
+    # Isolated demo mode handler (strictly segregated and labeled)
+    if state.get("demo") is True:
+        return _build_demo_ideas(
+            topic=topic,
+            pillars=pillars,
+            audience=audience,
+            evidence_pool=evidence_pool,
+            target_count=min(target_count, len(evidence_pool) * 2),
+            trace_meta=trace_meta,
+            resolved_ctx=resolved_ctx,
+            frozen_llm=frozen_llm,
+            cache=cache,
+            cache_key=cache_key
+        )
 
-    # 4. Deterministic structured fallback (ensures offline and test reliability)
-    angles = [
-        ("Retour d'expérience terrain", "high", 8.5, 9.0, 4.0),
-        ("Analyse critique des limites actuelles", "high", 9.0, 8.5, 5.0),
-        ("Guide pas-à-pas pour les décideurs techniques", "medium", 7.0, 9.5, 6.0),
-        ("Comparatif des approches open-source vs propriétaires", "medium", 8.0, 8.0, 4.5),
-        ("Gouvernance et réduction du risque d'hallucination", "high", 9.5, 9.5, 5.5),
-        ("Erreurs coûteuses observées lors du passage à l'échelle", "high", 8.5, 9.0, 4.0),
-        ("Architecture de référence pour agents gouvernés", "high", 9.0, 9.5, 6.0),
-        ("Optimisation des coûts de tokens et latence", "medium", 7.5, 8.5, 3.5),
-        ("L'humain dans la boucle (HITL) : mythe ou impératif ?", "high", 9.0, 9.0, 4.5),
-        ("Futur du travail : automatisation des flux éditoriaux", "medium", 8.0, 8.5, 4.0),
-        ("Sécurité et défense contre le prompt injection", "high", 9.5, 9.0, 5.0),
-        ("Mesure du ROI réel des assistants agentiques", "medium", 8.5, 9.0, 5.0),
+    if model is None:
+        logger.warning(f"No configured LLM provider available for workspace '{workspace_id}' (FND-08)")
+        return {
+            "status": "PROVIDER_UNAVAILABLE",
+            "reason": "Aucun fournisseur LLM autorisé ou configuré n'est disponible pour ce workspace.",
+            "generated_ideas": [],
+            "run_id": trace_meta["run_id"],
+            "resolved_llm": None,
+        }
+
+    try:
+        rendered_prompt = PromptRegistry.render(
+            "idea_research",
+            {
+                "pillars": ", ".join(pillars),
+                "audience": ", ".join(audience),
+                "topic_or_brief": topic,
+                "sources": str(evidence_pool[:6]),
+                "target_count": target_count
+            }
+        )
+        callback = ObservabilityTracer.get_callback_handler()
+        callbacks = [callback] if callback else []
+
+        result = invoke_structured_output(
+            model=model,
+            schema_cls=GeneratedIdeasBatch,
+            prompt=rendered_prompt,
+            callbacks=callbacks
+        )
+        if result and result.ideas:
+            ideas_list = []
+            for item in result.ideas:
+                dump = item.model_dump()
+                # Strip any accidental category prefix
+                dump["title"] = _clean_title(dump["title"], pillars)
+                # Normalize scores to 0-100 scale
+                dump["novelty_score"] = _normalize_score_100(dump["novelty_score"])
+                dump["relevance_score"] = _normalize_score_100(dump["relevance_score"])
+                dump["effort_score"] = _normalize_score_100(dump["effort_score"])
+                ideas_list.append(dump)
+
+            res = {
+                "status": "SUCCESS",
+                "generated_ideas": ideas_list,
+                "run_id": trace_meta["run_id"],
+                "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else (frozen_llm if isinstance(frozen_llm, dict) else None)
+            }
+            cache.set(cache_key, res)
+            ObservabilityTracer.tag_trace(trace_meta["run_id"], ["cache_miss"])
+            return res
+        else:
+            return {
+                "status": "NO_DATA",
+                "reason": "Le modèle n'a pu extraire aucune idée étayée par les preuves fournies.",
+                "generated_ideas": [],
+                "run_id": trace_meta["run_id"],
+                "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else None,
+            }
+    except Exception as e:
+        logger.warning(f"LLM ideation invocation failed: {e}")
+        return {
+            "status": "ERROR",
+            "reason": f"Échec de l'invocation du fournisseur LLM : {e}",
+            "generated_ideas": [],
+            "run_id": trace_meta["run_id"],
+            "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else (frozen_llm if isinstance(frozen_llm, dict) else None),
+        }
+
+
+def _build_demo_ideas(
+    topic: str,
+    pillars: List[str],
+    audience: List[str],
+    evidence_pool: List[Dict[str, Any]],
+    target_count: int,
+    trace_meta: Dict[str, Any],
+    resolved_ctx: Any,
+    frozen_llm: Any,
+    cache: Any,
+    cache_key: str,
+) -> Dict[str, Any]:
+    """Isolated, clearly labeled synthetic demo fixtures for offline demonstration and tests."""
+    demo_angles = [
+        ("Gouvernance et réduction du risque d'hallucination en production", "high", 95.0, 92.0, 50.0),
+        ("Architecture de référence pour agents gouvernés en environnement critique", "high", 90.0, 95.0, 55.0),
+        ("Audit de conformité EU AI Act : Ce que les DSI doivent anticiper", "high", 88.0, 94.0, 40.0),
     ]
-
     ideas: List[Dict[str, Any]] = []
-    for i in range(target_count):
-        angle_title, priority, novelty, relevance, effort = angles[i % len(angles)]
-        pillar = pillars[i % len(pillars)]
+    count = min(target_count, len(demo_angles))
+    for i in range(count):
+        angle_title, priority, novelty, relevance, effort = demo_angles[i % len(demo_angles)]
+        title = f"{angle_title} ({topic})"
         ideas.append({
-            "title": f"{pillar} : {angle_title} ({topic})",
-            "angle": f"Explorer {topic.lower()} sous l'angle : {angle_title.lower()}.",
+            "title": title,
+            "angle": f"Analyser les enjeux concrets de {topic.lower()} à travers l'axe : {angle_title.lower()}.",
             "target_audience": audience[0] if audience else "Professionnels Tech",
             "recommended_formats": ["linkedin", "x"],
-            "evidence": [evidence_pool[i % len(evidence_pool)]],
+            "evidence": [evidence_pool[i % len(evidence_pool)]] if evidence_pool else [],
             "novelty_score": novelty,
             "relevance_score": relevance,
             "effort_score": effort,
             "priority": priority,
-            "risks": ["Vérifier la validité des chiffres récents", "Clarifier les prérequis techniques"] if effort > 4.5 else []
+            "risks": ["Vérifier la validité des chiffres récents"] if effort > 45.0 else [],
+            "is_synthetic": True,
+            "is_demo": True,
         })
-
     res = {
+        "status": "DEMO",
         "generated_ideas": ideas,
-        "run_id": trace_meta["run_id"]
+        "run_id": trace_meta["run_id"],
+        "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else frozen_llm,
     }
-    # Store fallback response in cache as well
     cache.set(cache_key, res)
-    ObservabilityTracer.tag_trace(trace_meta["run_id"], ["cache_miss"])
     return res
+

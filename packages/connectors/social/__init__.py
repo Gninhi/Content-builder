@@ -5,7 +5,12 @@ from packages.connectors.social.models import (
     SocialAccountStatus,
     SocialProvider,
 )
-from packages.connectors.social.base import SocialPublisher, BaseSocialConnector
+from packages.connectors.social.base import (
+    SocialPublisher,
+    BaseSocialConnector,
+    BaseSocialPublisher,
+    SocialPublisherRegistry,
+)
 from packages.connectors.social.sandbox import SandboxSocialPublisher
 from packages.connectors.social.linkedin import LinkedInSocialPublisher, LinkedInConnector
 from packages.connectors.social.x_twitter import XSocialPublisher, XTwitterConnector
@@ -30,6 +35,8 @@ __all__ = [
     "SocialAccountStatus",
     "SocialProvider",
     "SocialPublisher",
+    "BaseSocialPublisher",
+    "SocialPublisherRegistry",
     "BaseSocialConnector",
     "SandboxSocialPublisher",
     "LinkedInSocialPublisher",

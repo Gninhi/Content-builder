@@ -1,0 +1,354 @@
+F401 [*] `typing.Dict` imported but unused
+ --> apps/api/routers/auth.py:3:36
+  |
+1 | import os
+2 | import uuid
+3 | from typing import Optional, List, Dict, Any
+  |                                    ^^^^
+4 | from datetime import datetime, timezone, timedelta
+5 | from fastapi import APIRouter, HTTPException, Depends, Request, Response
+  |
+help: Remove unused import
+  |
+2 | import uuid
+  - from typing import Optional, List, Dict, Any
+3 + from typing import Optional, List
+4 | from datetime import datetime, timezone, timedelta
+  |
+
+F401 [*] `typing.Any` imported but unused
+ --> apps/api/routers/auth.py:3:42
+  |
+1 | import os
+2 | import uuid
+3 | from typing import Optional, List, Dict, Any
+  |                                          ^^^
+4 | from datetime import datetime, timezone, timedelta
+5 | from fastapi import APIRouter, HTTPException, Depends, Request, Response
+  |
+help: Remove unused import
+  |
+2 | import uuid
+  - from typing import Optional, List, Dict, Any
+3 + from typing import Optional, List
+4 | from datetime import datetime, timezone, timedelta
+  |
+
+F401 [*] `datetime.datetime` imported but unused
+ --> apps/api/routers/auth.py:4:22
+  |
+2 | import uuid
+3 | from typing import Optional, List, Dict, Any
+4 | from datetime import datetime, timezone, timedelta
+  |                      ^^^^^^^^
+5 | from fastapi import APIRouter, HTTPException, Depends, Request, Response
+6 | from pydantic import BaseModel, Field, EmailStr, ConfigDict
+  |
+help: Remove unused import
+  |
+3 | from typing import Optional, List, Dict, Any
+  - from datetime import datetime, timezone, timedelta
+4 + from datetime import timedelta
+5 | from fastapi import APIRouter, HTTPException, Depends, Request, Response
+  |
+
+F401 [*] `datetime.timezone` imported but unused
+ --> apps/api/routers/auth.py:4:32
+  |
+2 | import uuid
+3 | from typing import Optional, List, Dict, Any
+4 | from datetime import datetime, timezone, timedelta
+  |                                ^^^^^^^^
+5 | from fastapi import APIRouter, HTTPException, Depends, Request, Response
+6 | from pydantic import BaseModel, Field, EmailStr, ConfigDict
+  |
+help: Remove unused import
+  |
+3 | from typing import Optional, List, Dict, Any
+  - from datetime import datetime, timezone, timedelta
+4 + from datetime import timedelta
+5 | from fastapi import APIRouter, HTTPException, Depends, Request, Response
+  |
+
+F401 [*] `packages.connectors.social.base.SocialPublisher` imported but unused
+  --> packages/connectors/social/linkedin.py:10:5
+   |
+ 8 | from packages.connectors.social.base import (
+ 9 |     BaseSocialConnector,
+10 |     SocialPublisher,
+   |     ^^^^^^^^^^^^^^^
+11 |     BaseSocialPublisher,
+12 |     SocialPublisherRegistry,
+   |
+help: Remove unused import: `packages.connectors.social.base.SocialPublisher`
+   |
+9  |     BaseSocialConnector,
+   -     SocialPublisher,
+10 |     BaseSocialPublisher,
+   |
+
+F401 [*] `packages.connectors.social.base.SocialPublisher` imported but unused
+ --> packages/connectors/social/sandbox.py:5:5
+  |
+3 | from typing import Any, Dict, List, Optional
+4 | from packages.connectors.social.base import (
+5 |     SocialPublisher,
+  |     ^^^^^^^^^^^^^^^
+6 |     BaseSocialPublisher,
+7 |     SocialPublisherRegistry,
+  |
+help: Remove unused import: `packages.connectors.social.base.SocialPublisher`
+  |
+4 | from packages.connectors.social.base import (
+  -     SocialPublisher,
+5 |     BaseSocialPublisher,
+  |
+
+F401 [*] `packages.connectors.social.base.SocialPublisher` imported but unused
+  --> packages/connectors/social/x_twitter.py:11:5
+   |
+ 9 | from packages.connectors.social.base import (
+10 |     BaseSocialConnector,
+11 |     SocialPublisher,
+   |     ^^^^^^^^^^^^^^^
+12 |     BaseSocialPublisher,
+13 |     SocialPublisherRegistry,
+   |
+help: Remove unused import: `packages.connectors.social.base.SocialPublisher`
+   |
+10 |     BaseSocialConnector,
+   -     SocialPublisher,
+11 |     BaseSocialPublisher,
+   |
+
+F401 [*] `os` imported but unused
+ --> packages/security/email_service.py:1:8
+  |
+1 | import os
+  |        ^^
+2 | import logging
+3 | from abc import ABC, abstractmethod
+  |
+help: Remove unused import: `os`
+  |
+  - import os
+1 | import logging
+  |
+
+F401 [*] `re` imported but unused
+ --> packages/security/passwords.py:1:8
+  |
+1 | import re
+  |        ^^
+2 | from typing import Tuple, Optional
+3 | import argon2
+  |
+help: Remove unused import: `re`
+  |
+  - import re
+1 | from typing import Tuple, Optional
+  |
+
+E402 Module level import not at top of file
+  --> services/orchestration/providers/nvidia.py:14:1
+   |
+12 | logger = logging.getLogger(__name__)
+13 |
+14 | from dotenv import load_dotenv, find_dotenv
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+15 | load_dotenv(find_dotenv(usecwd=True), override=True)
+   |
+help: Move module level imports to top of file
+
+F401 [*] `time` imported but unused
+ --> services/orchestration/structured_output.py:3:8
+  |
+1 | import json
+2 | import logging
+3 | import time
+  |        ^^^^
+4 | from typing import Any, Dict, List, Optional, Type, TypeVar
+5 | from pydantic import BaseModel
+  |
+help: Remove unused import: `time`
+  |
+2 | import logging
+  - import time
+3 | from typing import Any, Dict, List, Optional, Type, TypeVar
+  |
+
+F401 [*] `packages.observability.metrics.CostAndTokenEstimator` imported but unused
+ --> services/orchestration/structured_output.py:7:44
+  |
+5 | from pydantic import BaseModel
+6 | from langchain_core.messages import HumanMessage
+7 | from packages.observability.metrics import CostAndTokenEstimator
+  |                                            ^^^^^^^^^^^^^^^^^^^^^
+8 |
+9 | logger = logging.getLogger(__name__)
+  |
+help: Remove unused import: `packages.observability.metrics.CostAndTokenEstimator`
+  |
+6 | from langchain_core.messages import HumanMessage
+  - from packages.observability.metrics import CostAndTokenEstimator
+7 |
+  |
+
+F401 [*] `datetime.datetime` imported but unused
+ --> tests/security/test_complete_auth.py:3:22
+  |
+1 | import os
+2 | import pytest
+3 | from datetime import datetime, timezone, timedelta
+  |                      ^^^^^^^^
+4 | from fastapi.testclient import TestClient
+5 | from apps.api.main import app
+  |
+help: Remove unused import
+  |
+2 | import pytest
+  - from datetime import datetime, timezone, timedelta
+3 | from fastapi.testclient import TestClient
+  |
+
+F401 [*] `datetime.timezone` imported but unused
+ --> tests/security/test_complete_auth.py:3:32
+  |
+1 | import os
+2 | import pytest
+3 | from datetime import datetime, timezone, timedelta
+  |                                ^^^^^^^^
+4 | from fastapi.testclient import TestClient
+5 | from apps.api.main import app
+  |
+help: Remove unused import
+  |
+2 | import pytest
+  - from datetime import datetime, timezone, timedelta
+3 | from fastapi.testclient import TestClient
+  |
+
+F401 [*] `datetime.timedelta` imported but unused
+ --> tests/security/test_complete_auth.py:3:42
+  |
+1 | import os
+2 | import pytest
+3 | from datetime import datetime, timezone, timedelta
+  |                                          ^^^^^^^^^
+4 | from fastapi.testclient import TestClient
+5 | from apps.api.main import app
+  |
+help: Remove unused import
+  |
+2 | import pytest
+  - from datetime import datetime, timezone, timedelta
+3 | from fastapi.testclient import TestClient
+  |
+
+F401 [*] `apps.api.dependencies.get_repository` imported but unused
+ --> tests/security/test_complete_auth.py:6:35
+  |
+4 | from fastapi.testclient import TestClient
+5 | from apps.api.main import app
+6 | from apps.api.dependencies import get_repository
+  |                                   ^^^^^^^^^^^^^^
+7 | from infra.db.database import SessionLocal
+8 | from infra.db.repository import ContentOpsRepository
+  |
+help: Remove unused import: `apps.api.dependencies.get_repository`
+  |
+5 | from apps.api.main import app
+  - from apps.api.dependencies import get_repository
+6 | from infra.db.database import SessionLocal
+  |
+
+F401 [*] `packages.security.tokens.hash_crypto_token` imported but unused
+  --> tests/security/test_complete_auth.py:10:38
+   |
+ 8 | from infra.db.repository import ContentOpsRepository
+ 9 | from packages.security.email_service import get_email_service, MemoryLogEmailService
+10 | from packages.security.tokens import hash_crypto_token
+   |                                      ^^^^^^^^^^^^^^^^^
+11 |
+12 | client = TestClient(app)
+   |
+help: Remove unused import: `packages.security.tokens.hash_crypto_token`
+   |
+9  | from packages.security.email_service import get_email_service, MemoryLogEmailService
+   - from packages.security.tokens import hash_crypto_token
+10 |
+   |
+
+F841 Local variable `ws1_id` is assigned to but never used
+   --> tests/security/test_complete_auth.py:354:5
+    |
+352 |     )
+353 |     user_id = reg_res.json()["user_id"]
+354 |     ws1_id = reg_res.json()["workspace_id"]
+    |     ^^^^^^
+355 |
+356 |     # Add user to a second workspace directly in DB
+    |
+help: Remove assignment to unused variable `ws1_id`
+    |
+353 |     user_id = reg_res.json()["user_id"]
+    -     ws1_id = reg_res.json()["workspace_id"]
+354 +     reg_res.json()["workspace_id"]
+355 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+F401 [*] `typing.List` imported but unused
+ --> tests/unit/test_connector_liskov_characterization.py:3:20
+  |
+1 | import pytest
+2 | from datetime import datetime, timezone, timedelta
+3 | from typing import List, Type
+  |                    ^^^^
+4 | from packages.connectors.social.base import SocialPublisher
+5 | from packages.connectors.social.linkedin import LinkedInSocialPublisher
+  |
+help: Remove unused import: `typing.List`
+  |
+2 | from datetime import datetime, timezone, timedelta
+  - from typing import List, Type
+3 + from typing import Type
+4 | from packages.connectors.social.base import SocialPublisher
+  |
+
+F401 [*] `pytest` imported but unused
+ --> tests/unit/test_nvidia_integration.py:2:8
+  |
+1 | import json
+2 | import pytest
+  |        ^^^^^^
+3 | from unittest.mock import MagicMock
+4 | from pydantic import BaseModel, Field
+  |
+help: Remove unused import: `pytest`
+  |
+1 | import json
+  - import pytest
+2 | from unittest.mock import MagicMock
+  |
+
+F401 [*] `services.orchestration.providers.nvidia.validate_nvidia_endpoint` imported but unused
+ --> tests/unit/test_nvidia_integration.py:6:76
+  |
+4 | from pydantic import BaseModel, Field
+5 |
+6 | from services.orchestration.providers.nvidia import NVIDIAProviderAdapter, validate_nvidia_endpoint
+  |                                                                            ^^^^^^^^^^^^^^^^^^^^^^^^
+7 | from services.orchestration.structured_output import (
+8 |     make_schema_template,
+  |
+help: Remove unused import: `services.orchestration.providers.nvidia.validate_nvidia_endpoint`
+  |
+5 |
+  - from services.orchestration.providers.nvidia import NVIDIAProviderAdapter, validate_nvidia_endpoint
+6 + from services.orchestration.providers.nvidia import NVIDIAProviderAdapter
+7 | from services.orchestration.structured_output import (
+  |
+
+Found 21 errors.
+[*] 19 fixable with `--fix` (1 unsafe fix available with `--fix --unsafe-fixes`).

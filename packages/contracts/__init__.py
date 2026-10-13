@@ -24,6 +24,15 @@ from packages.contracts.schemas import (
     StrategyInsightsResponse,
 )
 from packages.contracts.events import DomainEvent, create_domain_event
+from packages.contracts.users import (
+    UserProfileResponse,
+    UserProfileUpdate,
+    UserWorkspaceInfo,
+    ChangePasswordRequest,
+    SessionInfoResponse,
+    PersonalDataExportResponse,
+    AvatarUploadResponse,
+)
 
 __all__ = [
     "WorkspaceCreate",
@@ -51,4 +60,11 @@ __all__ = [
     "StrategyInsightsResponse",
     "DomainEvent",
     "create_domain_event",
+    "UserProfileResponse",
+    "UserProfileUpdate",
+    "UserWorkspaceInfo",
+    "ChangePasswordRequest",
+    "SessionInfoResponse",
+    "PersonalDataExportResponse",
+    "AvatarUploadResponse",
 ]

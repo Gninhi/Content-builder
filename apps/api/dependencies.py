@@ -10,10 +10,11 @@ security = HTTPBearer(auto_error=False)
 
 
 class UserContext:
-    def __init__(self, user_id: str, role: str, workspace_id: str):
+    def __init__(self, user_id: str, role: str, workspace_id: str, jti: Optional[str] = None):
         self.user_id = user_id
         self.role = role  # Owner, Editor, Viewer, ServiceAgent
         self.workspace_id = workspace_id
+        self.jti = jti
 
 
 def get_current_user(
@@ -41,6 +42,7 @@ def get_current_user(
     user_id = claims.get("sub")
     role = claims.get("role")
     workspace_id = claims.get("workspace_id")
+    jti = claims.get("jti")
 
     if not user_id or not role or not workspace_id:
         raise HTTPException(
@@ -49,7 +51,23 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"}
         )
 
-    return UserContext(user_id=user_id, role=role, workspace_id=workspace_id)
+    # If token contains a session jti, check if the session has been revoked
+    if jti:
+        from infra.db.database import SessionLocal
+        from infra.db.models import UserSessionModel
+        s_db = SessionLocal()
+        try:
+            sess_record = s_db.query(UserSessionModel).filter(UserSessionModel.token_jti == jti).first()
+            if sess_record and sess_record.is_revoked:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Session révoquée. Veuillez vous reconnecter.",
+                    headers={"WWW-Authenticate": "Bearer"}
+                )
+        finally:
+            s_db.close()
+
+    return UserContext(user_id=user_id, role=role, workspace_id=workspace_id, jti=jti)
 
 
 def require_roles(*allowed_roles: str):

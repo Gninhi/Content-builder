@@ -29,6 +29,54 @@
       "input_per_1k": 0.00125,
       "output_per_1k": 0.00500
     },
+    "meta/llama-3.2-11b-vision-instruct": {
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.10,
+      "input_per_1k": 0.00005,
+      "output_per_1k": 0.00010
+    },
+    "meta/llama-3.2-90b-vision-instruct": {
+      "input_per_1m": 0.20,
+      "output_per_1m": 0.40,
+      "input_per_1k": 0.00020,
+      "output_per_1k": 0.00040
+    },
+    "nvidia/llama-3.1-nemotron-70b-instruct": {
+      "input_per_1m": 0.35,
+      "output_per_1m": 0.40,
+      "input_per_1k": 0.00035,
+      "output_per_1k": 0.00040
+    },
+    "meta/llama-3.1-8b-instruct": {
+      "input_per_1m": 0.05,
+      "output_per_1m": 0.08,
+      "input_per_1k": 0.00005,
+      "output_per_1k": 0.00008
+    },
+    "mistralai/mixtral-8x7b-instruct-v0.1": {
+      "input_per_1m": 0.15,
+      "output_per_1m": 0.15,
+      "input_per_1k": 0.00015,
+      "output_per_1k": 0.00015
+    },
+    "nvidia/nemotron-4-340b-instruct": {
+      "input_per_1m": 2.00,
+      "output_per_1m": 4.00,
+      "input_per_1k": 0.002,
+      "output_per_1k": 0.004
+    },
+    "z-ai/glm-5.3-flash": {
+      "input_per_1m": 0.10,
+      "output_per_1m": 0.20,
+      "input_per_1k": 0.00010,
+      "output_per_1k": 0.00020
+    },
+    "z-ai/glm-5.3": {
+      "input_per_1m": 0.50,
+      "output_per_1m": 1.00,
+      "input_per_1k": 0.00050,
+      "output_per_1k": 0.00100
+    },
     "default": {
       "input_per_1m": 0.50,
       "output_per_1m": 1.50,

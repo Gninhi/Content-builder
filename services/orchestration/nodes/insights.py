@@ -3,7 +3,8 @@ import logging
 from packages.prompts.registry import PromptRegistry
 from packages.observability.tracing import ObservabilityTracer
 from services.orchestration.state.base import StrategyInsightsState
-from services.orchestration.llm import get_gemini_model, GeneratedStrategyBatch
+from services.orchestration.structured_output import invoke_structured_output
+from services.orchestration.llm import get_gemini_model, resolve_and_get_llm, GeneratedStrategyBatch
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +13,8 @@ def generate_strategy_insights_node(state: StrategyInsightsState) -> Dict[str, A
     """
     Synthesizes facts into hypotheses and strategic recommendations,
     strictly maintaining propositional boundaries (PRD Section 6 & ADR 6).
-    Powered by Google Gemini 3.8 with structured output validation.
+    Powered by multi-provider LLM (Gemini / NVIDIA) with structured output validation.
+    Freezes run context to guarantee deterministic replay.
     """
     workspace_id = state.get("workspace_id", "default")
     pillars = state.get("pillars", ["IA générative", "Systèmes multi-agents"])
@@ -28,8 +30,49 @@ def generate_strategy_insights_node(state: StrategyInsightsState) -> Dict[str, A
         node_name="generate_strategy_insights"
     )
 
-    # 1. Try Gemini generation if configured
-    model = get_gemini_model(model_type="reasoning", temperature=0.2)
+    if not snapshots:
+        logger.info(f"No metric snapshots available for workspace '{workspace_id}', returning clean NO_DATA")
+        return {
+            "hypotheses": [],
+            "recommendations": [],
+            "status": "NO_DATA",
+            "message": "Aucune métrique de publication disponible pour ce workspace. Publiez des contenus pour générer des insights.",
+            "run_id": trace_meta["run_id"],
+            "resolved_llm": None
+        }
+
+    # 1. Resolve or restore frozen LLM configuration
+    frozen_llm = state.get("resolved_llm")
+    if isinstance(frozen_llm, dict):
+        run_override = {
+            "provider_id": frozen_llm.get("provider_id"),
+            "model_id": frozen_llm.get("model_id"),
+            "temperature": frozen_llm.get("temperature", 0.2),
+        }
+        model, resolved_ctx = resolve_and_get_llm(
+            task_name="strategy",
+            workspace_id=workspace_id,
+            run_override=run_override,
+            temperature=0.2,
+            allow_none_if_unconfigured=True
+        )
+    else:
+        raw_ov = state.get("llm_override")
+        override_dict = raw_ov if isinstance(raw_ov, dict) else None
+        model, resolved_ctx = resolve_and_get_llm(
+            task_name="strategy",
+            workspace_id=workspace_id,
+            run_override=override_dict,
+            temperature=0.2,
+            allow_none_if_unconfigured=True
+        )
+
+    if model is None:
+        try:
+            model = get_gemini_model(model_type="reasoning", temperature=0.2, workspace_id=workspace_id)
+        except Exception:
+            model = None
+
     if model is not None:
         try:
             summary = (
@@ -43,20 +86,25 @@ def generate_strategy_insights_node(state: StrategyInsightsState) -> Dict[str, A
                     "pillars": ", ".join(pillars)
                 }
             )
-            structured_llm = model.with_structured_output(GeneratedStrategyBatch)
             callback = ObservabilityTracer.get_callback_handler()
             callbacks = [callback] if callback else []
             
-            res: GeneratedStrategyBatch = structured_llm.invoke(rendered_prompt, config={"callbacks": callbacks})
+            res = invoke_structured_output(
+                model=model,
+                schema_cls=GeneratedStrategyBatch,
+                prompt=rendered_prompt,
+                callbacks=callbacks
+            )
             if res and res.hypotheses:
                 return {
                     "hypotheses": [h.model_dump() for h in res.hypotheses],
                     "recommendations": [r.model_dump() for r in res.recommendations],
                     "status": "COMPLETED",
-                    "run_id": trace_meta["run_id"]
+                    "run_id": trace_meta["run_id"],
+                    "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else (frozen_llm if isinstance(frozen_llm, dict) else None)
                 }
         except Exception as e:
-            logger.warning(f"Gemini strategy insights generation failed: {e}")
+            logger.warning(f"Strategy insights LLM generation failed: {e}")
 
     # 2. Deterministic structured fallback (ensures tests and offline runs succeed)
     hypotheses = [
@@ -95,5 +143,6 @@ def generate_strategy_insights_node(state: StrategyInsightsState) -> Dict[str, A
         "hypotheses": hypotheses,
         "recommendations": recommendations,
         "status": "COMPLETED",
-        "run_id": trace_meta["run_id"]
+        "run_id": trace_meta["run_id"],
+        "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else frozen_llm
     }

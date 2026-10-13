@@ -4,7 +4,21 @@ from packages.resilience.circuit_breaker import (
     BudgetExceededException,
     CircuitState,
     retry_with_backoff,
-    CycleBudget
+    CycleBudget,
+    get_circuit_breaker
+)
+from packages.resilience.rate_limiter import (
+    RateLimiter,
+    get_rate_limiter
+)
+from packages.resilience.errors import (
+    LLMError,
+    LLMAuthenticationError,
+    LLMModelNotFoundError,
+    LLMRateLimitError,
+    LLMTimeoutError,
+    LLMProviderUnavailableError,
+    normalize_llm_error
 )
 
 __all__ = [
@@ -13,5 +27,15 @@ __all__ = [
     "BudgetExceededException",
     "CircuitState",
     "retry_with_backoff",
-    "CycleBudget"
+    "CycleBudget",
+    "get_circuit_breaker",
+    "RateLimiter",
+    "get_rate_limiter",
+    "LLMError",
+    "LLMAuthenticationError",
+    "LLMModelNotFoundError",
+    "LLMRateLimitError",
+    "LLMTimeoutError",
+    "LLMProviderUnavailableError",
+    "normalize_llm_error"
 ]

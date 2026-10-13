@@ -1,0 +1,41 @@
+Unused files (2)
+app.js   
+style.css
+Unused dependencies (1)
+tailwind-merge  package.json:19:6
+Unused devDependencies (1)
+axe-core  package.json:28:6
+Unused exports (9)
+App                        src/App.tsx:104:14                              
+LinkedInPreviewStrategy    src/components/common/PlatformPreview.tsx:38:14 
+XPreviewStrategy           src/components/common/PlatformPreview.tsx:118:14
+PlatformPreviewRegistry    src/components/common/PlatformPreview.tsx:211:14
+TIMEZONE_OPTIONS           src/components/profile/PreferencesTab.tsx:7:14  
+CONTENT_STATUSES           src/constants/index.ts:34:14                    
+USER_ROLES                 src/constants/index.ts:48:14                    
+HITL_KEYBOARD_SHORTCUTS    src/constants/index.ts:56:14                    
+DEFAULT_THEME_PREFERENCES  src/context/ThemeContext.tsx:19:14              
+Unused exported types (20)
+PreviewRenderContext     interface  src/components/common/PlatformPreview.tsx:19:18
+PlatformPreviewStrategy  interface  src/components/common/PlatformPreview.tsx:29:18
+SelectOption             interface  src/components/common/Select.tsx:4:18          
+ContentStatusType        type       src/constants/index.ts:46:13                   
+UserRoleType             type       src/constants/index.ts:54:13                   
+ThemeMode                type       src/context/ThemeContext.tsx:3:13              
+ThemeContrast            type       src/context/ThemeContext.tsx:6:13              
+ThemePreferences         interface  src/context/ThemeContext.tsx:9:18              
+SaveStatus               type       src/context/ThemeContext.tsx:29:13             
+ToastType                type       src/context/ToastContext.tsx:4:13              
+ToastItem                interface  src/context/ToastContext.tsx:6:18              
+FactClaim                interface  src/types/api.ts:68:18                         
+QualityGateReport        interface  src/types/api.ts:73:18                         
+IdeaItem                 interface  src/types/api.ts:99:18                         
+CalendarEvent            interface  src/types/api.ts:112:18                        
+AnalyticsOverview        interface  src/types/api.ts:121:18                        
+StrategyInsight          interface  src/types/api.ts:131:18                        
+ConnectedAccount         interface  src/types/api.ts:139:18                        
+GovernanceSettings       interface  src/types/api.ts:149:18                        
+UserWorkspace            interface  src/types/api.ts:207:18                        
+Duplicate exports (2)
+App|default        src/App.tsx                    
+Badge|StatusBadge  src/components/common/Badge.tsx

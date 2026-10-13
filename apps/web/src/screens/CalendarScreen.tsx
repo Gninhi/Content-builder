@@ -3,44 +3,31 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiClient } from '../lib/api';
-import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
 import { Skeleton } from '../components/common/Skeleton';
 import { ErrorState } from '../components/common/ErrorState';
 import { EmptyState } from '../components/common/EmptyState';
-import { Dialog } from '../components/common/Dialog';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
-import { Input } from '../components/common/Input';
+import { Clock, RefreshCw } from 'lucide-react';
 import {
-  Clock,
-  AlertTriangle,
-  RefreshCw,
-  Zap,
-} from 'lucide-react';
-
-interface CalendarPost {
-  job_id?: string;
-  post_id?: string;
-  variant_id: string;
-  workspace_id: string;
-  platform: string;
-  scheduled_at?: string;
-  published_at?: string;
-  status: string;
-  body_snippet: string;
-}
+  CalendarSlotCard,
+  CalendarPost,
+} from '../components/calendar/CalendarSlotCard';
+import { CalendarListView } from '../components/calendar/CalendarListView';
+import { CalendarRescheduleModal } from '../components/calendar/CalendarRescheduleModal';
 
 export const CalendarScreen: React.FC = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { session, canEdit, isOwner } = useAuth();
   const { showToast } = useToast();
+  const isEn = language === 'en';
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scheduledPosts, setScheduledPosts] = useState<CalendarPost[]>([]);
   const [publishedPosts, setPublishedPosts] = useState<CalendarPost[]>([]);
 
-  const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
+  const [viewMode, setViewMode] = useState<'month' | 'week' | 'list'>('month');
   const [platformFilter, setPlatformFilter] = useState<string>('all');
 
   // Reschedule dialog
@@ -62,7 +49,7 @@ export const CalendarScreen: React.FC = () => {
       setScheduledPosts(data.scheduled || []);
       setPublishedPosts(data.published || []);
     } catch (err: any) {
-      setError(err.message || 'Impossible de charger le calendrier.');
+      setError(err.message || (isEn ? 'Failed to load calendar.' : 'Impossible de charger le calendrier.'));
     } finally {
       setLoading(false);
     }
@@ -72,7 +59,7 @@ export const CalendarScreen: React.FC = () => {
     fetchCalendar();
   }, [session?.workspace_id]);
 
-  const allPosts = [
+  const allPosts: CalendarPost[] = [
     ...scheduledPosts.map((p) => ({ ...p, isPublished: false })),
     ...publishedPosts.map((p) => ({
       ...p,
@@ -97,11 +84,22 @@ export const CalendarScreen: React.FC = () => {
 
     if (collision) {
       setCollisionWarning(
-        `Attention : Une publication sur ${collision.platform.toUpperCase()} est déjà programmée dans cet intervalle de 30 min.`
+        isEn
+          ? `Warning: A post on ${collision.platform.toUpperCase()} is already scheduled within this 30-minute window.`
+          : `Attention : Une publication sur ${collision.platform.toUpperCase()} est déjà programmée dans cet intervalle de 30 min.`
       );
     } else {
       setCollisionWarning(null);
     }
+  };
+
+  const handleOpenReschedule = (post: CalendarPost) => {
+    setSelectedPost(post);
+    setNewDateStr(
+      post.scheduled_at
+        ? new Date(post.scheduled_at).toISOString().slice(0, 16)
+        : new Date().toISOString().slice(0, 16)
+    );
   };
 
   const handleReschedule = async () => {
@@ -115,7 +113,7 @@ export const CalendarScreen: React.FC = () => {
           scheduled_at: new Date(newDateStr).toISOString(),
         }),
       });
-      showToast('success', 'Publication reprogrammée avec succès !');
+      showToast('success', isEn ? 'Publication rescheduled successfully!' : 'Publication reprogrammée avec succès !');
       await fetchCalendar();
       setSelectedPost(null);
     } catch (err: any) {
@@ -127,13 +125,13 @@ export const CalendarScreen: React.FC = () => {
 
   const handlePublishNow = async (jobId: string) => {
     if (!isOwner) {
-      showToast('error', 'Seul le rôle Owner peut déclencher la publication immédiate.');
+      showToast('error', isEn ? 'Only an Owner can trigger immediate broadcast.' : 'Seul le rôle Owner peut déclencher la publication immédiate.');
       return;
     }
     setIsPublishingNow(true);
     try {
       await apiClient(`/v1/publications/${jobId}/publish-now`, { method: 'POST' });
-      showToast('success', 'Publication diffusée et scellée en base avec succès !');
+      showToast('success', isEn ? 'Post broadcasted and sealed successfully!' : 'Publication diffusée et scellée en base avec succès !');
       await fetchCalendar();
       setSelectedPost(null);
     } catch (err: any) {
@@ -148,7 +146,7 @@ export const CalendarScreen: React.FC = () => {
     setIsCancelling(true);
     try {
       await apiClient(`/v1/publications/${cancelTargetJobId}/cancel`, { method: 'POST' });
-      showToast('info', 'Publication planifiée annulée.');
+      showToast('info', isEn ? 'Scheduled publication cancelled.' : 'Publication planifiée annulée.');
       await fetchCalendar();
       setCancelTargetJobId(null);
       setSelectedPost(null);
@@ -159,36 +157,39 @@ export const CalendarScreen: React.FC = () => {
     }
   };
 
-  if (loading) {
+  if (loading && allPosts.length === 0) {
     return (
       <div className="space-y-6">
-        <div className="h-8 w-64 bg-slate-800 rounded animate-pulse" />
-        <Skeleton className="h-[500px] w-full" />
+        <Skeleton className="h-8 w-64 rounded-md" />
+        <Skeleton className="h-[500px] w-full rounded-xl" />
       </div>
     );
   }
 
-  if (error) {
+  if (error && allPosts.length === 0) {
     return <ErrorState message={error} onRetry={fetchCalendar} />;
   }
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 w-full">
       {/* Top Header & View Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-default pb-4">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">
+          <h2 className="text-lg sm:text-xl font-bold text-txt-primary tracking-tight">
             {t.calendar.title}
           </h2>
-          <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
-            <Clock className="h-3.5 w-3.5 text-cyan-400" />
-            <span>Fuseau : UTC (affichage local : {Intl.DateTimeFormat().resolvedOptions().timeZone})</span>
+          <div className="flex items-center gap-2 text-xs text-txt-muted mt-1">
+            <Clock className="h-3.5 w-3.5 text-accent" />
+            <span className="font-mono">
+              {isEn ? 'Timezone: UTC (Local display: ' : 'Fuseau : UTC (affichage local : '}
+              {Intl.DateTimeFormat().resolvedOptions().timeZone})
+            </span>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           {/* Platform Filters */}
-          <div className="flex items-center rounded-lg border border-slate-700 bg-slate-800 p-0.5 text-xs">
+          <div className="flex items-center rounded-md border border-border-default bg-surface-subtle p-0.5 text-xs font-mono">
             {['all', 'linkedin', 'x'].map((p) => (
               <button
                 key={p}
@@ -196,24 +197,24 @@ export const CalendarScreen: React.FC = () => {
                 onClick={() => setPlatformFilter(p)}
                 className={`rounded px-2.5 py-1 font-medium transition-colors ${
                   platformFilter === p
-                    ? 'bg-cyan-500 text-slate-950 font-bold'
-                    : 'text-slate-300 hover:text-white'
+                    ? 'bg-accent text-txt-inverse font-bold shadow-xs'
+                    : 'text-txt-muted hover:text-txt-primary'
                 }`}
               >
-                {p === 'all' ? 'Toutes' : p.toUpperCase()}
+                {p === 'all' ? (isEn ? 'All' : 'Toutes') : p.toUpperCase()}
               </button>
             ))}
           </div>
 
-          {/* Month / Week Switcher */}
-          <div className="flex items-center rounded-lg border border-slate-700 bg-slate-800 p-0.5 text-xs">
+          {/* Month / Week / List Switcher */}
+          <div className="flex items-center rounded-md border border-border-default bg-surface-subtle p-0.5 text-xs">
             <button
               type="button"
               onClick={() => setViewMode('month')}
               className={`rounded px-2.5 py-1 font-medium transition-colors ${
                 viewMode === 'month'
-                  ? 'bg-slate-700 text-white font-bold'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-surface text-txt-primary font-semibold shadow-xs'
+                  : 'text-txt-muted hover:text-txt-primary'
               }`}
             >
               {t.calendar.view_month}
@@ -223,191 +224,106 @@ export const CalendarScreen: React.FC = () => {
               onClick={() => setViewMode('week')}
               className={`rounded px-2.5 py-1 font-medium transition-colors ${
                 viewMode === 'week'
-                  ? 'bg-slate-700 text-white font-bold'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-surface text-txt-primary font-semibold shadow-xs'
+                  : 'text-txt-muted hover:text-txt-primary'
               }`}
             >
               {t.calendar.view_week}
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`rounded px-2.5 py-1 font-medium transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-surface text-txt-primary font-semibold shadow-xs'
+                  : 'text-txt-muted hover:text-txt-primary'
+              }`}
+            >
+              {isEn ? 'List' : 'Liste'}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Calendar List View with Status & Collision Prevention */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-6">
+      {/* Main Content Area */}
+      <div className="rounded-xl border border-border-default bg-surface p-5 sm:p-6 space-y-6 shadow-subtle">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
-            Événements de publication ({filteredPosts.length})
+          <h3 className="text-xs font-semibold text-txt-secondary">
+            {isEn ? `Publication Events (${filteredPosts.length})` : `Événements de publication (${filteredPosts.length})`}
           </h3>
-          <Button variant="ghost" size="sm" onClick={fetchCalendar} className="text-xs text-slate-400">
-            <RefreshCw className="h-3.5 w-3.5 mr-1" />
-            Actualiser
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={fetchCalendar}
+            className="text-xs min-h-[36px]"
+          >
+            <RefreshCw className="h-3.5 w-3.5 mr-1 text-accent" />
+            {isEn ? 'Refresh' : 'Actualiser'}
           </Button>
         </div>
 
         {filteredPosts.length === 0 ? (
           <EmptyState
-            title="Aucune publication dans le calendrier"
-            description="Les publications approuvées dans la revue HITL apparaîtront automatiquement ici."
+            title={isEn ? 'No publications in calendar' : 'Aucune publication dans le calendrier'}
+            description={
+              isEn
+                ? 'Approved posts in the HITL review will automatically appear in this timeline.'
+                : 'Les publications approuvées dans la revue HITL apparaîtront automatiquement ici.'
+            }
+          />
+        ) : viewMode === 'list' ? (
+          <CalendarListView
+            posts={filteredPosts}
+            canEdit={canEdit}
+            onReschedule={handleOpenReschedule}
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredPosts.map((post, idx) => {
-              const date = post.scheduled_at ? new Date(post.scheduled_at) : new Date();
-              return (
-                <div
-                  key={idx}
-                  className={`rounded-xl border p-4 transition-all ${
-                    post.isPublished
-                      ? 'border-emerald-500/30 bg-emerald-950/10'
-                      : post.status === 'FAILED'
-                      ? 'border-red-500/40 bg-red-950/10'
-                      : 'border-slate-800 bg-slate-950/60 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <Badge variant={post.platform === 'linkedin' ? 'info' : 'neutral'} className="text-[10px]">
-                      {post.platform.toUpperCase()}
-                    </Badge>
-                    <Badge
-                      variant={
-                        post.isPublished
-                          ? 'success'
-                          : post.status === 'FAILED'
-                          ? 'danger'
-                          : 'warning'
-                      }
-                      className="text-[10px]"
-                    >
-                      {post.isPublished ? 'PUBLIÉ' : post.status}
-                    </Badge>
-                  </div>
-
-                  <p className="text-xs text-slate-200 line-clamp-2 font-medium mb-3">
-                    {post.body_snippet || 'Publication sans texte'}
-                  </p>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs text-slate-400">
-                    <span className="font-mono text-[11px] text-cyan-400">
-                      {date.toLocaleString('fr-FR', {
-                        day: 'numeric',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-
-                    {canEdit && !post.isPublished && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedPost(post);
-                          setNewDateStr(
-                            post.scheduled_at
-                              ? new Date(post.scheduled_at).toISOString().slice(0, 16)
-                              : new Date().toISOString().slice(0, 16)
-                          );
-                        }}
-                        className="text-[11px] text-cyan-400 hover:text-cyan-300 py-0.5 px-2"
-                      >
-                        Reprogrammer
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            {filteredPosts.map((post, idx) => (
+              <CalendarSlotCard
+                key={idx}
+                post={post}
+                canEdit={canEdit}
+                onReschedule={handleOpenReschedule}
+              />
+            ))}
           </div>
         )}
       </div>
 
       {/* Reschedule Modal */}
-      {selectedPost && (
-        <Dialog
-          isOpen={true}
-          onClose={() => setSelectedPost(null)}
-          title="Reprogrammer la publication"
-        >
-          <div className="space-y-4">
-            <p className="text-xs text-slate-300">
-              Choisissez le nouvel horaire de diffusion. Le système analyse les conflits temporels.
-            </p>
-
-            <div>
-              <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">
-                Date et Heure (Local)
-              </label>
-              <Input
-                type="datetime-local"
-                value={newDateStr}
-                onChange={(e) => {
-                  setNewDateStr(e.target.value);
-                  checkCollision(e.target.value, selectedPost.job_id);
-                }}
-              />
-            </div>
-
-            {collisionWarning && (
-              <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-950/30 p-3 text-xs text-amber-300">
-                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
-                <span>{collisionWarning}</span>
-              </div>
-            )}
-
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-slate-800">
-              <div className="flex items-center gap-2">
-                {selectedPost.job_id && (
-                  <>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      disabled={!isOwner}
-                      isLoading={isPublishingNow}
-                      onClick={() => handlePublishNow(selectedPost.job_id!)}
-                      title={!isOwner ? 'Réservé au rôle Owner' : 'Publier immédiatement sans attendre'}
-                    >
-                      <Zap className="h-3.5 w-3.5 mr-1" />
-                      Diffuser maintenant
-                    </Button>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      disabled={!isOwner}
-                      onClick={() => setCancelTargetJobId(selectedPost.job_id!)}
-                      title={!isOwner ? 'Réservé au rôle Owner' : 'Annuler la planification'}
-                    >
-                      Annuler le job
-                    </Button>
-                  </>
-                )}
-              </div>
-              <div className="flex gap-2 ml-auto">
-                <Button variant="ghost" size="sm" onClick={() => setSelectedPost(null)}>
-                  Fermer
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  isLoading={isRescheduling}
-                  onClick={handleReschedule}
-                >
-                  Reprogrammer
-                </Button>
-              </div>
-            </div>
-          </div>
-        </Dialog>
-      )}
+      <CalendarRescheduleModal
+        isOpen={Boolean(selectedPost)}
+        selectedPost={selectedPost}
+        newDateStr={newDateStr}
+        collisionWarning={collisionWarning}
+        isOwner={isOwner}
+        isRescheduling={isRescheduling}
+        isPublishingNow={isPublishingNow}
+        onDateChange={(val) => {
+          setNewDateStr(val);
+          if (selectedPost) {
+            checkCollision(val, selectedPost.job_id);
+          }
+        }}
+        onClose={() => setSelectedPost(null)}
+        onReschedule={handleReschedule}
+        onPublishNow={handlePublishNow}
+        onCancelJob={(jobId) => setCancelTargetJobId(jobId)}
+      />
 
       {/* Cancellation Confirm Dialog */}
       <ConfirmDialog
         isOpen={Boolean(cancelTargetJobId)}
         onClose={() => setCancelTargetJobId(null)}
         onConfirm={handleConfirmCancel}
-        title="Annuler la publication planifiée"
-        message="Êtes-vous certain de vouloir annuler définitivement ce travail de publication ?"
-        confirmText="Confirmer l'annulation"
+        title={isEn ? 'Cancel Scheduled Publication' : 'Annuler la publication planifiée'}
+        message={
+          isEn
+            ? 'Are you sure you want to permanently cancel this scheduled publication job?'
+            : 'Êtes-vous certain de vouloir annuler définitivement ce travail de publication ?'
+        }
+        confirmText={isEn ? 'Confirm Cancellation' : 'Confirmer l’annulation'}
         variant="danger"
         isLoading={isCancelling}
       />

@@ -6,6 +6,7 @@ langchain>=0.3.0
 langchain-core>=0.3.0
 langchain-community>=0.3.0
 langchain-google-genai>=2.0.0
+langchain-nvidia-ai-endpoints>=0.3.0
 langfuse>=2.0.0
 
 # API & Web Server
@@ -13,10 +14,12 @@ fastapi>=0.110.0
 uvicorn>=0.29.0
 pydantic>=2.7.0
 pydantic-settings>=2.2.0
+email-validator>=2.0.0
+pillow>=10.0.0
+python-multipart>=0.0.9
 
 # Database & Persistence
 sqlalchemy>=2.0.0
-aiosqlite>=0.20.0
 psycopg[binary]>=3.1.18
 psycopg2-binary>=2.9.0
 
@@ -28,14 +31,12 @@ python-dotenv>=1.0.0
 # Security, Caching & Migrations
 cryptography>=42.0.0
 PyJWT>=2.8.0
+argon2-cffi>=21.3.0
+beautifulsoup4>=4.12.0
 slowapi>=0.1.9
 redis>=5.0.0
 alembic>=1.13.0
-
-
-# CLI & Output Styling
-rich>=13.7.0
-typer>=0.12.0
+prometheus-client>=0.20.0
 
 # Testing & QA
 pytest>=8.0.0

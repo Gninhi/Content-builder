@@ -19,8 +19,9 @@ import {
 } from 'lucide-react';
 
 export const BrandProfileScreen: React.FC = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { session, canEdit } = useAuth();
+  const isEn = language === 'en';
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -57,7 +58,7 @@ export const BrandProfileScreen: React.FC = () => {
       const vers = await apiClient<BrandProfile[]>(`/v1/brand-profiles/${wsId}/versions`);
       setVersions(Array.isArray(vers) ? vers : []);
     } catch (err: any) {
-      setError(err.message || 'Impossible de récupérer le profil de marque.');
+      setError(err.message || (isEn ? 'Failed to fetch brand profile.' : 'Impossible de récupérer le profil de marque.'));
     } finally {
       setLoading(false);
     }
@@ -101,41 +102,43 @@ export const BrandProfileScreen: React.FC = () => {
   };
 
   const handleRestoreVersion = (v: BrandProfile) => {
-    if (!confirm(`Restaurer les paramètres de la version ${v.version} ?`)) return;
+    if (!confirm(isEn ? `Restore settings from version ${v.version}?` : `Restaurer les paramètres de la version ${v.version} ?`)) return;
     setVoice(v.voice || '');
     setPillars(v.pillars || []);
     setProhibitedTopics(v.prohibited_topics || []);
     setAllowedCtas(v.cta_policy?.allowed_ctas || []);
   };
 
-  if (loading) {
+  if (loading && !voice && pillars.length === 0) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-96 w-full" />
+        <Skeleton className="h-8 w-64 rounded-md" />
+        <Skeleton className="h-96 w-full rounded-xl" />
       </div>
     );
   }
 
-  if (error) {
+  if (error && !voice) {
     return <ErrorState message={error} onRetry={fetchProfileAndVersions} />;
   }
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-default pb-5">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold text-white tracking-tight">
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-lg sm:text-xl font-bold text-txt-primary tracking-tight">
               {t.brand.title}
             </h2>
-            <Badge variant="info" className="text-xs">
-              Version {currentVersion}
+            <Badge variant="accent" className="font-mono text-xs">
+              v{currentVersion}
             </Badge>
           </div>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Gouverne la voix, la conformité légale et les limites éditoriales de tous les agents.
+          <p className="text-xs text-txt-muted mt-1">
+            {isEn
+              ? 'Governs tone of voice, compliance boundaries, and editorial guardrails for all agents.'
+              : 'Gouverne la voix, la conformité légale et les limites éditoriales de tous les agents.'}
           </p>
         </div>
 
@@ -144,10 +147,10 @@ export const BrandProfileScreen: React.FC = () => {
             variant="secondary"
             size="sm"
             onClick={() => setShowHistory(!showHistory)}
-            className="flex items-center gap-1.5 text-xs"
+            className="flex items-center gap-1.5 text-xs min-h-[38px] sm:min-h-[36px]"
           >
-            <History className="h-4 w-4" />
-            <span>{showHistory ? 'Masquer l’historique' : 'Historique des versions'}</span>
+            <History className="h-4 w-4 text-txt-muted" />
+            <span>{showHistory ? (isEn ? 'Hide History' : 'Masquer l’historique') : (isEn ? 'Version History' : 'Historique des versions')}</span>
           </Button>
 
           {canEdit && (
@@ -156,7 +159,7 @@ export const BrandProfileScreen: React.FC = () => {
               size="sm"
               isLoading={saving}
               onClick={handleSave}
-              className="flex items-center gap-1.5 text-xs"
+              className="flex items-center gap-1.5 text-xs min-h-[38px] sm:min-h-[36px]"
             >
               <Save className="h-4 w-4" />
               <span>{t.brand.save_btn}</span>
@@ -166,28 +169,37 @@ export const BrandProfileScreen: React.FC = () => {
       </div>
 
       {saveSuccess && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 text-xs text-emerald-300 flex items-center gap-2">
-          <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-          <span>Profil de marque mis à jour avec succès et nouvelle version incrémentée.</span>
+        <div className="rounded-xl border border-status-success-border bg-status-success-bg p-4 text-xs sm:text-sm text-status-success-text flex items-center gap-3">
+          <CheckCircle2 className="h-5 w-5 text-status-success-text shrink-0" />
+          <span>
+            {isEn
+              ? 'Brand profile updated successfully and new sealed version incremented.'
+              : 'Profil de marque mis à jour avec succès et nouvelle version incrémentée.'}
+          </span>
         </div>
       )}
 
       {/* Version History Drawer / Panel */}
       {showHistory && (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 space-y-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Historique des versions enregistrées ({versions.length})
-          </h3>
-          <div className="space-y-2 max-h-60 overflow-y-auto">
+        <div className="rounded-xl border border-border-default bg-surface p-5 sm:p-6 space-y-4 shadow-subtle">
+          <div className="flex items-center justify-between border-b border-border-subtle pb-3">
+            <h3 className="text-xs font-semibold text-txt-secondary">
+              {isEn ? `Sealed Version History (${versions.length})` : `Historique des versions scellées (${versions.length})`}
+            </h3>
+            <span className="text-[11px] text-txt-muted">
+              {isEn ? 'Non-destructive restore' : 'Restauration non destructive'}
+            </span>
+          </div>
+          <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
             {versions.map((ver) => (
               <div
                 key={ver.id || ver.version}
-                className="flex items-center justify-between p-3 rounded-xl border border-slate-800 bg-slate-950/60 text-xs"
+                className="flex items-center justify-between p-3.5 rounded-lg border border-border-subtle bg-surface-subtle hover:border-border-default text-xs transition-colors"
               >
                 <div>
-                  <span className="font-bold text-slate-200">Version {ver.version}</span>
-                  <span className="text-slate-400 ml-3">
-                    {ver.pillars?.length || 0} piliers • {ver.prohibited_topics?.length || 0} interdits
+                  <span className="font-bold font-mono text-accent-text">Version {ver.version}</span>
+                  <span className="text-txt-muted ml-3">
+                    {ver.pillars?.length || 0} {isEn ? 'pillars' : 'piliers'} • {ver.prohibited_topics?.length || 0} {isEn ? 'banned' : 'interdits'}
                   </span>
                 </div>
                 {canEdit && (
@@ -195,10 +207,10 @@ export const BrandProfileScreen: React.FC = () => {
                     variant="ghost"
                     size="sm"
                     onClick={() => handleRestoreVersion(ver)}
-                    className="text-cyan-400 hover:text-cyan-300 text-xs"
+                    className="text-xs font-medium"
                   >
                     <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                    Restaurer
+                    {isEn ? 'Restore' : 'Restaurer'}
                   </Button>
                 )}
               </div>
@@ -210,37 +222,49 @@ export const BrandProfileScreen: React.FC = () => {
       {/* Main Form */}
       <form onSubmit={handleSave} className="space-y-6">
         {/* Voice and Tone */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-3">
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
-            {t.brand.voice_label}
-          </label>
+        <div className="rounded-xl border border-border-default bg-surface p-5 sm:p-6 space-y-3 shadow-subtle">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-semibold text-txt-secondary">
+              {t.brand.voice_label}
+            </label>
+            <span className="text-[11px] text-txt-muted">
+              {isEn ? 'Injected into system prompts' : 'Injecté dans le prompt système'}
+            </span>
+          </div>
           <Textarea
             rows={3}
             value={voice}
             onChange={(e) => setVoice(e.target.value)}
             disabled={!canEdit}
-            placeholder="Ex: Expert, pragmatique, direct, orienté retour d'expérience et architecture sans jargon creux."
+            placeholder={
+              isEn
+                ? 'e.g., Expert, pragmatic, direct, grounded in architecture and case studies.'
+                : 'Ex: Expert, pragmatique, direct, orienté retour d’expérience et architecture sans jargon creux.'
+            }
             required
           />
         </div>
 
         {/* Editorial Pillars */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
-            {t.brand.pillars_label}
-          </label>
+        <div className="rounded-xl border border-border-default bg-surface p-5 sm:p-6 space-y-4 shadow-subtle">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-semibold text-txt-secondary">
+              {t.brand.pillars_label}
+            </label>
+            <span className="text-[11px] text-txt-muted font-mono">{pillars.length} {isEn ? 'active' : 'actif(s)'}</span>
+          </div>
           <div className="flex flex-wrap gap-2">
             {pillars.map((pil, idx) => (
               <span
                 key={idx}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-950/60 border border-cyan-500/30 px-3 py-1.5 text-xs text-cyan-300"
+                className="inline-flex items-center gap-1.5 rounded-md bg-accent-subtle border border-accent-border px-3 py-1.5 text-xs text-accent-text font-medium"
               >
                 <span>{pil}</span>
                 {canEdit && (
                   <button
                     type="button"
                     onClick={() => setPillars(pillars.filter((_, i) => i !== idx))}
-                    className="hover:text-red-400 focus:outline-none focus:ring-1 focus:ring-red-400 rounded"
+                    className="hover:text-status-danger-text focus:outline-none focus:ring-1 focus:ring-border-focus rounded p-0.5"
                     aria-label={`Supprimer le pilier ${pil}`}
                   >
                     <X className="h-3 w-3" />
@@ -251,18 +275,19 @@ export const BrandProfileScreen: React.FC = () => {
           </div>
 
           {canEdit && (
-            <div className="flex gap-2 max-w-md">
+            <div className="flex gap-2 max-w-md pt-1">
               <Input
                 value={newPillar}
                 onChange={(e) => setNewPillar(e.target.value)}
-                placeholder="Ajouter un pilier thématique..."
+                placeholder={isEn ? 'Add a pillar topic...' : 'Ajouter un pilier thématique...'}
                 className="text-xs"
               />
               <Button
                 type="button"
-                variant="secondary"
+                variant="primary"
                 size="sm"
                 aria-label="Ajouter ce pilier"
+                className="min-h-[38px] px-3 shrink-0"
                 onClick={() => {
                   if (newPillar.trim()) {
                     setPillars([...pillars, newPillar.trim()]);
@@ -277,22 +302,27 @@ export const BrandProfileScreen: React.FC = () => {
         </div>
 
         {/* Prohibited Topics */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
-            {t.brand.prohibited_label}
-          </label>
+        <div className="rounded-xl border border-border-default bg-surface p-5 sm:p-6 space-y-4 shadow-subtle">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-semibold text-txt-secondary">
+              {t.brand.prohibited_label}
+            </label>
+            <span className="text-[11px] text-status-danger-text font-mono">
+              {prohibitedTopics.length} {isEn ? 'guardrail(s)' : 'garde-fou(s)'}
+            </span>
+          </div>
           <div className="flex flex-wrap gap-2">
             {prohibitedTopics.map((top, idx) => (
               <span
                 key={idx}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-red-950/40 border border-red-500/30 px-3 py-1.5 text-xs text-red-300"
+                className="inline-flex items-center gap-1.5 rounded-md bg-status-danger-bg border border-status-danger-border px-3 py-1.5 text-xs text-status-danger-text font-medium"
               >
                 <span>{top}</span>
                 {canEdit && (
                   <button
                     type="button"
                     onClick={() => setProhibitedTopics(prohibitedTopics.filter((_, i) => i !== idx))}
-                    className="hover:text-white focus:outline-none focus:ring-1 focus:ring-white rounded"
+                    className="hover:text-status-danger-text focus:outline-none focus:ring-1 focus:ring-border-focus rounded p-0.5"
                     aria-label={`Supprimer le sujet interdit ${top}`}
                   >
                     <X className="h-3 w-3" />
@@ -303,11 +333,11 @@ export const BrandProfileScreen: React.FC = () => {
           </div>
 
           {canEdit && (
-            <div className="flex gap-2 max-w-md">
+            <div className="flex gap-2 max-w-md pt-1">
               <Input
                 value={newProhibited}
                 onChange={(e) => setNewProhibited(e.target.value)}
-                placeholder="Ajouter un sujet ou mot interdit..."
+                placeholder={isEn ? 'Add a prohibited keyword...' : 'Ajouter un sujet ou mot interdit...'}
                 className="text-xs"
               />
               <Button
@@ -315,6 +345,7 @@ export const BrandProfileScreen: React.FC = () => {
                 variant="secondary"
                 size="sm"
                 aria-label="Ajouter ce sujet interdit"
+                className="min-h-[38px] px-3 shrink-0"
                 onClick={() => {
                   if (newProhibited.trim()) {
                     setProhibitedTopics([...prohibitedTopics, newProhibited.trim()]);
@@ -329,22 +360,25 @@ export const BrandProfileScreen: React.FC = () => {
         </div>
 
         {/* CTA Policy */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
-            Appels à l'action autorisés (CTA Policy)
-          </label>
+        <div className="rounded-xl border border-border-default bg-surface p-5 sm:p-6 space-y-4 shadow-subtle">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-semibold text-txt-secondary">
+              {isEn ? 'Allowed Calls-to-Action (CTA Policy)' : 'Appels à l’action autorisés (CTA Policy)'}
+            </label>
+            <span className="text-[11px] text-txt-muted font-mono">{allowedCtas.length} {isEn ? 'allowed' : 'autorisés'}</span>
+          </div>
           <div className="flex flex-wrap gap-2">
             {allowedCtas.map((cta, idx) => (
               <span
                 key={idx}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 border border-slate-700 px-3 py-1.5 text-xs text-slate-200"
+                className="inline-flex items-center gap-1.5 rounded-md bg-surface-subtle border border-border-subtle px-3 py-1.5 text-xs text-txt-primary font-mono"
               >
                 <span>{cta}</span>
                 {canEdit && (
                   <button
                     type="button"
                     onClick={() => setAllowedCtas(allowedCtas.filter((_, i) => i !== idx))}
-                    className="hover:text-red-400 focus:outline-none focus:ring-1 focus:ring-red-400 rounded"
+                    className="hover:text-status-danger-text focus:outline-none focus:ring-1 focus:ring-border-focus rounded p-0.5"
                     aria-label={`Supprimer le CTA ${cta}`}
                   >
                     <X className="h-3 w-3" />
@@ -355,18 +389,19 @@ export const BrandProfileScreen: React.FC = () => {
           </div>
 
           {canEdit && (
-            <div className="flex gap-2 max-w-md">
+            <div className="flex gap-2 max-w-md pt-1">
               <Input
                 value={newCta}
                 onChange={(e) => setNewCta(e.target.value)}
-                placeholder="Ajouter un CTA validé..."
+                placeholder={isEn ? 'Add an approved CTA...' : 'Ajouter un CTA validé...'}
                 className="text-xs"
               />
               <Button
                 type="button"
-                variant="secondary"
+                variant="primary"
                 size="sm"
                 aria-label="Ajouter ce CTA"
+                className="min-h-[38px] px-3 shrink-0"
                 onClick={() => {
                   if (newCta.trim()) {
                     setAllowedCtas([...allowedCtas, newCta.trim()]);
