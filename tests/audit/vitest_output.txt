@@ -2,26 +2,26 @@
 > contentops-web@2.0.0 test
 > vitest run
 
-Error: EPERM: operation not permitted, open '/Users/seansiehigninhi/package.json'
+Error: EPERM: operation not permitted, open '[WORKSPACE_ROOT]/package.json'
     at Object.readFileSync (node:fs:539:20)
-    at read (file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/apps/web/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:4858:17)
-    at getPackageScopeConfig (file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/apps/web/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:4949:27)
-    at packageResolve (file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/apps/web/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:6100:25)
-    at moduleResolve (file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/apps/web/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:6240:18)
-    at _tryModuleResolve (file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/apps/web/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:6285:12)
-    at _resolve$1 (file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/apps/web/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:6340:16)
-    at resolveSync (file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/apps/web/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:6373:10)
-    at resolvePathSync (file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/apps/web/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:6376:24)
-    at _resolve (file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/apps/web/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:6382:22) {
+    at read (file://./apps/web/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:4858:17)
+    at getPackageScopeConfig (file://./apps/web/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:4949:27)
+    at packageResolve (file://./apps/web/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:6100:25)
+    at moduleResolve (file://./apps/web/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:6240:18)
+    at _tryModuleResolve (file://./apps/web/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:6285:12)
+    at _resolve$1 (file://./apps/web/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:6340:16)
+    at resolveSync (file://./apps/web/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:6373:10)
+    at resolvePathSync (file://./apps/web/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:6376:24)
+    at _resolve (file://./apps/web/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:6382:22) {
   errno: -1,
   code: 'EPERM',
   syscall: 'open',
-  path: '/Users/seansiehigninhi/package.json'
+  path: '[WORKSPACE_ROOT]/package.json'
 }
  MISSING DEPENDENCY  Cannot find dependency 'happy-dom'
 
 
- RUN  v2.1.9 /Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/apps/web
+ RUN  v2.1.9 ./apps/web
 
  ✓ src/__tests__/useHitlShortcuts.test.ts (6 tests) 13ms
  ✓ src/__tests__/Button.test.tsx (6 tests) 35ms
@@ -36,7 +36,7 @@ act(() => {
 /* assert on the output */
 
 This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
-    at AuthProvider (/Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/apps/web/src/context/AuthContext.tsx:9:25)
+    at AuthProvider (./apps/web/src/context/AuthContext.tsx:9:25)
 Warning: An update to AuthProvider inside a test was not wrapped in act(...).
 
 When testing, code that causes React state updates should be wrapped into act(...):
@@ -47,7 +47,7 @@ act(() => {
 /* assert on the output */
 
 This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
-    at AuthProvider (/Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/apps/web/src/context/AuthContext.tsx:9:25)
+    at AuthProvider (./apps/web/src/context/AuthContext.tsx:9:25)
 
  ✓ src/__tests__/AuthFlows.test.tsx (4 tests) 59ms
  ✓ src/__tests__/AuthContext.test.tsx (5 tests) 61ms

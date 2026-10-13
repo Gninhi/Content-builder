@@ -37,7 +37,7 @@ Une remédiation immédiate de niveau P0 est requise sur ces défauts avant tout
 
 ### 3.1. Diagramme Réel Reconstruit (Mermaid)
 
-Le diagramme complet est sauvegardé dans le livrable racine [`pipeline.mmd`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/pipeline.mmd).
+Le diagramme complet est sauvegardé dans le livrable racine [`pipeline.mmd`](file://./pipeline.mmd).
 
 ```mermaid
 flowchart TD
@@ -130,7 +130,7 @@ flowchart TD
 
 ## 4. Phase 1 — Grille des Contrôles par Domaine (Synthèse AUD)
 
-La matrice détaillée exhaustive avec chaque verdict et statut de preuve est fournie dans le fichier racine [`coverage-matrix.csv`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/coverage-matrix.csv).
+La matrice détaillée exhaustive avec chaque verdict et statut de preuve est fournie dans le fichier racine [`coverage-matrix.csv`](file://./coverage-matrix.csv).
 
 ### Synthèse des Constats Clés de la Phase 1 :
 1. **Fournisseur NVIDIA & GLM-5.3 (AUD-LLM) :**
@@ -184,7 +184,7 @@ L'ensemble des tests dynamiques a été développé et validé sous `tests/audit
 
 ## 6. Synthèse des Constats par Gravité
 
-Le fichier complet de suivi est disponible dans [`findings.csv`](file:///Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/findings.csv).
+Le fichier complet de suivi est disponible dans [`findings.csv`](file://./findings.csv).
 
 ### Constats Critiques (Priorité P0)
 1. **FND-01 : Crash runtime `AttributeError` silencieux en collecte live (`pipeline.py:239-261` et `research.py:28`).**  
