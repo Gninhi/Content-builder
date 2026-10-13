@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from typing import Any, Dict, List, Optional, Type, TypeVar
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage
@@ -49,9 +50,6 @@ def make_schema_template(model_cls: Type[BaseModel]) -> Dict[str, Any]:
         return res
 
     return resolve_object(schema)
-
-
-import re
 
 
 _STRUCTURED_OUTPUT_METRICS: Dict[str, Dict[str, int]] = {}

@@ -1,6 +1,5 @@
 import pytest
 from unittest.mock import MagicMock
-from datetime import datetime, timezone
 
 from packages.connectors.social.vault import EncryptedOAuthTokenVault
 from packages.connectors.social.x_twitter import XSocialPublisher

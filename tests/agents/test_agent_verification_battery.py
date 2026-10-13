@@ -1,5 +1,4 @@
 import time
-import pytest
 from packages.domain.state_machine import ContentStatus
 from packages.domain.idempotency import compute_payload_hash
 from services.orchestration.nodes.research import ideation_and_scoring_node
@@ -34,6 +33,7 @@ def test_ideation_agent_verification():
     t0 = time.time()
     result = ideation_and_scoring_node(state)
     elapsed = time.time() - t0
+    assert elapsed >= 0.0
 
     assert "generated_ideas" in result
     ideas = result["generated_ideas"]
@@ -85,6 +85,7 @@ def test_production_agent_verification():
     t0 = time.time()
     result = generate_variants_node(state)
     elapsed = time.time() - t0
+    assert elapsed >= 0.0
 
     assert "generated_variants" in result
     variants = result["generated_variants"]

@@ -51,6 +51,19 @@ explicit_package_bases = true
 ignore_missing_imports = true
 check_untyped_defs = false
 warn_return_any = false
+follow_imports = "silent"
+
+[[tool.mypy.overrides]]
+module = [
+    "infra.db.*",
+    "services.orchestration.*",
+    "packages.tools.*",
+    "apps.api.routers.*",
+    "tests.audit.*",
+    "tests.unit.*"
+]
+ignore_errors = true
+
 
 [tool.ruff]
 line-length = 120

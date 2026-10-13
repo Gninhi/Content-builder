@@ -13,7 +13,7 @@ from packages.tools.schemas import (
     WebSearchResponse,
     SearchEngineType
 )
-from packages.resilience import get_circuit_breaker, CircuitBreakerOpenException
+from packages.resilience import get_circuit_breaker
 from packages.security.prompt_injection import sanitize_untrusted_text
 
 logger = logging.getLogger(__name__)

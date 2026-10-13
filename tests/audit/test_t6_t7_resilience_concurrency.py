@@ -2,10 +2,9 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from packages.tools.web_search import WebSearchTool, _SEARCH_CACHE
-from packages.resilience import CircuitBreaker, CircuitBreakerOpenException
+from packages.resilience import CircuitBreaker
 from services.publisher.worker import PublisherWorker
 from packages.domain.state_machine import ContentStatus
-from packages.domain.idempotency import compute_payload_hash
 
 
 def test_t6_search_resilience_and_circuit_breakers():

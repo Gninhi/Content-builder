@@ -1,6 +1,5 @@
 import time
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from services.orchestration.veille.pipeline import VeillePipeline, SYNTHETIC_DEMO_SIGNALS
 

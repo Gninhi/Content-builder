@@ -1,4 +1,3 @@
-import pytest
 from fastapi.testclient import TestClient
 
 from apps.api.main import app
@@ -6,7 +5,6 @@ from apps.api.dependencies import get_current_user, UserContext
 from infra.db.database import get_db_session
 from infra.db.repository import ContentOpsRepository
 from packages.prompts.veille_queries import compute_qualification_score, get_queries_for_axis, SUPPORTED_AXES
-from services.orchestration.veille.pipeline import VeillePipeline
 
 
 def test_qualification_score_rubric():

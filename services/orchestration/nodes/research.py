@@ -7,7 +7,7 @@ from packages.cache.factory import get_llm_cache, compute_cache_key
 from packages.tools.web_search import WebSearchTool
 from services.orchestration.state.base import IdeaResearchState
 from services.orchestration.structured_output import invoke_structured_output
-from services.orchestration.llm import get_gemini_model, resolve_and_get_llm, GeneratedIdeasBatch
+from services.orchestration.llm import resolve_and_get_llm, GeneratedIdeasBatch
 
 logger = logging.getLogger(__name__)
 

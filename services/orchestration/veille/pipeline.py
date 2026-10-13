@@ -5,7 +5,6 @@ Performs collection, sanitization, deduplication, scoring (0.0 to 5.0), and exec
 
 from typing import List, Dict, Any, Optional
 import logging
-from datetime import datetime
 
 from infra.db.repository import ContentOpsRepository
 from infra.db.models import SignalModel

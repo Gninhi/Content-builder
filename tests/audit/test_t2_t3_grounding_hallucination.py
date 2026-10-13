@@ -1,7 +1,6 @@
 import json
-import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from packages.prompts.veille_queries import compute_qualification_score
 from services.orchestration.nodes.research import collect_sources_node, ideation_and_scoring_node

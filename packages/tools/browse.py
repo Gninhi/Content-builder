@@ -5,7 +5,7 @@ import logging
 import re
 import socket
 import time
-from typing import Optional, Set
+from typing import Set
 from urllib.parse import urlparse, urljoin
 import urllib.robotparser
 
@@ -13,7 +13,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from packages.security.prompt_injection import sanitize_untrusted_text
-from packages.tools.schemas import BrowseRequest, BrowseResponse
+from packages.tools.schemas import BrowseResponse
 
 logger = logging.getLogger(__name__)
 

@@ -1,12 +1,9 @@
 import pytest
-import ipaddress
 from unittest.mock import patch, MagicMock
 
-from packages.security.prompt_injection import PromptInjectionGuard, sanitize_untrusted_text
+from packages.security.prompt_injection import PromptInjectionGuard
 from packages.tools.browse import (
     validate_target_url_security,
-    check_robots_txt_allowed,
-    FORBIDDEN_DOMAINS,
     SafeBrowserTool
 )
 

@@ -4,7 +4,6 @@ Covers 3 strategic axes: IA, Frameworks & Outils, Évolution des Métiers (Franc
 """
 
 from typing import List, Dict, Any
-import random
 import time
 
 AXIS_IA = "ia"

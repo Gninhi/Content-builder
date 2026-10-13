@@ -1,11 +1,10 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from packages.tools import (
     canonicalize_url,
     validate_target_url_security,
     web_search_tool,
-    safe_browser_tool,
-    OfficialDataConnectors
+    safe_browser_tool
 )
 from packages.security.prompt_injection import (
     wrap_untrusted_data,

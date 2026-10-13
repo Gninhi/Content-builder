@@ -1,6 +1,6 @@
 import pytest
 from datetime import datetime, timezone, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 import httpx
 
 from packages.connectors.social.linkedin import LinkedInSocialPublisher
@@ -8,7 +8,6 @@ from packages.connectors.social.x_twitter import XSocialPublisher
 from packages.connectors.social.exceptions import (
     TokenExpiringSoonError,
     SocialPublishUnknownError,
-    SocialAuthenticationError,
 )
 from packages.connectors.social.models import PublicationStatus
 
