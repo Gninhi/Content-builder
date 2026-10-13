@@ -72,8 +72,7 @@ def test_t3_hallucination_empty_sources_and_fabricated_claims():
     )
 
     with patch("services.orchestration.nodes.research.WebSearchTool.search", return_value=empty_search_resp), \
-         patch("services.orchestration.nodes.research.resolve_and_get_llm", return_value=(None, None)), \
-         patch("services.orchestration.nodes.research.get_gemini_model", return_value=None):
+         patch("services.orchestration.nodes.research.resolve_and_get_llm", return_value=(None, None)):
         state_after_collect = collect_sources_node(state)
         # Aucune source n'a pu être trouvée
         assert len(state_after_collect["raw_sources"]) == 0

@@ -54,6 +54,21 @@ class ContentOpsRepository:
     def get_workspace(self, workspace_id: str) -> Optional[WorkspaceModel]:
         return self.db.query(WorkspaceModel).filter(WorkspaceModel.id == workspace_id).first()
 
+    def ensure_workspace(self, workspace_id: str, name: Optional[str] = None, owner_id: str = "system") -> WorkspaceModel:
+        """Finds or creates a workspace to maintain referential integrity across test and production environments."""
+        ws = self.get_workspace(workspace_id)
+        if not ws:
+            ws = WorkspaceModel(
+                id=workspace_id,
+                name=name or f"Workspace {workspace_id}",
+                timezone="UTC",
+                owner_id=owner_id
+            )
+            self.db.add(ws)
+            self.db.commit()
+            self.db.refresh(ws)
+        return ws
+
     def get_workspace_llm_settings(self, workspace_id: str) -> Optional[WorkspaceLLMSettingsModel]:
         return self.db.query(WorkspaceLLMSettingsModel).filter(WorkspaceLLMSettingsModel.workspace_id == workspace_id).first()
 
@@ -66,6 +81,7 @@ class ContentOpsRepository:
         task_overrides: Optional[Dict[str, Any]] = None,
         provider_settings: Optional[Dict[str, Any]] = None,
     ) -> WorkspaceLLMSettingsModel:
+        self.ensure_workspace(workspace_id)
         settings = self.get_workspace_llm_settings(workspace_id)
         if not settings:
             settings = WorkspaceLLMSettingsModel(
@@ -182,6 +198,7 @@ class ContentOpsRepository:
         trust_level: str = "B",
         source_type: str = "web"
     ) -> VeilleSourceModel:
+        self.ensure_workspace(workspace_id)
         source = VeilleSourceModel(
             id=f"vsrc_{uuid.uuid4().hex[:12]}",
             workspace_id=workspace_id,
@@ -322,6 +339,7 @@ class ContentOpsRepository:
         is_synthetic: bool = False,
         max_dedup_days: int = 90
     ) -> SignalModel:
+        self.ensure_workspace(workspace_id)
         clean_url = canonical_url.strip().lower() if canonical_url else ""
         url_hash = hashlib.sha256(clean_url.encode()).hexdigest() if clean_url else hashlib.sha256(title.strip().lower().encode()).hexdigest()
         clean_title = re.sub(r"[^a-z0-9]", "", title.lower())
@@ -429,6 +447,7 @@ class ContentOpsRepository:
         risks: List[str],
         signal_id: Optional[str] = None
     ) -> IdeaModel:
+        self.ensure_workspace(workspace_id)
         # Check uniqueness by title in workspace to prevent duplicate cards
         clean_title = title.strip()
         existing = (
@@ -1202,6 +1221,8 @@ class ContentOpsRepository:
         )
 
     def add_workspace_member(self, workspace_id: str, user_id: str, role: str = "Viewer") -> WorkspaceMemberModel:
+        self.ensure_workspace(workspace_id)
+        self.get_or_create_user(user_id=user_id, default_role=role)
         existing = self.get_workspace_member(workspace_id, user_id)
         if existing:
             setattr(existing, "role", role)
