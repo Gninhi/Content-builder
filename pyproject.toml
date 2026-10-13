@@ -43,6 +43,7 @@ dev = [
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+addopts = "--ignore=tests/e2e"
 
 [tool.mypy]
 python_version = "3.12"
