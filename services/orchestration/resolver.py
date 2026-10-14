@@ -195,18 +195,18 @@ class LLMResolver:
         if not adapter.is_enabled():
             raise LLMResolutionError(f"Le provider LLM '{chosen_provider}' est désactivé.")
 
-        if not adapter.is_configured():
-            if allow_none_if_unconfigured:
-                logger.info(f"LLM Provider '{chosen_provider}' non configuré (clé absente). Mode dégradé déterministe actif.")
-                return None
-            raise LLMResolutionError(f"Le provider LLM '{chosen_provider}' n'a pas de clé API configurée.")
-
         if required_capability:
             model_info = adapter.get_model(chosen_model)
             if model_info and model_info.capabilities.get(required_capability) is False:
                 raise LLMResolutionError(
                     f"Le modèle '{chosen_provider}:{chosen_model}' ne supporte pas la capacité obligatoire '{required_capability}'."
                 )
+
+        if not adapter.is_configured():
+            if allow_none_if_unconfigured:
+                logger.info(f"LLM Provider '{chosen_provider}' non configuré (clé absente). Mode dégradé déterministe actif.")
+                return None
+            raise LLMResolutionError(f"Le provider LLM '{chosen_provider}' n'a pas de clé API configurée.")
 
         timeout = float(os.getenv("LLM_TIMEOUT_SECONDS", "30.0"))
         max_retries = int(os.getenv("LLM_MAX_RETRIES", "3"))

@@ -124,6 +124,8 @@ def test_resilient_chat_nvidia_wrapper_execution_and_circuit():
 
 
 def test_structured_output_validity_rates_tracking():
+    from services.orchestration.structured_output import _STRUCTURED_OUTPUT_METRICS
+    _STRUCTURED_OUTPUT_METRICS.clear()
     record_structured_output_metric("ideation_agent", True)
     record_structured_output_metric("ideation_agent", True)
     record_structured_output_metric("ideation_agent", False)

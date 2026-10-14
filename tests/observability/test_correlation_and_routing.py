@@ -60,16 +60,19 @@ def test_cycle_budget_records_langfuse_scores():
 def test_task_based_model_routing():
     """Verifies configurable model routing per agent task."""
     # When no API key is present, get_gemini_model_for_task returns None gracefully
-    with patch.dict(os.environ, {"GOOGLE_API_KEY": ""}):
+    with patch.dict(os.environ, {"GOOGLE_API_KEY": "", "NVIDIA_API_KEY": "", "DEFAULT_LLM_PROVIDER": "gemini"}):
         assert get_gemini_model_for_task("ideation") is None
+
 
     # When API key is present, model routing selects specific model or default gemini-3.8-flash
     with patch.dict(os.environ, {
         "GOOGLE_API_KEY": "AIzaSyFakeKeyForUnitTestsTestingRouting12345",
-        "LLM_MODEL_FOR_STRATEGY": "gemini-1.5-pro"
+        "LLM_MODEL_FOR_STRATEGY": "gemini-1.5-pro",
+        "LLM_PROVIDER_FOR_STRATEGY": "gemini"
     }):
         with patch("langchain_google_genai.ChatGoogleGenerativeAI") as mock_chat:
             _ = get_gemini_model_for_task("strategy")
             mock_chat.assert_called_once()
+
             _, kwargs = mock_chat.call_args
             assert kwargs["model"] == "gemini-1.5-pro"

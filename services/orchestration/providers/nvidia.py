@@ -20,7 +20,7 @@ from packages.resilience import (
 )
 from services.orchestration.providers.base import BaseLLMAdapter
 
-load_dotenv(find_dotenv(usecwd=True), override=True)
+load_dotenv(find_dotenv(usecwd=True), override=False)
 
 logger = logging.getLogger(__name__)
 
@@ -452,12 +452,12 @@ class NVIDIAProviderAdapter(BaseLLMAdapter):
         max_retries: int = 3,
         **kwargs: Any
     ) -> Any:
-        if not self.is_configured():
+        api_key = kwargs.pop("api_key", None) or os.getenv("NVIDIA_API_KEY")
+        if not api_key or api_key.startswith("your_") or len(api_key) <= 10:
             return None
 
         from langchain_nvidia_ai_endpoints import ChatNVIDIA
         base_url = self.get_base_url()
-        api_key = kwargs.pop("api_key", None) or os.getenv("NVIDIA_API_KEY")
 
         # Resolve model aliases
         if model_id in ("glm-5.3", "glm-5.3-flash", "default"):
