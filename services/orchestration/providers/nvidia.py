@@ -20,7 +20,7 @@ from packages.resilience import (
 )
 from services.orchestration.providers.base import BaseLLMAdapter
 
-load_dotenv(find_dotenv(usecwd=True), override=True)
+load_dotenv(find_dotenv(usecwd=True), override=False)
 
 logger = logging.getLogger(__name__)
 

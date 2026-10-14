@@ -45,8 +45,9 @@ from apps.api.routers import (
 logger = logging.getLogger("apps.api.main")
 
 
-# Max request body size: default 5 MB to safely accommodate image uploads
-MAX_REQUEST_BODY_SIZE = int(os.getenv("MAX_REQUEST_BODY_SIZE_BYTES", str(5 * 1024 * 1024)))
+# Max request body size: default 1 MB per PRD Section 6 (overrideable via MAX_REQUEST_BODY_SIZE_BYTES)
+MAX_REQUEST_BODY_SIZE = int(os.getenv("MAX_REQUEST_BODY_SIZE_BYTES", str(1 * 1024 * 1024)))
+
 
 
 @asynccontextmanager

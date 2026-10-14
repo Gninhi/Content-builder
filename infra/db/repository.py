@@ -52,12 +52,22 @@ class ContentOpsRepository:
         return ws
 
     def get_workspace(self, workspace_id: str) -> Optional[WorkspaceModel]:
-        return self.db.query(WorkspaceModel).filter(WorkspaceModel.id == workspace_id).first()
+        ws = self.db.query(WorkspaceModel).filter(WorkspaceModel.id == workspace_id).first()
+        if ws:
+            return ws
+        for obj in self.db.new:
+            if isinstance(obj, WorkspaceModel) and getattr(obj, "id", None) == workspace_id:
+                return obj
+        return None
 
     def ensure_workspace(self, workspace_id: str, name: Optional[str] = None, owner_id: str = "system") -> WorkspaceModel:
         """Finds or creates a workspace to maintain referential integrity across test and production environments."""
         ws = self.get_workspace(workspace_id)
         if not ws:
+            # Check if workspace was added to the pending session objects in the same transaction
+            for obj in self.db.new:
+                if isinstance(obj, WorkspaceModel) and getattr(obj, "id", None) == workspace_id:
+                    return obj
             ws = WorkspaceModel(
                 id=workspace_id,
                 name=name or f"Workspace {workspace_id}",
@@ -68,6 +78,7 @@ class ContentOpsRepository:
             self.db.commit()
             self.db.refresh(ws)
         return ws
+
 
     def get_workspace_llm_settings(self, workspace_id: str) -> Optional[WorkspaceLLMSettingsModel]:
         return self.db.query(WorkspaceLLMSettingsModel).filter(WorkspaceLLMSettingsModel.workspace_id == workspace_id).first()
@@ -1100,7 +1111,13 @@ class ContentOpsRepository:
 
     # ----------------- Users & Profiles -----------------
     def get_user(self, user_id: str) -> Optional[UserModel]:
-        return self.db.query(UserModel).filter(UserModel.id == user_id).first()
+        u = self.db.query(UserModel).filter(UserModel.id == user_id).first()
+        if u:
+            return u
+        for obj in self.db.new:
+            if isinstance(obj, UserModel) and getattr(obj, "id", None) == user_id:
+                return obj
+        return None
 
     def get_user_by_email(self, email: str) -> Optional[UserModel]:
         return self.db.query(UserModel).filter(UserModel.email == email.strip().lower()).first()

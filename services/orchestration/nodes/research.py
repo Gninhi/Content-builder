@@ -92,11 +92,11 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
     if cached_result is not None:
         logger.info(f"LLM Cache Hit for topic '{topic}' (key: {cache_key})")
         ObservabilityTracer.tag_trace(trace_meta["run_id"], ["cache_hit"])
-        return {
-            "generated_ideas": cached_result.get("generated_ideas", []),
-            "run_id": trace_meta["run_id"],
-            "cached": True
-        }
+        res_data = dict(cached_result)
+        res_data["run_id"] = trace_meta["run_id"]
+        res_data["cached"] = True
+        return res_data
+
 
     # 2. Build verified evidence pool from signals / sources (FND-02)
     evidence_pool = []
@@ -154,13 +154,14 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
             pillars=pillars,
             audience=audience,
             evidence_pool=evidence_pool,
-            target_count=min(target_count, len(evidence_pool) * 2),
+            target_count=target_count,
             trace_meta=trace_meta,
             resolved_ctx=resolved_ctx,
             frozen_llm=frozen_llm,
             cache=cache,
             cache_key=cache_key
         )
+
 
     if model is None:
         logger.warning(f"No configured LLM provider available for workspace '{workspace_id}'. Using deterministic fallback for test/offline environment.")
@@ -169,13 +170,14 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
             pillars=pillars,
             audience=audience,
             evidence_pool=evidence_pool,
-            target_count=min(target_count, len(evidence_pool) * 2),
+            target_count=target_count,
             trace_meta=trace_meta,
             resolved_ctx=resolved_ctx,
             frozen_llm=frozen_llm,
             cache=cache,
             cache_key=cache_key
         )
+
 
     try:
         rendered_prompt = PromptRegistry.render(
@@ -233,13 +235,14 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
             pillars=pillars,
             audience=audience,
             evidence_pool=evidence_pool,
-            target_count=min(target_count, len(evidence_pool) * 2),
+            target_count=target_count,
             trace_meta=trace_meta,
             resolved_ctx=resolved_ctx,
             frozen_llm=frozen_llm,
             cache=cache,
             cache_key=cache_key
         )
+
 
 
 def _build_demo_ideas(

@@ -29,8 +29,10 @@ def test_production_fallback_sets_degraded_flag_and_observability(monkeypatch):
 
     monkeypatch.setattr(ObservabilityTracer, "record_score", mock_record_score)
     monkeypatch.setattr(ObservabilityTracer, "tag_trace", mock_tag_trace)
-    # Ensure get_gemini_model returns None to trigger fallback
+    # Ensure LLM resolution returns None to trigger fallback
     monkeypatch.setattr("services.orchestration.nodes.production.get_gemini_model", lambda **kwargs: None)
+    monkeypatch.setattr("services.orchestration.nodes.production.resolve_and_get_llm", lambda **kwargs: (None, None))
+
 
     state = {
         "workspace_id": "ws_degraded_test",
