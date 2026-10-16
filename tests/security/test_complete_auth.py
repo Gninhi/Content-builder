@@ -2,7 +2,7 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 from apps.api.main import app
-from infra.db.database import SessionLocal
+from infra.db.database import SessionLocal, get_db_session
 from infra.db.repository import ContentOpsRepository
 from packages.security.email_service import get_email_service, MemoryLogEmailService
 
@@ -231,13 +231,20 @@ def test_account_lockout_after_failed_logins():
         )
         assert fail_res.status_code in (401, 423)
 
-    # 6th attempt should be HTTP 423 Locked
+    # 6th attempt: Account is locked in DB, but returns HTTP 401 to prevent user enumeration (ASVS 2.2.1)
     locked_res = client.post(
         "/v1/auth/login",
         json={"email": email, "password": pwd},  # even with correct password!
     )
-    assert locked_res.status_code == 423
-    assert "verrouillé" in locked_res.json()["detail"].lower()
+    assert locked_res.status_code == 401
+    assert "invalide" in locked_res.json()["detail"].lower()
+
+    # Verify that the account is genuinely locked in DB
+    with get_db_session() as db:
+        repo = ContentOpsRepository(db)
+        locked_u = repo.get_user_by_email(email)
+        assert locked_u is not None
+        assert locked_u.locked_until is not None
 
 
 def test_password_reset_flow():
@@ -315,7 +322,8 @@ def test_logout_and_session_invalidation():
     assert refresh_res.status_code == 401
 
 
-def test_demo_mode_endpoint():
+def test_demo_mode_endpoint(monkeypatch):
+    monkeypatch.setenv("DEMO_MODE_ENABLED", "true")
     demo_res = client.post("/v1/auth/demo")
     assert demo_res.status_code == 200
     data = demo_res.json()
@@ -347,8 +355,12 @@ def test_get_me_and_switch_workspace():
             "privacy_accepted": True,
         },
     )
-    user_id = reg_res.json()["user_id"]
-    assert "workspace_id" in reg_res.json()
+    assert reg_res.status_code in (200, 201)
+
+    # Authenticate to retrieve user_id
+    login_init = client.post("/v1/auth/login", json={"email": email, "password": pwd})
+    assert login_init.status_code == 200
+    user_id = login_init.json()["user_id"]
 
     # Add user to a second workspace directly in DB
     db = SessionLocal()

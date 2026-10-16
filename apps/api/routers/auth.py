@@ -182,7 +182,7 @@ def register(
     email_svc = get_email_service()
 
     if existing_user:
-        # OWASP anti-enumeration: return timing-safe identical success response
+        # OWASP anti-enumeration: return timing-safe identical success response and status
         if not existing_user.email_verified:
             raw_token = generate_crypto_token(32)
             token_hash = hash_crypto_token(raw_token)
@@ -193,7 +193,7 @@ def register(
                 user_name=str(existing_user.full_name or "Utilisateur"),
             )
         return {
-            "message": "Si l'adresse est valide, un email de confirmation a été envoyé pour activer le compte.",
+            "message": "Si l'adresse est valide, un email de confirmation a été envoyé pour activer votre accès.",
             "email": email_clean,
             "requires_verification": True,
         }
@@ -230,10 +230,8 @@ def register(
     )
 
     return {
-        "message": "Compte créé avec succès. Un email de confirmation a été envoyé pour activer votre accès.",
-        "user_id": str(user.id),
+        "message": "Si l'adresse est valide, un email de confirmation a été envoyé pour activer votre accès.",
         "email": str(user.email),
-        "workspace_id": str(ws.id),
         "requires_verification": require_verification,
     }
 
@@ -367,19 +365,15 @@ def login_with_password(
         locked_dt = ensure_utc(cast(Optional[datetime], user.locked_until))
         if locked_dt and locked_dt > utc_now():
             raise HTTPException(
-                status_code=423,
-                detail="Compte temporairement verrouillé suite à plusieurs tentatives infructueuses. Veuillez réessayer plus tard.",
+                status_code=401,
+                detail="Email ou mot de passe invalide.",
+                headers={"WWW-Authenticate": "Bearer"},
             )
         else:
             repo.reset_failed_logins(user_id)
 
     if not verify_password(req.password, str(user.password_hash or "")):
         attempts, locked = repo.record_failed_login(user_id)
-        if locked:
-            raise HTTPException(
-                status_code=423,
-                detail="Compte temporairement verrouillé suite à plusieurs tentatives infructueuses. Veuillez réessayer plus tard.",
-            )
         raise HTTPException(
             status_code=401,
             detail="Email ou mot de passe invalide.",
@@ -764,7 +758,7 @@ def start_demo_session(
     Creates an isolated ephemeral demo workspace with rich pre-seeded data
     for 2 hours without requiring registration. Controlled by DEMO_MODE_ENABLED.
     """
-    demo_enabled = os.getenv("DEMO_MODE_ENABLED", "true").strip().lower() in ("true", "1", "yes")
+    demo_enabled = os.getenv("DEMO_MODE_ENABLED", "false").strip().lower() in ("true", "1", "yes")
     if not demo_enabled:
         raise HTTPException(
             status_code=404,
