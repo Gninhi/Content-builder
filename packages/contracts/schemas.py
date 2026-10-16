@@ -12,7 +12,7 @@ def get_utc_now():
 class WorkspaceCreate(BaseModel):
     name: str = Field(..., json_schema_extra={"example": "AI & Growth Workspace"})
     timezone: str = Field("UTC", json_schema_extra={"example": "Europe/Paris"})
-    owner_id: str = Field("owner_1", json_schema_extra={"example": "owner_1"})
+    owner_id: Optional[str] = Field(None, json_schema_extra={"example": "owner_1"})
 
 
 class WorkspaceResponse(BaseModel):

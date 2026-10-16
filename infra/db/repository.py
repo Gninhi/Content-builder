@@ -48,6 +48,16 @@ class ContentOpsRepository:
             owner_id=owner_id
         )
         self.db.add(ws)
+        if owner_id:
+            user = self.get_user(owner_id)
+            if user:
+                member = WorkspaceMemberModel(
+                    id=f"mem_{uuid.uuid4().hex[:12]}",
+                    workspace_id=ws.id,
+                    user_id=owner_id,
+                    role="Owner",
+                )
+                self.db.add(member)
         self.db.commit()
         self.db.refresh(ws)
         return ws

@@ -7,7 +7,7 @@ from packages.contracts.schemas import (
     BrandProfileCreate,
     BrandProfileResponse,
 )
-from apps.api.dependencies import get_repository, UserContext, require_roles
+from apps.api.dependencies import get_repository, UserContext, require_roles, get_current_user
 from infra.db.repository import ContentOpsRepository
 
 router = APIRouter(tags=["Workspaces & Brand Profiles"])
@@ -17,9 +17,9 @@ router = APIRouter(tags=["Workspaces & Brand Profiles"])
 def create_workspace(
     req: WorkspaceCreate,
     repo: ContentOpsRepository = Depends(get_repository),
-    user: UserContext = Depends(require_roles("Owner"))
+    user: UserContext = Depends(get_current_user)
 ):
-    ws = repo.create_workspace(name=req.name, timezone=req.timezone, owner_id=req.owner_id)
+    ws = repo.create_workspace(name=req.name, timezone=req.timezone, owner_id=user.user_id)
     return WorkspaceResponse(
         id=str(ws.id),
         name=str(ws.name),
