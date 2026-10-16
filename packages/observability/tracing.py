@@ -86,14 +86,17 @@ class ObservabilityTracer:
             return None
 
         try:
-            from langfuse.langchain import CallbackHandler
+            from services.orchestration.callbacks.langfuse import SanitizedLangfuseCallbackHandler
             pub, _, _ = cls._resolve_credentials()
-            handler = CallbackHandler(
-                public_key=pub
+            handler = SanitizedLangfuseCallbackHandler(
+                public_key=pub,
+                session_id=session_id,
+                user_id=user_id,
+                tags=tags
             )
             return handler
         except Exception as e:
-            logger.warning(f"Unable to instantiate Langfuse CallbackHandler: {e}")
+            logger.warning(f"Unable to instantiate SanitizedLangfuseCallbackHandler: {e}")
             return None
 
     @classmethod
