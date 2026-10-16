@@ -53,7 +53,7 @@ Accès direct avec rechargement à chaud : 👉 [http://localhost:3000/ui/](http
 ## 🧪 Tests & Qualité
 
 ```bash
-# Tests complets backend (270 tests unitaires, intégration, sécurité, observabilité)
+# Tests complets backend (378 tests unitaires, intégration, sécurité, observabilité)
 pytest tests/
 
 # Vérification du typage statique

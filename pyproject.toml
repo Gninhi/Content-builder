@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "contentops-harness"
-version = "1.0.0"
+version = "2.0.0"
 description = "Governed agentic editorial operating system built with LangGraph, FastAPI, and React/Vite"
 authors = [{ name = "Martial Gninhi" }]
 readme = "README.md"

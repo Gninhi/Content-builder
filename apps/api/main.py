@@ -244,7 +244,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Content Operations Harness API",
     description="Governed agentic editorial operating system API built with LangGraph, FastAPI, and PostgreSQL/Supabase.",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan
 )
 
