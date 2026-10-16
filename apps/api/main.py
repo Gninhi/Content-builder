@@ -62,23 +62,44 @@ async def lifespan(app: FastAPI):
     # and reconcile any orphan PUBLISHING jobs left over from unexpected process stops
     db = SessionLocal()
     try:
+        from datetime import datetime, timezone, timedelta
         from infra.db.models import PublicationJobModel, ContentVariantModel
-        from packages.domain.state_machine import ContentStatus
-        orphan_jobs = (
+        from packages.domain.state_machine import ContentStatus, ContentStateMachine
+
+        stale_minutes = int(os.getenv("PUBLISHING_STALE_GRACE_MINUTES", "15"))
+        now = datetime.now(timezone.utc)
+        stale_threshold = now - timedelta(minutes=stale_minutes)
+
+        all_publishing_jobs = (
             db.query(PublicationJobModel)
             .filter(PublicationJobModel.status == ContentStatus.PUBLISHING.value)
             .all()
         )
-        for job in orphan_jobs:
+        stale_orphan_jobs = []
+        for job in all_publishing_jobs:
+            job_time = job.scheduled_at or job.created_at
+            if job_time:
+                if job_time.tzinfo is None:
+                    job_time = job_time.replace(tzinfo=timezone.utc)
+                if job_time <= stale_threshold:
+                    stale_orphan_jobs.append(job)
+            else:
+                stale_orphan_jobs.append(job)
+
+        for job in stale_orphan_jobs:
             logger.warning(
-                f"Startup reconciliation: publication job '{job.id}' was in PUBLISHING state. "
+                f"Startup reconciliation: publication job '{job.id}' exceeded stale grace limit ({stale_minutes}m) in PUBLISHING state. "
                 "Transitioning to PUBLISH_UNKNOWN for safe at-most-once reconciliation."
             )
+            ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISH_UNKNOWN)
             job.status = ContentStatus.PUBLISH_UNKNOWN.value  # type: ignore[assignment]
             variant = db.query(ContentVariantModel).filter(ContentVariantModel.id == job.variant_id).first()
             if variant:
+                var_status = ContentStatus.parse(str(variant.status))
+                if var_status == ContentStatus.PUBLISHING:
+                    ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISH_UNKNOWN)
                 variant.status = ContentStatus.PUBLISH_UNKNOWN.value  # type: ignore[assignment]
-        if orphan_jobs:
+        if stale_orphan_jobs:
             db.commit()
 
         repo = ContentOpsRepository(db)
