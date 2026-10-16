@@ -16,6 +16,7 @@ client = TestClient(app, raise_server_exceptions=False)
 
 @pytest.fixture(autouse=True)
 def vault_key_env():
+    old = os.environ.get("SECRET_VAULT_KEY")
     os.environ["SECRET_VAULT_KEY"] = "cbe7e00447543d905f45c9b5b702949529b8f356c6ed5c28e0ea21d53ce34536"
     yield
     if old is not None:
