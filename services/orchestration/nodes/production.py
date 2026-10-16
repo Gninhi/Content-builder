@@ -12,6 +12,8 @@ from services.orchestration.state.base import ContentProductionState
 from services.orchestration.structured_output import invoke_structured_output
 from services.orchestration.llm import get_gemini_model, resolve_and_get_llm, GeneratedVariant
 
+from packages.resilience.circuit_breaker import resolve_cycle_budget
+
 logger = logging.getLogger(__name__)
 
 
@@ -95,6 +97,10 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
         node_name="generate_variants"
     )
 
+    # Enforce FinOps cycle budget (N3)
+    budget = resolve_cycle_budget(state)
+    budget.check_budget()
+
     # 1. Resolve or restore frozen LLM configuration
     frozen_llm = state.get("resolved_llm")
     resolved_ctx = None
@@ -137,6 +143,7 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
     variants = []
 
     for platform in platforms:
+        budget.check_budget()
         variant_data = None
         variant_latency = 0.0
         variant_cost: Dict[str, Any] = {}
@@ -311,6 +318,11 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
         }
         payload_hash = compute_payload_hash(raw_payload)
 
+        tokens_used = variant_cost.get("total_tokens", 0) if variant_cost else 0
+        if tokens_used <= 0:
+            tokens_used = max(150, len(variant_data.get("body", "")) // 4 + 100)
+        budget.add_tokens(tokens_used)
+
         variants.append({
             "variant_id": f"var_{uuid.uuid4().hex[:12]}",
             "platform": variant_data["platform"],
@@ -328,7 +340,7 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
                 "model_id": resolved_ctx.model_id if resolved_ctx else "template",
                 "resolution_source": resolved_ctx.resolution_source if resolved_ctx else "fallback",
                 "latency_ms": round(variant_latency, 1),
-                "tokens": variant_cost.get("total_tokens", 0),
+                "tokens": tokens_used,
                 "cost_usd": variant_cost.get("estimated_cost_usd", 0.0)
             }
         })
@@ -342,5 +354,6 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
         "status": ContentStatus.DRAFT,
         "run_id": trace_meta["run_id"],
         "tags": tags,
-        "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else (frozen_llm if isinstance(frozen_llm, dict) else None)
+        "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else (frozen_llm if isinstance(frozen_llm, dict) else None),
+        "cycle_budget": budget
     }

@@ -5,6 +5,7 @@ from packages.resilience.circuit_breaker import (
     CircuitState,
     retry_with_backoff,
     CycleBudget,
+    resolve_cycle_budget,
     get_circuit_breaker
 )
 from packages.resilience.rate_limiter import (
@@ -28,6 +29,7 @@ __all__ = [
     "CircuitState",
     "retry_with_backoff",
     "CycleBudget",
+    "resolve_cycle_budget",
     "get_circuit_breaker",
     "RateLimiter",
     "get_rate_limiter",

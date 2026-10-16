@@ -18,6 +18,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from infra.db.database import init_db, SessionLocal
 from infra.db.repository import ContentOpsRepository
 from packages.security.limiter import limiter, safe_rate_limit_exceeded_handler, get_storage_status
+from packages.resilience.circuit_breaker import BudgetExceededException
 from packages.observability.correlation import set_correlation_id
 from packages.observability.prometheus import (
     get_prometheus_metrics_response,
@@ -236,6 +237,14 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
         status_code=exc.status_code,
         content={"error": "http_error", "detail": exc.detail},
         headers=getattr(exc, "headers", None)
+    )
+
+
+@app.exception_handler(BudgetExceededException)
+async def budget_exceeded_handler(request: Request, exc: BudgetExceededException):
+    return JSONResponse(
+        status_code=429,
+        content={"error": "budget_exceeded", "detail": f"LLM cycle budget exceeded: {str(exc)}"}
     )
 
 

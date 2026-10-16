@@ -1,6 +1,7 @@
 from typing import cast, Dict, Any, Optional
 from langchain_core.runnables import RunnableConfig
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
+from packages.resilience.circuit_breaker import resolve_cycle_budget, BudgetExceededException
 from packages.contracts.schemas import (
     IdeaResearchRequest,
     IdeaResearchResponse,
@@ -57,6 +58,7 @@ def research_ideas(
             "title": s.canonical_url or "Source",
         })
 
+    budget = resolve_cycle_budget()
     initial_state = {
         "workspace_id": ws_id,
         "topic_or_brief": req.topic_or_brief,
@@ -67,13 +69,20 @@ def research_ideas(
         "generated_ideas": [],
         "llm_override": req.llm_override,
         "run_id": "",
-        "errors": []
+        "errors": [],
+        "cycle_budget": budget,
     }
 
     # Run LangGraph idea_research workflow with Langfuse tracing
     callback = ObservabilityTracer.get_callback_handler()
     config: RunnableConfig = cast(RunnableConfig, {"callbacks": [callback]} if callback else {})
-    result = cast(Dict[str, Any], idea_research_graph.invoke(cast(Any, initial_state), config=config))
+    try:
+        result = cast(Dict[str, Any], idea_research_graph.invoke(cast(Any, initial_state), config=config))
+    except BudgetExceededException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"LLM cycle budget exceeded: {str(exc)}"
+        )
 
     generated = result.get("generated_ideas", [])
     run_id = result.get("run_id", "run_local")

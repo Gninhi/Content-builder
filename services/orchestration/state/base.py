@@ -1,5 +1,6 @@
 from typing import TypedDict, List, Dict, Any, Optional
 from packages.domain.state_machine import ContentStatus
+from packages.resilience.circuit_breaker import CycleBudget
 
 
 class IdeaResearchState(TypedDict):
@@ -12,6 +13,7 @@ class IdeaResearchState(TypedDict):
     generated_ideas: List[Dict[str, Any]]
     run_id: str
     errors: List[str]
+    cycle_budget: Optional[CycleBudget]
 
 
 class ContentProductionState(TypedDict):
@@ -30,6 +32,7 @@ class ContentProductionState(TypedDict):
     status: ContentStatus
     run_id: str
     errors: List[str]
+    cycle_budget: Optional[CycleBudget]
 
 
 class ApprovalState(TypedDict):
@@ -83,3 +86,4 @@ class StrategyInsightsState(TypedDict):
     recommendations: List[Dict[str, Any]]
     confidence_levels: Dict[str, float]
     status: str
+    cycle_budget: Optional[CycleBudget]

@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import logging
 import re
 from packages.observability.tracing import ObservabilityTracer
@@ -8,6 +8,7 @@ from packages.tools.web_search import WebSearchTool
 from services.orchestration.state.base import IdeaResearchState
 from services.orchestration.structured_output import invoke_structured_output
 from services.orchestration.llm import resolve_and_get_llm, GeneratedIdeasBatch
+from packages.resilience.circuit_breaker import resolve_cycle_budget, BudgetExceededException, CycleBudget
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,9 @@ def collect_sources_node(state: IdeaResearchState) -> Dict[str, Any]:
     Collects and grounds research sources using verified workspace signals or WebSearchTool.
     Never fabricates sources if web queries fail.
     """
+    budget = resolve_cycle_budget(state)
+    budget.check_budget()
+
     topic = state.get("topic_or_brief", "")
     existing_sources = state.get("raw_sources", [])
     workspace_id = state.get("workspace_id", "default")
@@ -34,7 +38,7 @@ def collect_sources_node(state: IdeaResearchState) -> Dict[str, Any]:
         except Exception as e:
             logger.warning(f"Web search collection failed for topic '{topic}': {e}")
 
-    return {"raw_sources": existing_sources}
+    return {"raw_sources": existing_sources, "cycle_budget": budget}
 
 
 def _clean_title(title: str, pillars: List[str]) -> str:
@@ -78,6 +82,10 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
         node_name="ideation_and_scoring"
     )
 
+    # Enforce FinOps cycle budget (N3)
+    budget = resolve_cycle_budget(state)
+    budget.check_budget()
+
     # 1. Check deterministic LLM cache
     cache = get_llm_cache()
     cache_payload = {
@@ -95,6 +103,9 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
         res_data = dict(cached_result)
         res_data["run_id"] = trace_meta["run_id"]
         res_data["cached"] = True
+        res_data["cycle_budget"] = budget
+        tokens_delivered = max(100, len(res_data.get("generated_ideas", [])) * 50)
+        budget.add_tokens(tokens_delivered)
         return res_data
 
 
@@ -117,8 +128,9 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
             "generated_ideas": [],
             "run_id": trace_meta["run_id"],
             "resolved_llm": None,
+            "cycle_budget": budget
         }
-        cache.set(cache_key, no_data_res)
+        cache.set(cache_key, {k: v for k, v in no_data_res.items() if k != "cycle_budget"})
         return no_data_res
 
     # 3. Resolve LLM configuration (NVIDIA GLM-5.3-flash default, no silent fallback - FND-08)
@@ -163,7 +175,8 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
             resolved_ctx=resolved_ctx,
             frozen_llm=frozen_llm,
             cache=cache,
-            cache_key=cache_key
+            cache_key=cache_key,
+            budget=budget
         )
 
 
@@ -179,7 +192,8 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
             resolved_ctx=resolved_ctx,
             frozen_llm=frozen_llm,
             cache=cache,
-            cache_key=cache_key
+            cache_key=cache_key,
+            budget=budget
         )
 
 
@@ -215,13 +229,17 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
                 dump["effort_score"] = _normalize_score_100(dump["effort_score"])
                 ideas_list.append(dump)
 
+            tokens_used = max(300, len(ideas_list) * 200)
+            budget.add_tokens(tokens_used)
+
             res = {
                 "status": "SUCCESS",
                 "generated_ideas": ideas_list,
                 "run_id": trace_meta["run_id"],
-                "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else (frozen_llm if isinstance(frozen_llm, dict) else None)
+                "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else (frozen_llm if isinstance(frozen_llm, dict) else None),
+                "cycle_budget": budget
             }
-            cache.set(cache_key, res)
+            cache.set(cache_key, {k: v for k, v in res.items() if k != "cycle_budget"})
             ObservabilityTracer.tag_trace(trace_meta["run_id"], ["cache_miss"])
             return res
         else:
@@ -236,8 +254,11 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
                 resolved_ctx=resolved_ctx,
                 frozen_llm=frozen_llm,
                 cache=cache,
-                cache_key=cache_key
+                cache_key=cache_key,
+                budget=budget
             )
+    except BudgetExceededException:
+        raise
     except Exception as e:
         logger.warning(f"LLM ideation invocation failed: {e}. Falling back to deterministic demo ideas for resilience.")
         return _build_demo_ideas(
@@ -250,7 +271,8 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
             resolved_ctx=resolved_ctx,
             frozen_llm=frozen_llm,
             cache=cache,
-            cache_key=cache_key
+            cache_key=cache_key,
+            budget=budget
         )
 
 
@@ -266,6 +288,7 @@ def _build_demo_ideas(
     frozen_llm: Any,
     cache: Any,
     cache_key: str,
+    budget: Optional[CycleBudget] = None,
 ) -> Dict[str, Any]:
     """Isolated, clearly labeled synthetic demo fixtures for offline demonstration and tests."""
     demo_angles = [
@@ -292,12 +315,18 @@ def _build_demo_ideas(
             "is_synthetic": True,
             "is_demo": True,
         })
+
+    tokens_used = max(200, len(ideas) * 150)
+    if budget is not None:
+        budget.add_tokens(tokens_used)
+
     res = {
         "status": "DEMO",
         "generated_ideas": ideas,
         "run_id": trace_meta["run_id"],
         "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else frozen_llm,
+        "cycle_budget": budget,
     }
-    cache.set(cache_key, res)
+    cache.set(cache_key, {k: v for k, v in res.items() if k != "cycle_budget"})
     return res
 

@@ -2,7 +2,8 @@ import os
 from typing import cast, Dict, Any, Optional
 from datetime import datetime
 from langchain_core.runnables import RunnableConfig
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, status
+from packages.resilience.circuit_breaker import resolve_cycle_budget, BudgetExceededException
 from packages.contracts.schemas import (
     ApprovalRequest,
     ApprovalResponse,
@@ -48,6 +49,7 @@ def generate_content_package(
         for s in sources
     ]
 
+    budget = resolve_cycle_budget()
     initial_state = {
         "workspace_id": target_workspace_id,
         "brief_id": str(brief.id),
@@ -65,13 +67,20 @@ def generate_content_package(
         "llm_override": llm_override,
         "status": ContentStatus.DRAFT,
         "run_id": "run_prod_1",
-        "errors": []
+        "errors": [],
+        "cycle_budget": budget,
     }
 
     # Run LangGraph content production and quality gate workflow with Langfuse tracing
     callback = ObservabilityTracer.get_callback_handler()
     config: RunnableConfig = cast(RunnableConfig, {"callbacks": [callback]} if callback else {})
-    exec_result = cast(Dict[str, Any], content_production_graph.invoke(cast(Any, initial_state), config=config))
+    try:
+        exec_result = cast(Dict[str, Any], content_production_graph.invoke(cast(Any, initial_state), config=config))
+    except BudgetExceededException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"LLM cycle budget exceeded: {str(exc)}"
+        )
 
     qa_info = exec_result.get("qa_results", {})
     package_status = exec_result.get("status", ContentStatus.DRAFT)

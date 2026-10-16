@@ -1,6 +1,7 @@
 from typing import Dict, Any
 import re
 from packages.domain.state_machine import ContentStatus
+from packages.resilience.circuit_breaker import resolve_cycle_budget
 from services.orchestration.state.base import ContentProductionState
 
 
@@ -9,6 +10,9 @@ def quality_gate_node(state: ContentProductionState) -> Dict[str, Any]:
     Quality Gate validator combining deterministic rule enforcement and claim verification.
     Complies with PRD Section 3.1 (FR-04, FR-05) and Section 6 (Quality Gate).
     """
+    budget = resolve_cycle_budget(state)
+    budget.check_budget()
+
     variants = state.get("generated_variants", [])
     prohibited_topics = state.get("prohibited_topics", [])
     
@@ -139,5 +143,6 @@ def quality_gate_node(state: ContentProductionState) -> Dict[str, Any]:
             "overall_score": overall_score,
             "variants_evaluated": len(evaluated_variants)
         },
-        "status": ContentStatus.IN_REVIEW if overall_passed else ContentStatus.QA_FAILED
+        "status": ContentStatus.IN_REVIEW if overall_passed else ContentStatus.QA_FAILED,
+        "cycle_budget": budget
     }

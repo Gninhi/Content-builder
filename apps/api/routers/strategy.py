@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, Body, HTTPException
+from fastapi import APIRouter, Depends, Body, HTTPException, status
+from packages.resilience.circuit_breaker import resolve_cycle_budget, BudgetExceededException
 from datetime import datetime, timezone
 from typing import cast, Dict, Any, Optional
 from langchain_core.runnables import RunnableConfig
@@ -48,6 +49,7 @@ def generate_strategy_insights(
         for s in snapshots_models
     ]
 
+    budget = resolve_cycle_budget()
     initial_state: Dict[str, Any] = {
         "workspace_id": ws_id,
         "pillars": pillars,
@@ -56,12 +58,19 @@ def generate_strategy_insights(
         "recommendations": [],
         "confidence_levels": {},
         "llm_override": llm_override,
-        "status": "PENDING"
+        "status": "PENDING",
+        "cycle_budget": budget
     }
 
     callback = ObservabilityTracer.get_callback_handler()
     config: RunnableConfig = cast(RunnableConfig, {"callbacks": [callback]} if callback else {})
-    result = cast(Dict[str, Any], strategy_insights_graph.invoke(cast(Any, initial_state), config=config))
+    try:
+        result = cast(Dict[str, Any], strategy_insights_graph.invoke(cast(Any, initial_state), config=config))
+    except BudgetExceededException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"LLM cycle budget exceeded: {str(exc)}"
+        )
 
 
     insights = [
