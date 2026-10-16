@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import datetime, timezone
-from packages.observability.correlation import get_correlation_id
+from packages.observability.correlation import get_correlation_id, CorrelationIdLogFilter
 from packages.observability.pii import PIIRedactor
 
 
@@ -46,6 +46,7 @@ def setup_structured_logging(as_json: bool = False, level: int = logging.INFO) -
     root_logger.setLevel(level)
 
     handler = logging.StreamHandler()
+    handler.addFilter(CorrelationIdLogFilter())
     if as_json:
         handler.setFormatter(StructuredJSONFormatter())
     else:
