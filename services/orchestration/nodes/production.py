@@ -1,7 +1,7 @@
 import time
 import uuid
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from packages.domain.state_machine import ContentStatus
 from packages.domain.idempotency import compute_payload_hash
 from packages.prompts.registry import PromptRegistry
@@ -23,6 +23,40 @@ def _enforce_x_char_limit(body: str, max_chars: int = 280) -> str:
     if last_break > 180:
         truncated = truncated[:last_break].rstrip()
     return f"{truncated}..."
+
+
+def verify_claim_against_sources(claim_text: str, sources: List[Any]) -> tuple[bool, float]:
+    """
+    Deterministically verifies that an extracted factual claim is substantiated by source material.
+    Normalizes words and calculates an overlap ratio against source texts.
+    Returns (is_verified, confidence_score).
+    """
+    if not claim_text or not sources:
+        return False, 0.0
+
+    import re
+    # Extract alphanumeric keywords (length >= 3 or numbers/percentages)
+    claim_words = set(re.findall(r'\b[a-zA-ZÀ-ÿ0-9%]{3,}\b', claim_text.lower()))
+    if not claim_words:
+        return False, 0.0
+
+    combined_source_text = ""
+    for s in sources:
+        if isinstance(s, dict):
+            combined_source_text += " " + str(s.get("content", "")) + " " + str(s.get("summary", "")) + " " + str(s.get("title", ""))
+        elif isinstance(s, str):
+            combined_source_text += " " + s
+        elif hasattr(s, "content"):
+            combined_source_text += " " + str(getattr(s, "content", ""))
+
+    combined_source_text = combined_source_text.lower()
+    if not combined_source_text.strip():
+        return False, 0.0
+
+    matched = sum(1 for w in claim_words if w in combined_source_text)
+    overlap_ratio = round(matched / len(claim_words), 2)
+    is_verified = overlap_ratio >= 0.50
+    return is_verified, overlap_ratio
 
 
 def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
@@ -136,15 +170,20 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
                             cd = c.model_dump() if hasattr(c, "model_dump") else dict(c)
                             if not cd.get("source_id"):
                                 cd["source_id"] = source_id
-                            cd["verified"] = True
+                            c_text = cd.get("claim", "")
+                            is_ver, conf = verify_claim_against_sources(c_text, sources)
+                            cd["verified"] = is_ver
+                            cd["confidence_score"] = conf
                             claims_list.append(cd)
                     else:
+                        c_text = f"Affirmation vérifiée sur {objective}"
+                        is_ver, conf = verify_claim_against_sources(c_text, sources)
                         claims_list = [
                             {
-                                "claim": f"Affirmation vérifiée sur {objective}",
+                                "claim": c_text,
                                 "source_id": source_id,
-                                "verified": True,
-                                "confidence_score": 0.95
+                                "verified": is_ver,
+                                "confidence_score": conf
                             }
                         ]
 
@@ -190,12 +229,14 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
                     f"{selected_cta} 👇"
                 )
                 hashtags = ["#IntelligenceArtificielle", "#GouvernanceIA", "#ProductOps", "#LangGraph"]
+                claim_text = "80% des projets IA échouent sans gouvernance éditoriale claire"
+                is_ver, conf = verify_claim_against_sources(claim_text, sources)
                 claims = [
                     {
-                        "claim": "80% des projets IA échouent sans gouvernance éditoriale claire",
+                        "claim": claim_text,
                         "source_id": source_id,
-                        "verified": True,
-                        "confidence_score": 0.95
+                        "verified": is_ver,
+                        "confidence_score": conf
                     }
                 ]
                 media_spec: Dict[str, Any] = {
@@ -210,12 +251,14 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
                     f"{selected_cta}"
                 )
                 hashtags = ["#AI", "#BuildInPublic"]
+                claim_text = "L'IA nécessite des garde-fous pour garantir la véracité des affirmations"
+                is_ver, conf = verify_claim_against_sources(claim_text, sources)
                 claims = [
                     {
-                        "claim": "L'IA nécessite des garde-fous pour garantir la véracité des affirmations",
+                        "claim": claim_text,
                         "source_id": source_id,
-                        "verified": True,
-                        "confidence_score": 0.98
+                        "verified": is_ver,
+                        "confidence_score": conf
                     }
                 ]
                 media_spec = {
