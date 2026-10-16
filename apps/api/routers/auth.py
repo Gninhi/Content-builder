@@ -29,6 +29,14 @@ def _is_cookie_secure(request: Request) -> bool:
     return request.url.scheme == "https"
 
 
+def is_email_verification_required() -> bool:
+    """Enforces email verification requirement (fail-closed in production)."""
+    env_val = os.getenv("REQUIRE_EMAIL_VERIFICATION")
+    if env_val is not None:
+        return env_val.strip().lower() in ("true", "1", "yes")
+    return is_production()
+
+
 def _set_refresh_cookie(response: Response, raw_token: str, request: Request) -> None:
     response.set_cookie(
         key=REFRESH_COOKIE_NAME,
@@ -201,7 +209,7 @@ def register(
     pwd_hash = hash_password(req.password)
     invitation_code_hash = hash_crypto_token(req.invitation_code) if req.invitation_code else None
 
-    require_verification = os.getenv("REQUIRE_EMAIL_VERIFICATION", "false").lower() in ("true", "1")
+    require_verification = is_email_verification_required()
     email_verified = not require_verification
 
     try:
@@ -382,7 +390,7 @@ def login_with_password(
 
     repo.reset_failed_logins(user_id)
 
-    require_verification = os.getenv("REQUIRE_EMAIL_VERIFICATION", "false").lower() in ("true", "1")
+    require_verification = is_email_verification_required()
     if require_verification and not user.email_verified:
         raise HTTPException(
             status_code=403,
