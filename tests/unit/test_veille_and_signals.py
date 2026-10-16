@@ -80,6 +80,21 @@ def test_repository_veille_sources_and_signals():
 def test_signals_api_endpoints():
     client = TestClient(app)
 
+    from infra.db.database import get_db_session
+    from infra.db.repository import ContentOpsRepository
+    from infra.db.models import WorkspaceModel, WorkspaceMemberModel
+    with get_db_session() as db:
+        repo = ContentOpsRepository(db)
+        if not repo.get_user("owner_test"):
+            repo.create_user("owner_test", "owner@api_test.com", "Owner Test")
+        ws = db.query(WorkspaceModel).filter_by(id="ws_api_test").first()
+        if not ws:
+            ws = WorkspaceModel(id="ws_api_test", name="API Test WS", timezone="UTC", owner_id="owner_test")
+            db.add(ws)
+            db.commit()
+        if not db.query(WorkspaceMemberModel).filter_by(workspace_id="ws_api_test", user_id="owner_test").first():
+            repo.add_workspace_member("ws_api_test", "owner_test", "Owner")
+
     # Mock Owner auth
     def mock_owner_context():
         return UserContext(user_id="owner_test", workspace_id="ws_api_test", role="Owner")

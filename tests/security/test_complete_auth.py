@@ -192,7 +192,17 @@ def test_login_and_refresh_token_rotation():
     rotated_cookie = refresh_res.cookies["refresh_token"]
     assert rotated_cookie != initial_refresh_cookie
 
-    # REUSE DETECTION: presenting the previous revoked refresh token triggers breach alert
+    # REUSE DETECTION: presenting the previous revoked refresh token past the 20s grace window triggers breach alert (Finding H1)
+    with get_db_session() as db:
+        from infra.db.models import UserRefreshTokenModel
+        from datetime import datetime, timezone, timedelta
+        import hashlib
+        tok_hash = hashlib.sha256(initial_refresh_cookie.encode()).hexdigest()
+        rt = db.query(UserRefreshTokenModel).filter_by(token_hash=tok_hash).first()
+        if rt:
+            rt.revoked_at = datetime.now(timezone.utc) - timedelta(seconds=25)
+            db.commit()
+
     reuse_res = client.post(
         "/v1/auth/refresh",
         cookies={"refresh_token": initial_refresh_cookie},

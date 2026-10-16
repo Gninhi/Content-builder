@@ -18,6 +18,13 @@ def setup_test_environment():
     try:
         repo = ContentOpsRepository(db)
         repo.ensure_default_users()
+        from infra.db.models import UserModel
+        u = db.query(UserModel).filter(UserModel.id == "user_editor_profile").first()
+        if u:
+            u.is_active = True
+            db.commit()
+        else:
+            repo.create_user("user_editor_profile", "editor_profile@test.com", "Editor Profile")
         if not repo.get_workspace("ws_profile_test"):
             ws = repo.create_workspace("Profile Test WS", owner_id="user_owner_profile")
             ws.id = "ws_profile_test"  # type: ignore[assignment]

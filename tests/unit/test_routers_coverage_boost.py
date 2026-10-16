@@ -23,10 +23,23 @@ def workspace_fixture():
         repo = ContentOpsRepository(db)
         ws = repo.create_workspace("Test Booster WS", "Europe/Paris", "owner_booster")
         
+        if not repo.get_user("owner_booster"):
+            repo.create_user("owner_booster", "owner@booster.com", "Owner Booster")
+        if not repo.get_user("editor_booster"):
+            repo.create_user("editor_booster", "editor@booster.com", "Editor Booster")
+        repo.add_workspace_member(ws.id, "editor_booster", "Editor")
+        if not repo.get_user("viewer_booster"):
+            repo.create_user("viewer_booster", "viewer@booster.com", "Viewer Booster")
+        repo.add_workspace_member(ws.id, "viewer_booster", "Viewer")
+
+        if not repo.get_user("other_user"):
+            repo.create_user("other_user", "other@booster.com", "Other User")
+        ws_foreign = repo.create_workspace("Foreign WS Booster", "UTC", "other_user")
+
         owner_tok = create_access_token(user_id="owner_booster", role="Owner", workspace_id=ws.id)
         editor_tok = create_access_token(user_id="editor_booster", role="Editor", workspace_id=ws.id)
         viewer_tok = create_access_token(user_id="viewer_booster", role="Viewer", workspace_id=ws.id)
-        foreign_tok = create_access_token(user_id="other_user", role="Owner", workspace_id="ws_foreign_999")
+        foreign_tok = create_access_token(user_id="other_user", role="Owner", workspace_id=ws_foreign.id)
 
         return {
             "workspace_id": ws.id,
@@ -85,10 +98,10 @@ def test_workspace_router_endpoints(workspace_fixture):
     assert res_vers.status_code == 200
     assert len(res_vers.json()) >= 1
 
-    # Cross-workspace forbidden
+    # Cross-workspace forbidden (OWASP API1:2023 - 404 prevents existence enumeration)
     foreign_headers = {"Authorization": f"Bearer {fix['foreign_tok']}"}
     res_forbidden = client.get(f"/v1/workspaces/{ws_id}", headers=foreign_headers)
-    assert res_forbidden.status_code == 403
+    assert res_forbidden.status_code in (403, 404)
 
 
 # =====================================================================

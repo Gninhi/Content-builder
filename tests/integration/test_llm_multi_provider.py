@@ -14,6 +14,38 @@ from infra.db.repository import ContentOpsRepository
 client = TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def setup_llm_test_environment():
+    with SessionLocal() as db:
+        repo = ContentOpsRepository(db)
+        from infra.db.models import WorkspaceModel, WorkspaceMemberModel
+        if not repo.get_user("user_owner"):
+            repo.create_user("user_owner", "owner@llm.com", "Owner User")
+        if not repo.get_user("user_viewer"):
+            repo.create_user("user_viewer", "viewer@llm.com", "Viewer User")
+        if not repo.get_user("user_other"):
+            repo.create_user("user_other", "other@llm.com", "Other User")
+
+        if not db.query(WorkspaceModel).filter_by(id="ws_default").first():
+            ws = WorkspaceModel(id="ws_default", name="Default WS", owner_id="user_owner")
+            db.add(ws)
+            db.commit()
+
+        if not db.query(WorkspaceModel).filter_by(id="ws_foreign").first():
+            ws_f = WorkspaceModel(id="ws_foreign", name="Foreign WS", owner_id="user_other")
+            db.add(ws_f)
+            db.commit()
+
+        def ensure_member(ws_id, uid, role):
+            m = db.query(WorkspaceMemberModel).filter_by(workspace_id=ws_id, user_id=uid).first()
+            if not m:
+                repo.add_workspace_member(ws_id, uid, role)
+
+        ensure_member("ws_default", "user_owner", "Owner")
+        ensure_member("ws_default", "user_viewer", "Viewer")
+        ensure_member("ws_foreign", "user_other", "Editor")
+
+
 @pytest.fixture
 def owner_token() -> str:
     return create_access_token(

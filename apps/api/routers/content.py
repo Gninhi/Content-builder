@@ -32,9 +32,9 @@ def generate_content_package(
     if not brief:
         raise HTTPException(status_code=404, detail="Brief not found.")
     if brief.workspace_id != user.workspace_id:
-        raise HTTPException(status_code=403, detail="Access to brief belonging to another workspace is forbidden.")
+        raise HTTPException(status_code=404, detail="Brief not found.")
     if workspace_id and workspace_id != user.workspace_id:
-        raise HTTPException(status_code=403, detail="Cannot generate content for another workspace.")
+        raise HTTPException(status_code=404, detail="Workspace not found.")
 
     target_workspace_id = str(user.workspace_id)
     brand_profile = repo.get_latest_brand_profile(target_workspace_id)
@@ -174,7 +174,7 @@ def approve_content_variant(
         )
     except ValueError as e:
         if "access denied" in str(e).lower() or "not found" in str(e).lower():
-            raise HTTPException(status_code=403, detail=str(e))
+            raise HTTPException(status_code=404, detail="Variant not found.")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -198,7 +198,7 @@ def rewrite_content_variant(
     package = variant.package
     brief = package.brief if package else None
     if brief and brief.workspace_id != user.workspace_id:
-        raise HTTPException(status_code=403, detail="Forbidden workspace access.")
+        raise HTTPException(status_code=404, detail="Variant not found.")
 
     # Record the feedback approval
     repo.record_approval(

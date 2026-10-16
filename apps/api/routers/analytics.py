@@ -34,7 +34,7 @@ def record_metric(
         .first()
     )
     if not post:
-        raise HTTPException(status_code=403, detail="Post not found or access denied for this workspace.")
+        raise HTTPException(status_code=404, detail="Post not found.")
     snapshot = repo.record_metric_snapshot(
         post_id=req.post_id,
         impressions=req.impressions,

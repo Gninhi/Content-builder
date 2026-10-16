@@ -39,6 +39,14 @@ def ensure_default_brand_profile():
                 cta_policy={}
             ))
             db.commit()
+
+        from infra.db.repository import ContentOpsRepository
+        from infra.db.models import WorkspaceMemberModel
+        repo = ContentOpsRepository(db)
+        if not repo.get_user("user_valid"):
+            repo.create_user("user_valid", "valid@test.com", "Valid User")
+        if not db.query(WorkspaceMemberModel).filter_by(workspace_id="ws_default", user_id="user_valid").first():
+            repo.add_workspace_member("ws_default", "user_valid", "Editor")
     yield
 
 

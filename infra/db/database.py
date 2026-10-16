@@ -24,28 +24,29 @@ engine = create_engine(
     connect_args={"check_same_thread": False} if "sqlite" in SYNC_DATABASE_URL else {}
 )
 
-SessionLocal = scoped_session(sessionmaker(autocommit=False, autoflush=False, expire_on_commit=False, bind=engine))
+session_factory = sessionmaker(autocommit=False, autoflush=False, expire_on_commit=False, bind=engine)
+SessionLocal = scoped_session(session_factory)
 
 Base = declarative_base()
 
 
 @contextmanager
 def get_db_session():
-    """Context manager for obtaining a database session."""
-    db = SessionLocal()
+    """Context manager for obtaining an isolated database session with guaranteed closure."""
+    db = session_factory()
     try:
         yield db
     finally:
-        SessionLocal.remove()
+        db.close()
 
 
 def get_db():
-    """Dependency for obtaining a database session."""
-    db = SessionLocal()
+    """Dependency for obtaining an isolated database session per request."""
+    db = session_factory()
     try:
         yield db
     finally:
-        SessionLocal.remove()
+        db.close()
 
 
 def init_db():

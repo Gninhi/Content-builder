@@ -52,7 +52,7 @@ def publish_now(
         raise HTTPException(status_code=404, detail="Publication job not found.")
     job_ws = job.variant.package.brief.workspace_id if (job.variant and job.variant.package and job.variant.package.brief) else None
     if job_ws != user.workspace_id:
-        raise HTTPException(status_code=403, detail="Access to publication job in another workspace is forbidden.")
+        raise HTTPException(status_code=404, detail="Publication job not found.")
 
     worker = PublisherWorker(repo.db)
     try:
@@ -73,7 +73,7 @@ def cancel_publication_job(
         raise HTTPException(status_code=404, detail="Publication job not found.")
     job_ws = job.variant.package.brief.workspace_id if (job.variant and job.variant.package and job.variant.package.brief) else None
     if job_ws != user.workspace_id:
-        raise HTTPException(status_code=403, detail="Access to publication job in another workspace is forbidden.")
+        raise HTTPException(status_code=404, detail="Publication job not found.")
 
     current_status = ContentStatus.parse(str(job.status))
     if current_status == ContentStatus.PUBLISHED:
@@ -110,7 +110,7 @@ def reconcile_publication_job(
         raise HTTPException(status_code=404, detail="Publication job not found.")
     job_ws = job.variant.package.brief.workspace_id if (job.variant and job.variant.package and job.variant.package.brief) else None
     if job_ws != user.workspace_id:
-        raise HTTPException(status_code=403, detail="Access to publication job in another workspace is forbidden.")
+        raise HTTPException(status_code=404, detail="Publication job not found.")
 
     worker = PublisherWorker(repo.db)
     try:
