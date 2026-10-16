@@ -6,20 +6,22 @@ import { ToastProvider } from './context/ToastContext';
 import { AppShell } from './components/layout/AppShell';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 
-// Screens
+// Primary screens (critical path)
 import { AuthScreen } from './screens/AuthScreen';
 import { DashboardScreen } from './screens/DashboardScreen';
 import { InboxScreen } from './screens/InboxScreen';
-import { CalendarScreen } from './screens/CalendarScreen';
-import { IdeationScreen } from './screens/IdeationScreen';
-import { VeilleScreen } from './screens/VeilleScreen';
-import { InsightsScreen } from './screens/InsightsScreen';
-import { BrandProfileScreen } from './screens/BrandProfileScreen';
-import { ConnectionsScreen } from './screens/ConnectionsScreen';
-import { SettingsScreen } from './screens/SettingsScreen';
-import { AgentsScreen } from './screens/AgentsScreen';
-import { UserProfileScreen } from './screens/UserProfileScreen';
-import { StyleGuideScreen } from './screens/StyleGuideScreen';
+
+// Secondary screens (code-split via dynamic import)
+const CalendarScreen = React.lazy(() => import('./screens/CalendarScreen').then(m => ({ default: m.CalendarScreen })));
+const VeilleScreen = React.lazy(() => import('./screens/VeilleScreen').then(m => ({ default: m.VeilleScreen })));
+const IdeationScreen = React.lazy(() => import('./screens/IdeationScreen').then(m => ({ default: m.IdeationScreen })));
+const InsightsScreen = React.lazy(() => import('./screens/InsightsScreen').then(m => ({ default: m.InsightsScreen })));
+const BrandProfileScreen = React.lazy(() => import('./screens/BrandProfileScreen').then(m => ({ default: m.BrandProfileScreen })));
+const ConnectionsScreen = React.lazy(() => import('./screens/ConnectionsScreen').then(m => ({ default: m.ConnectionsScreen })));
+const SettingsScreen = React.lazy(() => import('./screens/SettingsScreen').then(m => ({ default: m.SettingsScreen })));
+const AgentsScreen = React.lazy(() => import('./screens/AgentsScreen').then(m => ({ default: m.AgentsScreen })));
+const UserProfileScreen = React.lazy(() => import('./screens/UserProfileScreen').then(m => ({ default: m.UserProfileScreen })));
+const StyleGuideScreen = React.lazy(() => import('./screens/StyleGuideScreen').then(m => ({ default: m.StyleGuideScreen })));
 
 const MainRouter: React.FC = () => {
   const { isAuthenticated, isInitializing } = useAuth();
@@ -100,7 +102,15 @@ const MainRouter: React.FC = () => {
 
   return (
     <AppShell currentScreen={currentScreen} onNavigate={navigateTo}>
-      {renderActiveScreen()}
+      <React.Suspense
+        fallback={
+          <div className="flex h-64 items-center justify-center text-txt-muted text-sm font-mono animate-pulse">
+            Chargement du module...
+          </div>
+        }
+      >
+        {renderActiveScreen()}
+      </React.Suspense>
     </AppShell>
   );
 };

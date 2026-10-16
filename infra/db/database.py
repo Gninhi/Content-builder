@@ -50,6 +50,7 @@ def get_db():
 
 def init_db():
     """Initializes tables in database and applies backwards-compatible column additions."""
+    import infra.db.models  # noqa: F401 - Ensure all model tables are registered on Base.metadata
     Base.metadata.create_all(bind=engine)
     try:
         from sqlalchemy import text, inspect

@@ -21,7 +21,7 @@ router = APIRouter(tags=["Strategy & Insights"])
 
 @router.post("/v1/strategy/insights", response_model=StrategyInsightsResponse)
 def generate_strategy_insights(
-    workspace_id: str = Body("ws_default", embed=True),
+    workspace_id: Optional[str] = Body(None, embed=True),
     llm_override: Optional[Dict[str, Any]] = Body(None, embed=True),
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor"))
@@ -49,7 +49,7 @@ def generate_strategy_insights(
     ]
 
     initial_state: Dict[str, Any] = {
-        "workspace_id": workspace_id,
+        "workspace_id": ws_id,
         "pillars": pillars,
         "metric_snapshots": snapshots,
         "hypotheses": [],

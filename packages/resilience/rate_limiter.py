@@ -28,7 +28,9 @@ class RateLimiter:
     def record_retry_after(self, seconds: float) -> None:
         """Enforces a mandatory cooldown period following an HTTP 429 response."""
         with self._lock:
-            cooldown = max(0.5, seconds) + random.uniform(0.1, 0.5)  # add jitter
+            base_cooldown = max(0.1, seconds)
+            jitter = random.uniform(0.01, 0.05)
+            cooldown = base_cooldown + jitter
             self._retry_after_until = time.time() + cooldown
             logger.warning(f"[{self.name}] Rate limit 429 encountered. Cooldown active for {cooldown:.2f}s.")
 

@@ -9,6 +9,7 @@ from packages.contracts.schemas import (
 )
 from services.orchestration.graphs.idea_research import graph as idea_research_graph
 from packages.observability.tracing import ObservabilityTracer
+from packages.prompts.registry import PROMPTS_V1
 from apps.api.dependencies import get_repository, UserContext, require_roles
 from infra.db.repository import ContentOpsRepository
 
@@ -123,15 +124,36 @@ def research_ideas(
             )
         )
 
-    # Log agent run for full auditability (PRD FR-10)
+    # Log agent run with true resolved execution metadata (PRD FR-10)
+    prompt_version = PROMPTS_V1.get("idea_research", {}).get("version", "1.1.0")
+    is_cached = bool(result.get("cached", False))
+    resolved_llm_info = result.get("resolved_llm")
+
+    if is_cached:
+        cached_model = resolved_llm_info.get("model_id") if isinstance(resolved_llm_info, dict) else "memory"
+        logged_model = f"cache:{cached_model}"
+        logged_cost = 0.0
+    elif isinstance(resolved_llm_info, dict):
+        provider = resolved_llm_info.get("provider_id", "unknown")
+        model_id = resolved_llm_info.get("model_id", "unknown")
+        logged_model = f"{provider}/{model_id}"
+        tokens = resolved_llm_info.get("total_tokens")
+        logged_cost = float(tokens) * 0.000002 if tokens else 0.0
+    elif result.get("status") == "FALLBACK":
+        logged_model = "fallback:deterministic_demo"
+        logged_cost = 0.0
+    else:
+        logged_model = "system:deterministic"
+        logged_cost = 0.0
+
     repo.log_agent_run(
         workspace_id=ws_id,
         graph="idea_research_graph",
         node="ideate_and_score",
         trace_id=run_id,
-        prompt_version="1.1.0",
-        model="nvidia/z-ai/glm-5.3-flash",
-        cost=0.001
+        prompt_version=prompt_version,
+        model=logged_model,
+        cost=logged_cost
     )
 
     return IdeaResearchResponse(

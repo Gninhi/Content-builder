@@ -53,7 +53,7 @@ Accès direct avec rechargement à chaud : 👉 [http://localhost:3000/ui/](http
 ## 🧪 Tests & Qualité
 
 ```bash
-# Tests complets backend (156 tests)
+# Tests complets backend (270 tests unitaires, intégration, sécurité, observabilité)
 pytest tests/
 
 # Vérification du typage statique
@@ -62,7 +62,7 @@ mypy .
 # Analyse du code et linting
 ruff check apps/ packages/ infra/ tests/
 
-# Tests frontend (25 tests Vitest)
+# Tests frontend (40 tests Vitest)
 cd apps/web && npm test
 
 # Build de production frontend
@@ -78,11 +78,13 @@ La documentation exhaustive du projet est centralisée dans le dossier [`docs/`]
 * **[Carte & Index de la Documentation](docs/README.md)**
 * **[Architecture Système & Graphes LangGraph](docs/architecture/overview.md)**
 * **[Architecture Multi-Provider LLM](docs/architecture/llm-providers.md)**
-* **[Décisions d'Architecture (ADR 0001 à 0007)](docs/architecture/adr/)**
+* **[Décisions d'Architecture (ADR 0001 à 0011)](docs/architecture/adr/)**
+* **[Pipeline de Veille & Idéation Autonome](docs/veille/architecture.md)**
 * **[Gouvernance, Machine à États & RBAC](docs/product/governance.md)**
 * **[Guide du Profil de Marque](docs/product/brand-governance.md)**
 * **[Contrats & Spécification des APIs](docs/product/api-contracts.md)**
-* **[Système de Design & Accessibilité](docs/design-system/principles.md)**
+* **[Système de Design & Accessibilité](docs/design-system/overview.md)**
 * **[Politique de Sécurité & Signalement](docs/operations/security.md)**
 * **[Runbooks d'Exploitation en Production](docs/operations/runbooks/)**
+* **[Rapports d'Audits Techniques & Matrices](docs/audits/audit_exhaustif_severe_2026.md)**
 * **[Changelog de Consolidation](docs/CHANGELOG_CONSOLIDATION.md)**

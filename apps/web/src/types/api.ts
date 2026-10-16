@@ -295,7 +295,36 @@ export interface VeilleSource {
   source_type: string;
   is_active: boolean;
   health_status: string;
+  last_polled_at?: string | null;
+  error_message?: string | null;
   created_at: string;
 }
 
+export interface VeilleRun {
+  id: string;
+  workspace_id: string;
+  status: 'RUNNING' | 'COMPLETED' | 'DEGRADED' | 'FAILED' | string;
+  trigger_type: 'SCHEDULED' | 'MANUAL' | string;
+  axis?: string | null;
+  sources_contacted: number;
+  sources_failed: number;
+  signals_discovered: number;
+  signals_saved: number;
+  signals_qualified: number;
+  signals_rejected: number;
+  error_summary?: string | null;
+  started_at: string;
+  completed_at?: string | null;
+}
 
+export interface VeilleScheduleStatus {
+  workspace_id: string;
+  timezone: string;
+  scheduled_hour: number;
+  scheduled_minute: number;
+  is_due: boolean;
+  last_run?: VeilleRun | null;
+  next_scheduled_run: string;
+  active_sources_count: number;
+  failing_sources_count: number;
+}

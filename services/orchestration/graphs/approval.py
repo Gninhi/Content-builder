@@ -23,11 +23,19 @@ def create_approval_graph(checkpointer: Optional[BaseCheckpointSaver] = None):
     g.add_edge("prepare_for_review", "human_review")
     g.add_edge("human_review", END)
 
+    # When running under LangGraph API / Studio / CLI dev server, persistence
+    # is handled automatically by the platform runtime. Providing a custom checkpointer
+    # triggers a ValueError in langgraph dev / Cloud.
+    import sys
+    if "langgraph_api" in sys.modules and checkpointer is None:
+        return g.compile(interrupt_before=["human_review"])
+
     cp = checkpointer if checkpointer is not None else get_checkpointer()
     return g.compile(
         checkpointer=cp,
         interrupt_before=["human_review"]
     )
+
 
 
 # Default graph instance for runtime

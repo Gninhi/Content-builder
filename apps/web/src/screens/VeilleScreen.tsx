@@ -51,7 +51,8 @@ export const VeilleScreen: React.FC<VeilleScreenProps> = ({ onNavigate }) => {
   const [selectedTrust, setSelectedTrust] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [isDemoMode, setIsDemoMode] = useState<boolean>(true);
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
+  const [scheduleStatus, setScheduleStatus] = useState<any>(null);
 
   // Source Modal state
   const [sourcesModalOpen, setSourcesModalOpen] = useState(false);
@@ -66,7 +67,7 @@ export const VeilleScreen: React.FC<VeilleScreenProps> = ({ onNavigate }) => {
   // Converting state
   const [convertingSignalId, setConvertingSignalId] = useState<string | null>(null);
 
-  // 1. Fetch Signals & Sources
+  // 1. Fetch Signals & Sources & Schedule
   const fetchSignals = async () => {
     try {
       setLoading(true);
@@ -95,10 +96,21 @@ export const VeilleScreen: React.FC<VeilleScreenProps> = ({ onNavigate }) => {
     }
   };
 
+  const fetchScheduleStatus = async () => {
+    try {
+      const data = await apiClient<any>('/v1/signals/schedule-status');
+      setScheduleStatus(data);
+    } catch (err) {
+      // Non-blocking
+    }
+  };
+
   useEffect(() => {
     fetchSignals();
     fetchSources();
+    fetchScheduleStatus();
   }, [selectedAxis, selectedTrust, selectedStatus, session?.workspace_id]);
+
 
   // 2. Trigger Collection Cycle
   const handleCollectSignals = async () => {
@@ -323,6 +335,38 @@ export const VeilleScreen: React.FC<VeilleScreenProps> = ({ onNavigate }) => {
           )}
         </div>
       </div>
+
+      {/* Schedule & Observability Banner */}
+      {scheduleStatus && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border border-border-default bg-surface/60 text-xs">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-accent/10 text-accent font-medium text-[11px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+              Collecte Quotidienne : {String(scheduleStatus.scheduled_hour).padStart(2, '0')}h{String(scheduleStatus.scheduled_minute).padStart(2, '0')} ({scheduleStatus.timezone})
+            </span>
+            {scheduleStatus.last_run ? (
+              <span className="text-txt-muted text-[11px]">
+                Dernier cycle :{' '}
+                <strong className={scheduleStatus.last_run.status === 'COMPLETED' ? 'text-status-success-text' : 'text-status-warning-text'}>
+                  {scheduleStatus.last_run.status}
+                </strong>{' '}
+                ({new Date(scheduleStatus.last_run.started_at).toLocaleTimeString(isEn ? 'en-US' : 'fr-FR', { hour: '2-digit', minute: '2-digit' })}, {scheduleStatus.last_run.signals_saved} signaux)
+              </span>
+            ) : (
+              <span className="text-txt-muted text-[11px]">Aucun cycle automatique enregistré aujourd'hui</span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 text-[11px] text-txt-muted">
+            <span>Sources : <strong className="text-txt-primary">{scheduleStatus.active_sources_count} actives</strong></span>
+            {scheduleStatus.failing_sources_count > 0 && (
+              <span className="text-status-danger-text font-semibold">
+                ⚠️ {scheduleStatus.failing_sources_count} en erreur
+              </span>
+            )}
+            <span>Prochain run : <strong className="text-txt-primary">{new Date(scheduleStatus.next_scheduled_run).toLocaleDateString(isEn ? 'en-US' : 'fr-FR', { day: 'numeric', month: 'short' })} à {new Date(scheduleStatus.next_scheduled_run).toLocaleTimeString(isEn ? 'en-US' : 'fr-FR', { hour: '2-digit', minute: '2-digit' })}</strong></span>
+          </div>
+        </div>
+      )}
 
       {/* Axis Navigation Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-border-default text-xs">
@@ -735,11 +779,32 @@ export const VeilleScreen: React.FC<VeilleScreenProps> = ({ onNavigate }) => {
               sources.map((src) => (
                 <div
                   key={src.id}
-                  className="flex items-center justify-between p-2.5 rounded-lg border border-border-subtle bg-app text-xs"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 rounded-lg border border-border-subtle bg-app text-xs gap-2"
                 >
-                  <div className="truncate pr-2">
-                    <strong className="block text-txt-primary truncate">{src.name}</strong>
-                    <span className="text-[10px] text-txt-muted truncate">{src.url}</span>
+                  <div className="truncate pr-2 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <strong className="text-txt-primary truncate">{src.name}</strong>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded font-medium ${
+                        src.health_status === 'HEALTHY'
+                          ? 'bg-status-success-bg text-status-success-text'
+                          : src.health_status === 'ERROR'
+                          ? 'bg-status-danger-bg text-status-danger-text'
+                          : 'bg-status-warning-bg text-status-warning-text'
+                      }`}>
+                        {src.health_status}
+                      </span>
+                    </div>
+                    <span className="block text-[10px] text-txt-muted truncate">{src.url}</span>
+                    {src.last_polled_at && (
+                      <span className="block text-[9px] text-txt-muted">
+                        Dernier scan : {new Date(src.last_polled_at).toLocaleDateString(isEn ? 'en-US' : 'fr-FR')} {new Date(src.last_polled_at).toLocaleTimeString(isEn ? 'en-US' : 'fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                    {src.error_message && (
+                      <span className="block text-[10px] text-status-danger-text truncate">
+                        Erreur : {src.error_message}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <Badge variant="neutral" className="text-[10px] uppercase">{src.axis}</Badge>

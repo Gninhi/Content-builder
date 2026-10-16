@@ -69,10 +69,10 @@ class OAuthStateManager:
         if self._redis_client:
             try:
                 payload = oauth_state.model_dump_json()
-                self._redis_client.setex(
+                self._redis_client.set(
                     f"oauth_state:{state_token}",
-                    self.ttl_minutes * 60,
-                    payload
+                    payload,
+                    ex=self.ttl_minutes * 60
                 )
                 return state_token
             except Exception:

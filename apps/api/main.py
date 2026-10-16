@@ -13,12 +13,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from infra.db.database import init_db, SessionLocal
 from infra.db.repository import ContentOpsRepository
-from packages.security.limiter import limiter
+from packages.security.limiter import limiter, safe_rate_limit_exceeded_handler, get_storage_status
 from packages.observability.correlation import set_correlation_id
 from packages.observability.prometheus import (
     get_prometheus_metrics_response,
@@ -132,9 +131,16 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Attach rate limiter
+# Attach resilient rate limiter
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+app.add_exception_handler(RateLimitExceeded, safe_rate_limit_exceeded_handler)  # type: ignore[arg-type]
+try:
+    import redis.exceptions
+    app.add_exception_handler(redis.exceptions.ConnectionError, safe_rate_limit_exceeded_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(redis.exceptions.RedisError, safe_rate_limit_exceeded_handler)  # type: ignore[arg-type]
+except ImportError:
+    pass
+app.add_exception_handler(ConnectionError, safe_rate_limit_exceeded_handler)  # type: ignore[arg-type]
 app.add_middleware(SlowAPIMiddleware)
 
 # Restrictive CORS configuration
@@ -297,6 +303,12 @@ def readiness_check():
     configured_providers = [p.provider_id for p in providers_info if p.is_configured]
     checks["llm_providers"] = configured_providers
     checks["llm_key"] = "configured" if configured_providers else "missing_or_placeholder"
+
+    # 4. Rate Limiter Storage Diagnostic
+    rl_diag = get_storage_status()
+    checks["rate_limiter_storage"] = rl_diag.get("status", "unknown")
+    if rl_diag.get("status") == "redis_unreachable_fail_closed":
+        is_ready = False
 
     status_code = 200 if is_ready else 503
     return JSONResponse(

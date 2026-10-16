@@ -13,7 +13,7 @@ def human_review_decision_node(state: ApprovalState) -> Dict[str, Any]:
     expected_hash = state.get("payload_hash", "")
     
     current_hash = compute_payload_hash(payload)
-    if expected_hash and current_hash != expected_hash:
+    if decision != "edit" and expected_hash and current_hash != expected_hash:
         return {
             "status": ContentStatus.QA_FAILED,
             "feedback": "Payload hash mismatch: content was modified without re-evaluation."

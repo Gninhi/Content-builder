@@ -32,18 +32,6 @@ class ContentProductionState(TypedDict):
     errors: List[str]
 
 
-class QualityReviewState(TypedDict):
-    variant: Dict[str, Any]
-    platform: str
-    prohibited_topics: List[str]
-    sources: List[Dict[str, Any]]
-    checks: List[Dict[str, Any]]
-    passed: bool
-    qa_score: float
-    reasons: List[str]
-    unsupported_claims: List[str]
-
-
 class ApprovalState(TypedDict):
     variant_id: str
     package_id: str

@@ -9,15 +9,36 @@ SUSPICIOUS_PATTERNS = [
     r"ignore\s+(all\s+)?(previous|prior)\s+(instructions|directives|prompts)",
     r"disregard\s+(all\s+)?(previous|prior)\s+(instructions|rules)",
     r"you\s+are\s+now\s+(an?\s+)?(unrestricted|evil|dan|new\s+role)",
+    r"you\s+must\s+now\s+act\s+as",
     r"system\s*:\s*(you|override)",
     r"new\s+system\s+prompt\s*:",
     r"reveal\s+(your\s+)?(api_key|secrets?|passwords?|tokens?)",
     r"publish\s+without\s+(approval|review|validation)",
     r"delete\s+(all\s+)?(data|database|records)",
     r"bypass\s+(all\s+)?(guardrails|filters|security)",
+    r"</?untrusted(?:_external_data|_content)?>",
+    r"<script.*?>.*?</script>",
+    r"\{\{.*?\}\}",
+    r"(?:call\s+tool|execute\s+command|eval\s*\()",
 ]
 
 COMPILED_PATTERNS = [re.compile(p, re.IGNORECASE) for p in SUSPICIOUS_PATTERNS]
+
+
+def sanitize_untrusted_input_filtered(text: str) -> str:
+    """
+    Centralized sanitizer: strips zero-width hidden characters, replaces hostile instructions
+    with [FILTERED_UNTRUSTED_INSTRUCTION], and encodes XML brackets to prevent boundary breakouts.
+    """
+    if not text:
+        return ""
+    # Strip zero-width characters and directional overrides used to hide instructions
+    cleaned = re.sub(r"[\u200B-\u200D\uFEFF\u202A-\u202E]", "", text)
+    for pattern in COMPILED_PATTERNS:
+        cleaned = pattern.sub("[FILTERED_UNTRUSTED_INSTRUCTION]", cleaned)
+    # Neutralize residual XML tag delimiters that could break encapsulation
+    cleaned = cleaned.replace("<", "&lt;").replace(">", "&gt;")
+    return cleaned
 
 
 def wrap_untrusted_data(content: str, origin: str, timestamp: Optional[str] = None) -> str:
@@ -86,6 +107,10 @@ class PromptInjectionGuard:
     @staticmethod
     def defang_text(text: str) -> str:
         return sanitize_untrusted_text(text)
+
+    @staticmethod
+    def sanitize_untrusted_input(text: str) -> str:
+        return sanitize_untrusted_input_filtered(text)
 
     @staticmethod
     def sanitize_for_prompt(text: str, origin: str) -> str:

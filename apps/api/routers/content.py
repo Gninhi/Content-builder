@@ -22,7 +22,7 @@ router = APIRouter(tags=["Content Production & Approvals"])
 @router.post("/v1/content/generate")
 def generate_content_package(
     brief_id: str = Body(..., embed=True),
-    workspace_id: str = Body("ws_default", embed=True),
+    workspace_id: Optional[str] = Body(None, embed=True),
     llm_override: Optional[Dict[str, Any]] = Body(None, embed=True),
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor", "ServiceAgent"))
@@ -32,21 +32,23 @@ def generate_content_package(
         raise HTTPException(status_code=404, detail="Brief not found.")
     if brief.workspace_id != user.workspace_id:
         raise HTTPException(status_code=403, detail="Access to brief belonging to another workspace is forbidden.")
+    if workspace_id and workspace_id != user.workspace_id:
+        raise HTTPException(status_code=403, detail="Cannot generate content for another workspace.")
 
-    workspace_id = str(brief.workspace_id)
-    brand_profile = repo.get_latest_brand_profile(workspace_id)
+    target_workspace_id = str(user.workspace_id)
+    brand_profile = repo.get_latest_brand_profile(target_workspace_id)
     voice = str(brand_profile.voice) if brand_profile else "Expert et direct"
     prohibited = list(brand_profile.prohibited_topics) if brand_profile else []
     cta_policy = dict(brand_profile.cta_policy) if brand_profile and brand_profile.cta_policy else {}
 
-    sources = repo.list_sources(workspace_id)
+    sources = repo.list_sources(target_workspace_id)
     raw_sources = [
         {"canonical_url": s.canonical_url, "facts": s.extracted_facts}
         for s in sources
     ]
 
     initial_state = {
-        "workspace_id": workspace_id,
+        "workspace_id": target_workspace_id,
         "brief_id": str(brief.id),
         "objective": str(brief.objective),
         "angle": "Perspective d'expert et retour terrain",

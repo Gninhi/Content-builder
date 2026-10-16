@@ -34,6 +34,7 @@ class WorkspaceModel(Base):
     brand_profiles = relationship("BrandProfileModel", back_populates="workspace", cascade="all, delete-orphan")
     sources = relationship("ContentSourceModel", back_populates="workspace", cascade="all, delete-orphan")
     veille_sources = relationship("VeilleSourceModel", back_populates="workspace", cascade="all, delete-orphan")
+    veille_runs = relationship("VeilleRunModel", back_populates="workspace", cascade="all, delete-orphan")
     signals = relationship("SignalModel", back_populates="workspace", cascade="all, delete-orphan")
     ideas = relationship("IdeaModel", back_populates="workspace", cascade="all, delete-orphan")
     social_accounts = relationship("ConnectedSocialAccountModel", back_populates="workspace", cascade="all, delete-orphan")
@@ -400,6 +401,28 @@ class VeilleSourceModel(Base):
     signals = relationship("SignalModel", back_populates="source", cascade="all, delete-orphan")
 
 
+class VeilleRunModel(Base):
+    __tablename__ = "veille_runs"
+
+    id = Column(String(64), primary_key=True)
+    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String(32), default="RUNNING", nullable=False, index=True)  # "RUNNING", "COMPLETED", "FAILED"
+    trigger_type = Column(String(32), default="SCHEDULED", nullable=False)  # "SCHEDULED", "MANUAL"
+    axis = Column(String(64), nullable=True)
+    sources_contacted = Column(Integer, default=0, nullable=False)
+    sources_failed = Column(Integer, default=0, nullable=False)
+    signals_discovered = Column(Integer, default=0, nullable=False)
+    signals_saved = Column(Integer, default=0, nullable=False)
+    signals_qualified = Column(Integer, default=0, nullable=False)
+    signals_rejected = Column(Integer, default=0, nullable=False)
+    error_summary = Column(Text, nullable=True)
+    execution_metrics = Column(JSON, default=dict, nullable=False)
+    started_at = Column(DateTime, default=utc_now, nullable=False)
+    completed_at = Column(DateTime, nullable=True)
+
+    workspace = relationship("WorkspaceModel", back_populates="veille_runs")
+
+
 class SignalModel(Base):
     __tablename__ = "signals"
 
@@ -425,5 +448,4 @@ class SignalModel(Base):
     workspace = relationship("WorkspaceModel", back_populates="signals")
     source = relationship("VeilleSourceModel", back_populates="signals")
     ideas = relationship("IdeaModel", back_populates="signal")
-
 

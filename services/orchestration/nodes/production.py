@@ -71,13 +71,17 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
     else:
         raw_ov = state.get("llm_override")
         override_dict = raw_ov if isinstance(raw_ov, dict) else None
-        model, resolved_ctx = resolve_and_get_llm(
-            task_name="production",
-            workspace_id=workspace_id,
-            run_override=override_dict,
-            temperature=0.4,
-            allow_none_if_unconfigured=True,
-        )
+        try:
+            model, resolved_ctx = resolve_and_get_llm(
+                task_name="production",
+                workspace_id=workspace_id,
+                run_override=override_dict,
+                temperature=0.4,
+                allow_none_if_unconfigured=True,
+            )
+        except Exception as err:
+            logger.warning(f"LLM resolution failed for production node: {err}. Falling back to default/deterministic mode.")
+            model, resolved_ctx = None, None
 
     # Backwards compatibility fallback if monkeypatched in unit tests
     if model is None:

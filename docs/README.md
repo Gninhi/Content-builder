@@ -25,7 +25,14 @@ docs/
 │       ├── 0007-react-vite-ui-stack.md     # Pile UI moderne React 18, Vite & Tailwind
 │       ├── 0008-social-connectors-and-p... # Connecteurs sociaux isolés et registre d'aperçus
 │       ├── 0009-obsidian-vault-and-bras... # Direction A « Obsidian Vault & Brass Precision »
-│       └── 0010-volatile-jwt-auth-and-m... # Authentification JWT volatile et profil multi-tenant
+│       ├── 0010-volatile-jwt-auth-and-m... # Authentification JWT volatile et profil multi-tenant
+│       └── 0011-langgraph-orchestrati...   # Consolidation LangGraph et séparation des rôles
+│
+├── veille/                                 # Pipeline de veille & idéation autonome
+│   ├── architecture.md                     # Architecture de collecte, déduplication et scoring
+│   ├── sources_catalog.md                  # Catalogue officiel des sources (Niveaux A à D)
+│   ├── query_bank.md                       # Banque de requêtes spécialisées et prompts
+│   └── compliance_matrix.md                # Matrice de conformité et règles de qualification
 │
 ├── product/                                # Règles métier, gouvernance et contrats
 │   ├── governance.md                       # Parcours éditorial, machine à états HITL & RBAC
@@ -33,7 +40,10 @@ docs/
 │   └── api-contracts.md                    # Spécification des endpoints REST et contrats
 │
 ├── design-system/                          # Écosystème de design, tokens et composants
-│   └── principles.md                       # Principes directeurs, tokens et accessibilité WCAG AA
+│   ├── overview.md                         # Vue d'ensemble « Obsidian Vault & Brass Precision »
+│   ├── principles.md                       # Principes directeurs et accessibilité WCAG 2.2 AA
+│   ├── tokens.md                           # Architecture des tokens sémantiques OKLCH
+│   └── audit-final.md                      # Validation et conformité de l'interface
 │
 ├── operations/                             # Déploiement, sécurité, tests et runbooks
 │   ├── security.md                         # Politique de sécurité et signalement des failles
@@ -49,7 +59,17 @@ docs/
 │       ├── secret_leak.md                  # Procédure de réponse à fuite de secret
 │       └── token_rotation.md               # Rotation périodique des clés API
 │
+├── audits/                                 # Rapports d'audits techniques et matrices de preuve
+│   ├── audit_exhaustif_severe_2026.md      # Audit complet du dépôt (backend, frontend, graphes)
+│   ├── audit_veille_industrialisation_2... # Audit du pipeline de veille et idéation
+│   ├── remediation_veille_industrialis...  # Validation des remédiations du pipeline de veille
+│   ├── pipeline.mmd                        # Diagramme Mermaid de flux de veille et d'idéation
+│   ├── coverage-matrix.csv                 # Matrice de couverture détaillée des contrôles
+│   ├── findings.csv                        # Inventaire exhaustif des constats et remédiations
+│   └── traceability-matrix.csv             # Matrice de traçabilité des exigences produit
+│
 └── archive/                                # Rapports d'audits et jalons historiques (lecture seule)
+    ├── FINAL_REPORT_REFONTE.md             # Clôture du chantier de refonte globale (10/10)
     ├── AUDIT.md                            # Audit initial sécurité & architecture (06/10)
     ├── AUDIT_V2.md                         # Audit indépendant V2 (07/10)
     ├── AUDIT_UI.md                         # Diagnostic UI initial (08/10)

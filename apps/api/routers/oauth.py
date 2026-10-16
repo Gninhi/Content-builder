@@ -1,8 +1,9 @@
 import os
+import json
 import uuid
 import urllib.parse
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Optional, List
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Body, Request
 from fastapi.responses import HTMLResponse
@@ -16,6 +17,19 @@ from packages.connectors.social.vault import EncryptedOAuthTokenVault
 from packages.security.oauth_state import oauth_state_manager
 
 router = APIRouter(prefix="/v1/oauth", tags=["OAuth 2.0 Management"])
+
+
+def _get_allowed_target_origins() -> List[str]:
+    """Retrieves explicitly trusted origins for OAuth postMessage callbacks, avoiding wildcard '*' targetOrigin."""
+    raw = os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000,http://127.0.0.1:8000"
+    )
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
+    app_url = os.getenv("APP_URL")
+    if app_url and app_url.strip():
+        origins.append(app_url.strip())
+    return list(dict.fromkeys(origins))
 
 
 @router.get("/start/{provider}")
@@ -122,6 +136,7 @@ def oauth_callback(
 
     if error:
         if is_browser:
+            allowed_origins_json = json.dumps(_get_allowed_target_origins())
             err_html = f"""<!DOCTYPE html>
 <html lang="fr">
 <head><meta charset="utf-8"><title>Échec OAuth</title>
@@ -141,7 +156,12 @@ button {{ background: #dc2626; color: white; border: none; border-radius: 8px; p
 </div>
 <script>
 if (window.opener) {{
-    try {{ window.opener.postMessage({{ type: 'CONTENTOPS_OAUTH_ERROR', provider: '{provider_clean}', error: '{error}' }}, '*'); }} catch(e) {{}}
+    var allowedOrigins = {allowed_origins_json};
+    for (var i = 0; i < allowedOrigins.length; i++) {{
+        try {{
+            window.opener.postMessage({{ type: 'CONTENTOPS_OAUTH_ERROR', provider: '{provider_clean}', error: '{error}' }}, allowedOrigins[i]);
+        }} catch(e) {{}}
+    }}
 }}
 </script>
 </body>
@@ -321,6 +341,7 @@ if (window.opener) {{
     }
 
     if is_browser:
+        allowed_origins_json = json.dumps(_get_allowed_target_origins())
         html = f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -348,14 +369,17 @@ if (window.opener) {{
   </div>
   <script>
     if (window.opener) {{
-      try {{
-        window.opener.postMessage({{
-          type: 'CONTENTOPS_OAUTH_SUCCESS',
-          provider: '{provider_clean}',
-          account_id: '{account_id}',
-          account_name: '{account_name}'
-        }}, '*');
-      }} catch (e) {{}}
+      var allowedOrigins = {allowed_origins_json};
+      for (var i = 0; i < allowedOrigins.length; i++) {{
+        try {{
+          window.opener.postMessage({{
+            type: 'CONTENTOPS_OAUTH_SUCCESS',
+            provider: '{provider_clean}',
+            account_id: '{account_id}',
+            account_name: '{account_name}'
+          }}, allowedOrigins[i]);
+        }} catch (e) {{}}
+      }}
       setTimeout(function() {{ window.close(); }}, 1200);
     }} else {{
       setTimeout(function() {{ window.location.href = '/ui/#connections?oauth=success&provider={provider_clean}'; }}, 1500);

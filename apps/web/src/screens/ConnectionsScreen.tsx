@@ -82,6 +82,17 @@ export const ConnectionsScreen: React.FC = () => {
   // Listen for OAuth completion message from the opened external tab
   useEffect(() => {
     const handleOAuthMessage = (event: MessageEvent) => {
+      // Validate origin to prevent cross-site message injection or spoofing
+      const trustedOrigins = [
+        window.location.origin,
+        'http://localhost:8000',
+        'http://127.0.0.1:8000',
+        'http://localhost:3000',
+        'http://127.0.0.1:3000'
+      ];
+      if (!trustedOrigins.includes(event.origin)) {
+        return;
+      }
       if (event.data?.type === 'CONTENTOPS_OAUTH_SUCCESS') {
         const prov = String(event.data.provider || '').toUpperCase();
         showToast('success', `Compte ${prov} connecté et vérifié avec succès !`);

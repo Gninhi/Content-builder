@@ -486,11 +486,31 @@ class NVIDIAProviderAdapter(BaseLLMAdapter):
         if hasattr(chat_model, "_client") and hasattr(chat_model._client, "infer_path"):
             chat_model._client.infer_path = "{base_url}/chat/completions"
 
+        effective_timeout = float(timeout or os.getenv("NVIDIA_TIMEOUT_SECONDS", os.getenv("LLM_TIMEOUT_SECONDS", "15.0")))
+        if hasattr(chat_model, "_client"):
+            if hasattr(chat_model._client, "timeout"):
+                chat_model._client.timeout = effective_timeout
+
+            import requests
+
+            class _TimeoutSession(requests.Session):
+                def request(self, method, url, **req_kwargs):
+                    if "timeout" not in req_kwargs or req_kwargs["timeout"] is None:
+                        req_kwargs["timeout"] = effective_timeout
+                    return super().request(method, url, **req_kwargs)
+
+            def _session_factory():
+                sess = _TimeoutSession()
+                if hasattr(chat_model._client, "verify_ssl"):
+                    sess.verify = chat_model._client.verify_ssl
+                return sess
+
+            chat_model._client.get_session_fn = _session_factory
+
         # Wire client-side rate limiter (40 RPM default) and per-model circuit breaker
         rpm = int(os.getenv("NVIDIA_RPM_LIMIT", "40"))
         limiter = get_rate_limiter("nvidia_api", requests_per_minute=rpm)
         cb = get_circuit_breaker(provider_id="nvidia", model_id=model_id)
-        effective_timeout = float(timeout or os.getenv("NVIDIA_TIMEOUT_SECONDS", "60.0"))
 
         return ResilientChatNVIDIA(
             raw_model=chat_model,

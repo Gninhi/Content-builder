@@ -175,6 +175,23 @@ def test_hitl_approval_and_seal_verification():
     assert res_tampered["status"] == ContentStatus.QA_FAILED
     assert "mismatch" in res_tampered["feedback"].lower()
 
+    # 3. Legitimate human edit with new payload hash calculation
+    edited_payload = {
+        "title": "Article revu et corrigé",
+        "body": "Contenu amélioré par le relecteur",
+        "platform": "linkedin"
+    }
+    edit_state = {
+        "decision": "edit",
+        "payload": edited_payload,
+        "payload_hash": payload_hash  # Original unedited hash
+    }
+    res_edit = human_review_decision_node(edit_state)
+    assert res_edit["status"] == ContentStatus.APPROVED
+    assert "payload_hash" in res_edit
+    assert res_edit["payload_hash"] == compute_payload_hash(edited_payload)
+    assert res_edit["payload_hash"] != payload_hash
+
 
 def test_insights_agent_verification_no_hallucination():
     """Validates insights node: returns NO_DATA without hallucinating metrics."""

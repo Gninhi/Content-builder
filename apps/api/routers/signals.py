@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from apps.api.dependencies import get_repository, UserContext, require_roles
 from infra.db.repository import ContentOpsRepository
 from services.orchestration.veille.pipeline import VeillePipeline
+from packages.tools.browse import validate_target_url_security
 
 router = APIRouter(prefix="/v1/signals", tags=["Veille Technologique & Signals"])
 
@@ -71,7 +72,38 @@ class VeilleSourceResponse(BaseModel):
     source_type: str
     is_active: bool
     health_status: str
+    last_polled_at: Optional[str] = None
+    error_message: Optional[str] = None
     created_at: str
+
+
+class VeilleRunResponse(BaseModel):
+    id: str
+    workspace_id: str
+    status: str
+    trigger_type: str
+    axis: Optional[str] = None
+    sources_contacted: int
+    sources_failed: int
+    signals_discovered: int
+    signals_saved: int
+    signals_qualified: int
+    signals_rejected: int
+    error_summary: Optional[str] = None
+    started_at: str
+    completed_at: Optional[str] = None
+
+
+class VeilleScheduleStatusResponse(BaseModel):
+    workspace_id: str
+    timezone: str
+    scheduled_hour: int
+    scheduled_minute: int
+    is_due: bool
+    last_run: Optional[VeilleRunResponse] = None
+    next_scheduled_run: str
+    active_sources_count: int
+    failing_sources_count: int
 
 
 def _serialize_signal(sig) -> Dict[str, Any]:
@@ -104,11 +136,33 @@ def _serialize_source(src) -> Dict[str, Any]:
         "source_type": src.source_type,
         "is_active": src.is_active,
         "health_status": src.health_status,
+        "last_polled_at": src.last_polled_at.isoformat() if src.last_polled_at else None,
+        "error_message": src.error_message,
         "created_at": src.created_at.isoformat() if src.created_at else "",
     }
 
 
+def _serialize_run(run) -> Dict[str, Any]:
+    return {
+        "id": run.id,
+        "workspace_id": run.workspace_id,
+        "status": run.status,
+        "trigger_type": run.trigger_type,
+        "axis": run.axis,
+        "sources_contacted": run.sources_contacted,
+        "sources_failed": run.sources_failed,
+        "signals_discovered": run.signals_discovered,
+        "signals_saved": run.signals_saved,
+        "signals_qualified": run.signals_qualified,
+        "signals_rejected": run.signals_rejected,
+        "error_summary": run.error_summary,
+        "started_at": run.started_at.isoformat() if run.started_at else "",
+        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+    }
+
+
 # --- Endpoints ---
+
 
 @router.post("/collect", response_model=List[SignalResponse])
 def trigger_collection(
@@ -124,8 +178,54 @@ def trigger_collection(
         demo=req.demo,
         custom_query=req.custom_query,
         limit_per_axis=req.limit_per_axis,
+        trigger_type="MANUAL",
     )
     return [_serialize_signal(s) for s in signals]
+
+
+@router.get("/schedule-status", response_model=VeilleScheduleStatusResponse)
+def get_veille_schedule_status(
+    repo: ContentOpsRepository = Depends(get_repository),
+    user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer", "ServiceAgent")),
+):
+    """Returns the schedule, next run time, and health status for the workspace."""
+    from services.scheduler.veille_worker import VeilleSchedulerWorker, DEFAULT_SCHEDULE_HOUR, DEFAULT_SCHEDULE_MINUTE
+    worker = VeilleSchedulerWorker()
+    ws = repo.get_workspace(user.workspace_id)
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace not found.")
+
+    latest_run = repo.get_latest_veille_run(user.workspace_id)
+    is_due = worker.is_run_due_for_workspace(ws, repo, DEFAULT_SCHEDULE_HOUR, DEFAULT_SCHEDULE_MINUTE)
+    next_due = worker.calculate_next_due_run(ws, latest_run, DEFAULT_SCHEDULE_HOUR, DEFAULT_SCHEDULE_MINUTE)
+
+    sources = repo.list_veille_sources(user.workspace_id)
+    active_sources = [s for s in sources if s.is_active]
+    failing_sources = [s for s in active_sources if s.health_status == "ERROR"]
+
+    return {
+        "workspace_id": user.workspace_id,
+        "timezone": getattr(ws, "timezone", "Europe/Paris") or "Europe/Paris",
+        "scheduled_hour": DEFAULT_SCHEDULE_HOUR,
+        "scheduled_minute": DEFAULT_SCHEDULE_MINUTE,
+        "is_due": is_due,
+        "last_run": _serialize_run(latest_run) if latest_run else None,
+        "next_scheduled_run": next_due.isoformat(),
+        "active_sources_count": len(active_sources),
+        "failing_sources_count": len(failing_sources),
+    }
+
+
+@router.get("/runs", response_model=List[VeilleRunResponse])
+def list_veille_runs(
+    limit: int = Query(10, ge=1, le=50),
+    repo: ContentOpsRepository = Depends(get_repository),
+    user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer", "ServiceAgent")),
+):
+    """Lists recent collection run histories and telemetry for observability."""
+    runs = repo.list_veille_runs(workspace_id=user.workspace_id, limit=limit)
+    return [_serialize_run(r) for r in runs]
+
 
 
 @router.get("", response_model=List[SignalResponse])
@@ -173,6 +273,14 @@ def create_source(
     user: UserContext = Depends(require_roles("Owner")),
 ):
     """Creates a new monitoring source (strictly restricted to workspace Owner)."""
+    try:
+        validate_target_url_security(req.url)
+    except (PermissionError, ValueError) as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"URL invalide ou rejetée par le filtre de sécurité SSRF: {err}"
+        )
+
     src = repo.create_veille_source(
         workspace_id=user.workspace_id,
         name=req.name,
@@ -202,6 +310,15 @@ def update_source(
     user: UserContext = Depends(require_roles("Owner")),
 ):
     """Updates a monitoring source (strictly restricted to workspace Owner)."""
+    if req.url is not None:
+        try:
+            validate_target_url_security(req.url)
+        except (PermissionError, ValueError) as err:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"URL invalide ou rejetée par le filtre de sécurité SSRF: {err}"
+            )
+
     updated = repo.update_veille_source(
         source_id=source_id,
         workspace_id=user.workspace_id,

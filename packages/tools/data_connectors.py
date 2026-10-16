@@ -1,10 +1,12 @@
 import logging
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
+import defusedxml.common
 from typing import List
 import httpx
 
 from packages.tools.schemas import OfficialDataSignalItem, DataConnectorSource
 from packages.security.prompt_injection import sanitize_untrusted_text
+from packages.tools.browse import fetch_safe_url
 
 logger = logging.getLogger(__name__)
 
@@ -161,37 +163,45 @@ class OfficialDataConnectors:
 
     @classmethod
     def fetch_rss_feed(cls, feed_url: str, max_results: int = 5) -> List[OfficialDataSignalItem]:
-        """Parses standard RSS/Atom feeds for authoritative tech outlets and government alerts."""
+        """
+        Parses standard RSS 2.0 and Atom feeds with strict SSRF validation,
+        redirect re-checking, size limit enforcement, and safe defusedxml parsing.
+        """
         signals: List[OfficialDataSignalItem] = []
         try:
-            with httpx.Client(timeout=8.0, follow_redirects=True) as client:
-                resp = client.get(feed_url, headers={"User-Agent": "ContentOps-Harness-Bot/1.0"})
-                if resp.status_code == 200:
-                    root = ET.fromstring(resp.text)
-                    # Check RSS 2.0 (<channel><item>)
-                    channel = root.find("channel")
-                    items = channel.findall("item") if channel is not None else root.findall("item")
-                    if not items:
-                        # Try Atom (<feed><entry>)
-                        ns = {"atom": "http://www.w3.org/2005/Atom"}
-                        items = root.findall("atom:entry", ns)
+            resp = fetch_safe_url(feed_url, timeout=8.0, max_redirects=3, max_bytes=1_000_000)
+            if resp.status_code == 200:
+                root = ET.fromstring(resp.text)
+                # Check RSS 2.0 (<channel><item>)
+                channel = root.find("channel")
+                items = channel.findall("item") if channel is not None else root.findall("item")
+                if not items:
+                    # Try Atom (<feed><entry>)
+                    ns = {"atom": "http://www.w3.org/2005/Atom"}
+                    items = root.findall("atom:entry", ns)
 
-                    for it in items[:max_results]:
-                        title = it.findtext("title") or "Flux RSS Article"
-                        link = it.findtext("link") or feed_url
-                        desc = it.findtext("description") or it.findtext("summary") or ""
-                        pub_date = it.findtext("pubDate") or it.findtext("published") or it.findtext("updated") or ""
+                for it in items[:max_results]:
+                    title = it.findtext("title") or "Flux RSS Article"
+                    link = it.findtext("link") or feed_url
+                    desc = it.findtext("description") or it.findtext("summary") or ""
+                    pub_date = it.findtext("pubDate") or it.findtext("published") or it.findtext("updated") or ""
 
-                        signals.append(OfficialDataSignalItem(
-                            source_type=DataConnectorSource.RSS,
-                            identifier=link,
-                            title=title.strip(),
-                            url=link.strip(),
-                            summary=sanitize_untrusted_text(desc[:400].strip()),
-                            published_date=pub_date.strip(),
-                            metadata={"feed_url": feed_url}
-                        ))
+                    signals.append(OfficialDataSignalItem(
+                        source_type=DataConnectorSource.RSS,
+                        identifier=link,
+                        title=title.strip(),
+                        url=link.strip(),
+                        summary=sanitize_untrusted_text(desc[:400].strip()),
+                        published_date=pub_date.strip(),
+                        metadata={"feed_url": feed_url}
+                    ))
+        except defusedxml.common.DefusedXmlException as xml_err:
+            logger.warning(f"XML security guard (XXE/DTD) blocked malicious feed for {feed_url}: {xml_err}")
+            return []
+        except (PermissionError, ValueError) as ssrf_err:
+            logger.warning(f"SSRF or size guard blocked RSS fetch for {feed_url}: {ssrf_err}")
+            raise
         except Exception as e:
-            logger.warning(f"RSS feed fetch failed for {feed_url}: {e}")
+            logger.warning(f"RSS feed fetch/parse failed for {feed_url}: {e}")
 
         return signals

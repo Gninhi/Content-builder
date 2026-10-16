@@ -35,12 +35,22 @@ DEFAULT_USER_AGENT = (
 MAX_CONTENT_BYTES = 1_000_000  # 1 MB maximum content limit
 
 
+CLOUD_METADATA_HOSTS: Set[str] = {
+    "169.254.169.254",
+    "metadata.google.internal",
+    "instance-data",
+    "metadata.internal",
+}
+
+
 def validate_target_url_security(url: str) -> None:
     """
     Strict SSRF and domain guard:
     1. Rejects non-HTTP(S) protocols.
-    2. Blocks private IPs, loopback, link-local, cloud metadata endpoints.
-    3. Blocks scraping targets with strictly enforced official APIs (LinkedIn, X).
+    2. Rejects user credentials embedded in URLs.
+    3. Blocks private IPs, loopback, link-local, cloud metadata endpoints.
+    4. Blocks scraping targets with strictly enforced official APIs (LinkedIn, X).
+    5. Resolves hostname to underlying IP and verifies none are in prohibited ranges.
     """
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
@@ -48,9 +58,17 @@ def validate_target_url_security(url: str) -> None:
             f"Protocole non autorisé : '{parsed.scheme}'. Seuls http et https sont acceptés."
         )
 
+    if parsed.username or parsed.password:
+        raise PermissionError("Sécurité SSRF : Identifiants d'authentification intégrés dans l'URL interdits.")
+
     hostname = (parsed.hostname or "").lower()
     if not hostname:
         raise ValueError("URL sans nom d'hôte valide.")
+
+    if hostname in CLOUD_METADATA_HOSTS or any(hostname.endswith(f".{m}") for m in CLOUD_METADATA_HOSTS):
+        raise PermissionError(
+            f"Sécurité SSRF : L'hôte cible '{hostname}' correspond à un endpoint de métadonnées cloud interdit."
+        )
 
     # 1. Block LinkedIn and X
     for forbidden in FORBIDDEN_DOMAINS:
@@ -67,6 +85,8 @@ def validate_target_url_security(url: str) -> None:
             or ip.is_loopback
             or ip.is_link_local
             or ip.is_unspecified
+            or ip.is_multicast
+            or ip.is_reserved
         ):
             raise PermissionError(
                 f"Sécurité SSRF : L'IP cible ({hostname}) est une adresse privée ou locale interdite."
@@ -82,12 +102,49 @@ def validate_target_url_security(url: str) -> None:
                     ip_obj.is_private
                     or ip_obj.is_loopback
                     or ip_obj.is_link_local
+                    or ip_obj.is_unspecified
+                    or ip_obj.is_multicast
+                    or ip_obj.is_reserved
                 ):
                     raise PermissionError(
-                        f"Sécurité SSRF : Le domaine '{hostname}' résout vers une IP privée ({target_ip})."
+                        f"Sécurité SSRF : Le domaine '{hostname}' résout vers une IP privée ou locale interdite ({target_ip})."
                     )
         except socket.gaierror:
             pass  # DNS resolution will fail naturally later
+
+
+def fetch_safe_url(
+    url: str,
+    timeout: float = 8.0,
+    max_redirects: int = 3,
+    max_bytes: int = MAX_CONTENT_BYTES,
+    headers: dict = None
+) -> httpx.Response:
+    """
+    Safely executes an HTTP GET request with SSRF validation re-checked at every redirect hop,
+    strict size limits, and robust timeout handling.
+    """
+    current_url = url
+    req_headers = {"User-Agent": DEFAULT_USER_AGENT}
+    if headers:
+        req_headers.update(headers)
+
+    for _ in range(max_redirects + 1):
+        validate_target_url_security(current_url)
+        with httpx.Client(timeout=timeout, follow_redirects=False) as client:
+            resp = client.get(current_url, headers=req_headers)
+            if resp.is_redirect:
+                loc = resp.headers.get("location")
+                if not loc:
+                    raise ValueError(f"Redirection HTTP sans header Location sur {current_url}")
+                current_url = urljoin(current_url, loc)
+                continue
+            if len(resp.content) > max_bytes:
+                raise ValueError(
+                    f"Taille de contenu trop volumineuse ({len(resp.content)} bytes > limite {max_bytes} bytes)"
+                )
+            return resp
+    raise ValueError(f"Trop de redirections HTTP (limite: {max_redirects}) pour l'URL {url}")
 
 
 def check_robots_txt_allowed(url: str, user_agent: str = "*") -> bool:

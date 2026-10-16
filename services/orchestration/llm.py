@@ -50,10 +50,6 @@ class GeneratedVariant(BaseModel):
     claims: List[GeneratedClaim] = Field(default_factory=list)
 
 
-class GeneratedVariantsBatch(BaseModel):
-    variants: List[GeneratedVariant]
-
-
 class GeneratedStrategyHypothesis(BaseModel):
     pillar: str
     fact: str
@@ -80,12 +76,6 @@ class GeneratedStrategyBatch(BaseModel):
 def is_gemini_available() -> bool:
     """Checks if a valid Google Gemini API key is configured."""
     key = os.getenv("GOOGLE_API_KEY", "")
-    return bool(key and not key.startswith("your_") and len(key) > 10)
-
-
-def is_nvidia_available() -> bool:
-    """Checks if a valid NVIDIA API key is configured."""
-    key = os.getenv("NVIDIA_API_KEY", "")
     return bool(key and not key.startswith("your_") and len(key) > 10)
 
 

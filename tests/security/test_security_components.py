@@ -66,6 +66,9 @@ def test_oauth_state_manager_with_redis():
     mock_redis = unittest.mock.MagicMock()
     stored_cache = {}
 
+    def set_val(key, val, ex=None):
+        stored_cache[key] = val
+
     def setex(key, ttl, val):
         stored_cache[key] = val
 
@@ -75,6 +78,7 @@ def test_oauth_state_manager_with_redis():
     def delete(key):
         stored_cache.pop(key, None)
 
+    mock_redis.set.side_effect = set_val
     mock_redis.setex.side_effect = setex
     mock_redis.get.side_effect = get
     mock_redis.delete.side_effect = delete

@@ -61,6 +61,7 @@ Thumbs.db
 *~
 .opencode-logs/
 .antigravitycli/
+.langgraph_api/
 
 # Databases, Storage & Local State
 *.db
@@ -78,7 +79,6 @@ dumps/
 backups/
 *.zip
 gitleaks.json
-.opencode-logs/
 
 # Node & Frontend
 node_modules/

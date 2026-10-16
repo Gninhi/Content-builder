@@ -109,14 +109,34 @@ def repair_json_brackets(text: str) -> str:
     return repaired
 
 
-def extract_json_from_text(text: str) -> str:
+def extract_json_from_text(text: Any) -> str:
     """
     Extracts valid JSON string from raw LLM output.
     Strips reasoning tokens (<think>...</think>), markdown code fences,
     and isolates the outermost JSON object or array.
+    Safely handles string, list of content blocks, or object representations.
     """
-    if not text:
+    if text is None:
         return ""
+
+    if isinstance(text, list):
+        parts = []
+        for part in text:
+            if isinstance(part, str):
+                parts.append(part)
+            elif isinstance(part, dict) and "text" in part:
+                parts.append(str(part["text"]))
+            elif hasattr(part, "text"):
+                parts.append(str(part.text))
+            else:
+                parts.append(str(part))
+        text = "".join(parts)
+    elif not isinstance(text, str):
+        text = str(text)
+
+    if not text.strip():
+        return ""
+
     # Strip chain-of-thought tokens from reasoning models (e.g. GLM-5.3)
     t = re.sub(r"<think>.*?(?:</think>|$)", "", text, flags=re.DOTALL).strip()
     fence = chr(96) * 3

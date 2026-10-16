@@ -28,6 +28,7 @@ from infra.db.models import (
     UserRefreshTokenModel,
     WorkspaceInvitationModel,
     AuditLogModel,
+    VeilleRunModel,
     utc_now,
 )
 from packages.domain.state_machine import ContentStatus, ContentStateMachine
@@ -330,6 +331,84 @@ class ContentOpsRepository:
             )
             created.append(src)
         return created
+
+    # ----------------- Veille Runs (Observability & SRE) -----------------
+    def create_veille_run(
+        self,
+        workspace_id: str,
+        trigger_type: str = "SCHEDULED",
+        axis: Optional[str] = None,
+    ) -> VeilleRunModel:
+        self.ensure_workspace(workspace_id)
+        run = VeilleRunModel(
+            id=f"vrun_{uuid.uuid4().hex[:12]}",
+            workspace_id=workspace_id,
+            status="RUNNING",
+            trigger_type=trigger_type,
+            axis=axis,
+            sources_contacted=0,
+            sources_failed=0,
+            signals_discovered=0,
+            signals_saved=0,
+            signals_qualified=0,
+            signals_rejected=0,
+            error_summary=None,
+            execution_metrics={},
+            started_at=utc_now(),
+        )
+        self.db.add(run)
+        self.db.commit()
+        self.db.refresh(run)
+        return run
+
+    def complete_veille_run(
+        self,
+        run_id: str,
+        status: str = "COMPLETED",
+        sources_contacted: int = 0,
+        sources_failed: int = 0,
+        signals_discovered: int = 0,
+        signals_saved: int = 0,
+        signals_qualified: int = 0,
+        signals_rejected: int = 0,
+        error_summary: Optional[str] = None,
+        execution_metrics: Optional[Dict[str, Any]] = None,
+    ) -> Optional[VeilleRunModel]:
+        run = self.db.query(VeilleRunModel).filter(VeilleRunModel.id == run_id).first()
+        if not run:
+            return None
+        run.status = status
+        run.sources_contacted = sources_contacted
+        run.sources_failed = sources_failed
+        run.signals_discovered = signals_discovered
+        run.signals_saved = signals_saved
+        run.signals_qualified = signals_qualified
+        run.signals_rejected = signals_rejected
+        if error_summary:
+            run.error_summary = error_summary
+        if execution_metrics:
+            run.execution_metrics = execution_metrics
+        run.completed_at = utc_now()
+        self.db.commit()
+        self.db.refresh(run)
+        return run
+
+    def get_latest_veille_run(self, workspace_id: str) -> Optional[VeilleRunModel]:
+        return (
+            self.db.query(VeilleRunModel)
+            .filter(VeilleRunModel.workspace_id == workspace_id)
+            .order_by(VeilleRunModel.started_at.desc())
+            .first()
+        )
+
+    def list_veille_runs(self, workspace_id: str, limit: int = 10) -> List[VeilleRunModel]:
+        return (
+            self.db.query(VeilleRunModel)
+            .filter(VeilleRunModel.workspace_id == workspace_id)
+            .order_by(VeilleRunModel.started_at.desc())
+            .limit(limit)
+            .all()
+        )
 
     # ----------------- Signals (Veille Grounding) -----------------
     def save_signal(

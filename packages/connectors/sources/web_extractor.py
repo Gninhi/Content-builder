@@ -2,35 +2,22 @@ import re
 import hashlib
 from typing import Dict, Any, List
 from datetime import datetime, timezone
+from packages.security.prompt_injection import PromptInjectionGuard
 
 
 class WebExtractorConnector:
     """
     Extracts, normalizes, and sanitizes untrusted external sources (URLs, notes, text)
-    strictly mitigating prompt injection risks as defined in PRD Section 7.
+    strictly mitigating prompt injection risks via centralized PromptInjectionGuard.
     """
-
-    SUSPICIOUS_PATTERNS = [
-        re.compile(r"ignore\s+(all\s+)?(previous|prior)\s+instructions", re.IGNORECASE),
-        re.compile(r"system\s*:\s*you\s+are", re.IGNORECASE),
-        re.compile(r"you\s+must\s+now\s+act\s+as", re.IGNORECASE),
-        re.compile(r"</?untrusted(?:_external_data|_content)?>", re.IGNORECASE),
-        re.compile(r"<script.*?>.*?</script>", re.IGNORECASE),
-        re.compile(r"\{\{.*?\}\}", re.IGNORECASE),  # template injections
-        re.compile(r"(?:call\s+tool|execute\s+command|eval\s*\()", re.IGNORECASE),
-    ]
 
     @classmethod
     def sanitize_untrusted_input(cls, text: str) -> str:
         """
-        Neutralizes potential prompt injection markers, control tags, and commands in untrusted content.
+        Delegates to centralized security sanitizer to neutralize potential prompt injection markers,
+        zero-width hidden instructions, and boundary breakout attempts.
         """
-        sanitized = text
-        for pattern in cls.SUSPICIOUS_PATTERNS:
-            sanitized = pattern.sub("[FILTERED_UNTRUSTED_INSTRUCTION]", sanitized)
-        # Neutralize any residual XML tag delimiters that could break encapsulation
-        sanitized = sanitized.replace("<", "&lt;").replace(">", "&gt;")
-        return sanitized
+        return PromptInjectionGuard.sanitize_untrusted_input(text)
 
     @classmethod
     def wrap_untrusted_content(cls, content: str, source_id: str = "unknown") -> str:

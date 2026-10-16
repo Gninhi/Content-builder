@@ -25,6 +25,7 @@ from packages.security.passwords import (
     verify_password,
     validate_password_strength,
 )
+from packages.security.limiter import get_client_ip
 
 router = APIRouter(prefix="/v1", tags=["User Profile"])
 
@@ -34,10 +35,8 @@ MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024  # 2 MB
 
 
 def _get_client_ip(request: Request) -> Optional[str]:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else None
+    """Safely extracts client IP via centralized security limiter verifying trusted proxies."""
+    return get_client_ip(request)
 
 
 def _to_profile_response(user_model: UserModel, workspaces: List[UserWorkspaceInfo]) -> UserProfileResponse:

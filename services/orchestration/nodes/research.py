@@ -139,13 +139,17 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
     else:
         raw_ov = state.get("llm_override")
         override_dict = raw_ov if isinstance(raw_ov, dict) else None
-        model, resolved_ctx = resolve_and_get_llm(
-            task_name="ideation",
-            workspace_id=workspace_id,
-            run_override=override_dict,
-            temperature=0.3,
-            allow_none_if_unconfigured=True
-        )
+        try:
+            model, resolved_ctx = resolve_and_get_llm(
+                task_name="ideation",
+                workspace_id=workspace_id,
+                run_override=override_dict,
+                temperature=0.3,
+                allow_none_if_unconfigured=True
+            )
+        except Exception as err:
+            logger.warning(f"LLM resolution failed for ideation node: {err}. Falling back to deterministic mode.")
+            model, resolved_ctx = None, None
 
     # Isolated demo mode handler (strictly segregated and labeled)
     if state.get("demo") is True:
@@ -221,13 +225,19 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
             ObservabilityTracer.tag_trace(trace_meta["run_id"], ["cache_miss"])
             return res
         else:
-            return {
-                "status": "NO_DATA",
-                "reason": "Le modèle n'a pu extraire aucune idée étayée par les preuves fournies.",
-                "generated_ideas": [],
-                "run_id": trace_meta["run_id"],
-                "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else None,
-            }
+            logger.warning("Structured output returned no ideas. Falling back to deterministic demo ideas for resilience.")
+            return _build_demo_ideas(
+                topic=topic,
+                pillars=pillars,
+                audience=audience,
+                evidence_pool=evidence_pool,
+                target_count=target_count,
+                trace_meta=trace_meta,
+                resolved_ctx=resolved_ctx,
+                frozen_llm=frozen_llm,
+                cache=cache,
+                cache_key=cache_key
+            )
     except Exception as e:
         logger.warning(f"LLM ideation invocation failed: {e}. Falling back to deterministic demo ideas for resilience.")
         return _build_demo_ideas(

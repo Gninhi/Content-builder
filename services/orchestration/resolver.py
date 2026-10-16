@@ -15,6 +15,25 @@ class LLMResolutionError(Exception):
     pass
 
 
+class LLMProviderDisabledError(LLMResolutionError):
+    """Raised when a requested LLM provider is explicitly disabled."""
+    def __init__(self, provider_id: str):
+        super().__init__(f"Le provider LLM '{provider_id}' est désactivé.")
+        self.provider_id = provider_id
+
+
+class LLMProviderNotConfiguredError(LLMResolutionError):
+    """Raised when a requested LLM provider lacks valid API credentials."""
+    def __init__(self, provider_id: str):
+        super().__init__(f"Le provider LLM '{provider_id}' n'a pas de clé API configurée.")
+        self.provider_id = provider_id
+
+
+class LLMModelCapabilityError(LLMResolutionError):
+    """Raised when a requested model lacks a required capability."""
+    pass
+
+
 @dataclass
 class ResolvedLLMContext:
     model: Any
@@ -193,12 +212,15 @@ class LLMResolver:
             raise LLMResolutionError(f"Le provider LLM '{chosen_provider}' n'est pas reconnu par le registre.")
 
         if not adapter.is_enabled():
-            raise LLMResolutionError(f"Le provider LLM '{chosen_provider}' est désactivé.")
+            if allow_none_if_unconfigured:
+                logger.info(f"LLM Provider '{chosen_provider}' est désactivé. Mode dégradé déterministe actif.")
+                return None
+            raise LLMProviderDisabledError(chosen_provider)
 
         if required_capability:
             model_info = adapter.get_model(chosen_model)
             if model_info and model_info.capabilities.get(required_capability) is False:
-                raise LLMResolutionError(
+                raise LLMModelCapabilityError(
                     f"Le modèle '{chosen_provider}:{chosen_model}' ne supporte pas la capacité obligatoire '{required_capability}'."
                 )
 
@@ -206,7 +228,7 @@ class LLMResolver:
             if allow_none_if_unconfigured:
                 logger.info(f"LLM Provider '{chosen_provider}' non configuré (clé absente). Mode dégradé déterministe actif.")
                 return None
-            raise LLMResolutionError(f"Le provider LLM '{chosen_provider}' n'a pas de clé API configurée.")
+            raise LLMProviderNotConfiguredError(chosen_provider)
 
         timeout = float(os.getenv("LLM_TIMEOUT_SECONDS", "30.0"))
         max_retries = int(os.getenv("LLM_MAX_RETRIES", "3"))
