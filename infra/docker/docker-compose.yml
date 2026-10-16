@@ -5,26 +5,28 @@ services:
     image: postgres:16-alpine
     container_name: contentops_db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
-      POSTGRES_DB: contentops
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-contentops_secure_pg_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-contentops}
     ports:
-      - "5432:5432"
+      # Bound strictly to loopback interface to prevent exposing database to external networks
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ../migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql
-      - ../migrations/002_rls_policies.sql:/docker-entrypoint-initdb.d/002_rls_policies.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - contentops_internal
 
   redis:
     image: redis:7-alpine
     container_name: contentops_redis
     ports:
-      - "6379:6379"
+      # Bound strictly to loopback interface to prevent exposing Redis to external networks
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -32,6 +34,8 @@ services:
       retries: 5
     volumes:
       - redisdata:/data
+    networks:
+      - contentops_internal
 
   api:
     build:
@@ -46,16 +50,24 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://postgres:postgrespassword@db:5432/contentops
-      REDIS_URL: redis://redis:6379/0
-      ENV: production
-      ENVIRONMENT: production
-      SOCIAL_SANDBOX_MODE: "true"
-      LIVE_PUBLISHING_ENABLED: "false"
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:${POSTGRES_PASSWORD:-contentops_secure_pg_pass}@db:5432/${POSTGRES_DB:-contentops}}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      APP_ENV: ${APP_ENV:-production}
+      SOCIAL_SANDBOX_MODE: ${SOCIAL_SANDBOX_MODE:-true}
+      LIVE_PUBLISHING_ENABLED: ${LIVE_PUBLISHING_ENABLED:-false}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
+      SECRET_VAULT_KEY: ${SECRET_VAULT_KEY:-}
     volumes:
       - ../../storage:/app/storage
+    command: >
+      sh -c "alembic upgrade head && uvicorn apps.api.main:app --host 0.0.0.0 --port 8000"
+    networks:
+      - contentops_internal
+
+networks:
+  contentops_internal:
+    driver: bridge
 
 volumes:
   pgdata:
   redisdata:
-
