@@ -7,3 +7,4 @@ os.environ.setdefault("JWT_SECRET_KEY", "f9b2d8e4c1a705e38d9b1c2a4f6e80237d5c9e1
 os.environ.setdefault("SOCIAL_SANDBOX_MODE", "true")
 os.environ.setdefault("LIVE_PUBLISHING_ENABLED", "false")
 os.environ.setdefault("REQUIRE_EMAIL_VERIFICATION", "false")
+os.environ.setdefault("ENABLE_BACKGROUND_DAEMONS", "false")

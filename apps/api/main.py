@@ -1,6 +1,9 @@
 import os
 import time
+import asyncio
+import random
 import logging
+from typing import Callable, Coroutine, Any, Optional
 from pathlib import Path
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv, find_dotenv
@@ -48,6 +51,42 @@ logger = logging.getLogger("apps.api.main")
 # Max request body size: default 1 MB per PRD Section 6 (overrideable via MAX_REQUEST_BODY_SIZE_BYTES)
 MAX_REQUEST_BODY_SIZE = int(os.getenv("MAX_REQUEST_BODY_SIZE_BYTES", str(1 * 1024 * 1024)))
 
+
+async def supervise_daemon(
+    name: str,
+    runner_coro: Callable[[asyncio.Event], Coroutine[Any, Any, None]],
+    stop_event: asyncio.Event,
+    initial_delay: float = 1.0,
+    max_delay: float = 60.0,
+    backoff_factor: float = 2.0,
+) -> None:
+    """
+    Supervises a background daemon coroutine with exponential backoff and jitter on unexpected errors.
+    Runs continuously until stop_event is set.
+    """
+    delay = initial_delay
+    while not stop_event.is_set():
+        try:
+            logger.info(f"Supervisor starting daemon '{name}'")
+            await runner_coro(stop_event)
+            break
+        except asyncio.CancelledError:
+            logger.info(f"Daemon '{name}' cancelled.")
+            break
+        except Exception as exc:
+            if stop_event.is_set():
+                break
+            jitter = random.uniform(0, 0.25 * delay)
+            sleep_time = min(max_delay, delay) + jitter
+            logger.error(
+                f"Daemon '{name}' crashed with error: {exc}. Retrying in {sleep_time:.2f}s (backoff_factor={backoff_factor}).",
+                exc_info=True,
+            )
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=sleep_time)
+            except asyncio.TimeoutError:
+                pass
+            delay = min(max_delay, delay * backoff_factor)
 
 
 @asynccontextmanager
@@ -138,7 +177,58 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
 
+    # Attach background daemon lifecycle management
+    enable_daemons = os.getenv("ENABLE_BACKGROUND_DAEMONS", "true").lower() in ("true", "1", "yes")
+    app.state.background_tasks = []
+    app.state.background_stop_event = asyncio.Event()
+
+    if enable_daemons:
+        stop_event = app.state.background_stop_event
+        from services.scheduler.dispatcher import SchedulerDispatcher
+        from services.scheduler.veille_worker import VeilleSchedulerWorker
+
+        dispatcher_interval = int(os.getenv("PUBLICATION_DISPATCHER_INTERVAL_SECONDS", "15"))
+        veille_interval = int(os.getenv("VEILLE_SCHEDULER_INTERVAL_SECONDS", "60"))
+
+        async def run_dispatcher(evt: asyncio.Event):
+            dispatcher = SchedulerDispatcher()
+            await dispatcher.run_daemon_loop(poll_interval_seconds=dispatcher_interval, stop_event=evt)
+
+        async def run_veille(evt: asyncio.Event):
+            worker = VeilleSchedulerWorker()
+            await worker.run_daemon_loop(poll_interval_seconds=veille_interval, stop_event=evt)
+
+        dispatcher_task = asyncio.create_task(
+            supervise_daemon(
+                name="SchedulerDispatcher",
+                runner_coro=run_dispatcher,
+                stop_event=stop_event,
+                initial_delay=float(os.getenv("DISPATCHER_RETRY_INITIAL_DELAY", "2.0")),
+                max_delay=float(os.getenv("DISPATCHER_RETRY_MAX_DELAY", "60.0")),
+            )
+        )
+        veille_task = asyncio.create_task(
+            supervise_daemon(
+                name="VeilleSchedulerWorker",
+                runner_coro=run_veille,
+                stop_event=stop_event,
+                initial_delay=float(os.getenv("VEILLE_RETRY_INITIAL_DELAY", "5.0")),
+                max_delay=float(os.getenv("VEILLE_RETRY_MAX_DELAY", "120.0")),
+            )
+        )
+        app.state.background_tasks = [dispatcher_task, veille_task]
+        logger.info("Background daemons started under supervision: SchedulerDispatcher, VeilleSchedulerWorker")
+
     yield
+
+    # Graceful shutdown of background daemons
+    if hasattr(app.state, "background_stop_event") and app.state.background_stop_event:
+        app.state.background_stop_event.set()
+    if hasattr(app.state, "background_tasks") and app.state.background_tasks:
+        for t in app.state.background_tasks:
+            t.cancel()
+        await asyncio.gather(*app.state.background_tasks, return_exceptions=True)
+        logger.info("Background daemons successfully stopped.")
 
     # Graceful shutdown: flush pending observability traces to Langfuse
     from packages.observability.tracing import ObservabilityTracer
