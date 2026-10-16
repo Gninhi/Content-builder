@@ -18,7 +18,7 @@ client = TestClient(app)
 def clean_oauth_env():
     # Set required env vars for tests
     old_env = os.environ.copy()
-    os.environ["SECRET_VAULT_KEY"] = "super-secret-vault-master-key-32b!"
+    os.environ["SECRET_VAULT_KEY"] = "cbe7e00447543d905f45c9b5b702949529b8f356c6ed5c28e0ea21d53ce34536"
     os.environ["LINKEDIN_CLIENT_ID"] = "test_li_client_id"
     os.environ["LINKEDIN_CLIENT_SECRET"] = "test_li_client_secret"
     os.environ["LINKEDIN_REDIRECT_URI"] = "http://localhost:8000/v1/oauth/callback/linkedin"

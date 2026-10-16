@@ -173,7 +173,7 @@ def test_jwt_production_validation_fail_closed(monkeypatch):
         validate_jwt_configuration()
     assert "Production Startup Denied" in str(exc2.value)
 
-    monkeypatch.setenv("JWT_SECRET_KEY", "a-very-strong-production-secret-key-for-contentops-2026-strict")
+    monkeypatch.setenv("JWT_SECRET_KEY", "9f82c4b1d607a3e5c9b2d8e4c1a705e38d9b1c2a4f6e80237d5c9e1b3a5f7024")
     validate_jwt_configuration()  # Must not raise
 
 

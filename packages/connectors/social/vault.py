@@ -98,12 +98,14 @@ class EncryptedOAuthTokenVault(BaseOAuthTokenVault):
                 raise ValueError("FATAL: SECRET_VAULT_KEY is required and must not be empty in production.")
             raw_key = "default-dev-secret-vault-key-32b-min"
 
-        if env == "production" and raw_key:
-            if raw_key == "default-dev-secret-vault-key-32b-min" or len(raw_key) < 32:
+        if env in ("production", "prod") and raw_key:
+            from packages.security.auth import validate_secret_entropy
+            try:
+                validate_secret_entropy(raw_key, secret_name="SECRET_VAULT_KEY", min_length=32, min_entropy=3.0)
+            except ValueError as exc:
                 raise ValueError(
-                    "FATAL: Insecure or default SECRET_VAULT_KEY is prohibited in production. "
-                    "Minimum length: 32 characters."
-                )
+                    f"FATAL: Insecure or default SECRET_VAULT_KEY is prohibited in production. {exc}"
+                ) from exc
 
         if raw_key:
             derived = hashlib.sha256(raw_key.encode("utf-8")).digest()

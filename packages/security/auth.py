@@ -1,5 +1,7 @@
+import math
 import os
 import uuid
+from collections import Counter
 from typing import Dict, Any, Optional, Set, Union
 from datetime import datetime, timezone, timedelta
 from enum import Enum
@@ -8,6 +10,61 @@ from dotenv import load_dotenv, find_dotenv
 
 # Prioritize values from .env file unconditionally over inherited shell values
 load_dotenv(find_dotenv(usecwd=True), override=True)
+
+PROHIBITED_SECRET_PATTERNS = (
+    "change-me",
+    "changeme",
+    "example",
+    "password",
+    "secret",
+    "admin",
+    "12345",
+    "qwerty",
+    "test",
+    "default",
+)
+
+
+def calculate_shannon_entropy(data: str) -> float:
+    """Calculates the Shannon entropy in bits per character."""
+    if not data:
+        return 0.0
+    counts = Counter(data)
+    length = len(data)
+    return -sum((count / length) * math.log2(count / length) for count in counts.values())
+
+
+def validate_secret_entropy(
+    secret: str,
+    secret_name: str = "SECRET_KEY",
+    min_length: int = 32,
+    min_entropy: float = 3.0,
+) -> None:
+    """
+    Validates that a cryptographic secret meets security standards:
+    1. Minimum length (default 32 chars).
+    2. Contains no prohibited substrings (change-me, example, secret, test, password, etc.).
+    3. Shannon entropy is >= min_entropy bits/char.
+    """
+    if not secret:
+        raise ValueError(f"{secret_name} must not be empty.")
+    if len(secret) < min_length:
+        raise ValueError(
+            f"{secret_name} length ({len(secret)}) is below minimum required length of {min_length} characters."
+        )
+
+    lower_secret = secret.lower()
+    for pattern in PROHIBITED_SECRET_PATTERNS:
+        if pattern in lower_secret:
+            raise ValueError(
+                f"{secret_name} contains prohibited placeholder or insecure pattern '{pattern}'."
+            )
+
+    entropy = calculate_shannon_entropy(secret)
+    if entropy < min_entropy:
+        raise ValueError(
+            f"{secret_name} entropy ({entropy:.2f} bits/char) is below minimum required threshold of {min_entropy:.2f}."
+        )
 
 
 class Role(str, Enum):
@@ -63,13 +120,16 @@ def validate_jwt_configuration() -> None:
     load_dotenv()
     if is_production():
         secret = os.getenv("JWT_SECRET_KEY", "")
-        if not secret or secret == DEFAULT_DEV_JWT_SECRET or len(secret) < 32:
+        if not secret or secret == DEFAULT_DEV_JWT_SECRET:
             raise RuntimeError(
                 "Production Startup Denied: JWT_SECRET_KEY must be configured with a dedicated strong secret "
-                "of at least 32 characters in production. Default development keys are strictly rejected. "
-                "For local development, configure ENV=dev or ENV=development in your .env file, "
-                "or define a strong JWT_SECRET_KEY (at least 32 characters)."
+                "in production. Default development keys are strictly rejected. "
+                "Configure a cryptographically random secret with >= 32 characters and high entropy."
             )
+        try:
+            validate_secret_entropy(secret, secret_name="JWT_SECRET_KEY", min_length=32, min_entropy=3.0)
+        except ValueError as exc:
+            raise RuntimeError(f"Production Startup Denied: {exc}") from exc
 
 
 def create_access_token(
