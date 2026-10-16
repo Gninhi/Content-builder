@@ -88,7 +88,7 @@ JWT_KEY_ID = os.getenv("JWT_KEY_ID", "key_v1")
 JWT_ALGORITHM = "HS256"
 JWT_ISSUER = "contentops-auth"
 JWT_AUDIENCE = "contentops-api"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
 
 
 def get_key_ring() -> Dict[str, str]:
