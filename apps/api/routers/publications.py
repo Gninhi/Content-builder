@@ -1,6 +1,6 @@
-from typing import cast
+from typing import cast, List, Optional
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from packages.contracts.schemas import (
     PublicationScheduleRequest,
     PublicationJobResponse,
@@ -10,7 +10,7 @@ from packages.domain.state_machine import ContentStatus, ContentStateMachine
 from services.publisher.worker import PublisherWorker
 from apps.api.dependencies import get_repository, UserContext, require_roles
 from infra.db.repository import ContentOpsRepository
-from infra.db.models import PublicationJobModel
+from infra.db.models import PublicationJobModel, ContentVariantModel, ContentPackageModel, ContentBriefModel
 
 router = APIRouter(tags=["Publications & Scheduling"])
 
@@ -123,3 +123,35 @@ def reconcile_publication_job(
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/v1/publications", response_model=List[PublicationJobResponse])
+def list_publications(
+    status: Optional[str] = Query(None, description="Filter by publication status"),
+    limit: int = Query(50, ge=1, le=100, description="Max jobs to return (1-100)"),
+    repo: ContentOpsRepository = Depends(get_repository),
+    user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer", "ServiceAgent"))
+):
+    query = (
+        repo.db.query(PublicationJobModel)
+        .join(ContentVariantModel)
+        .join(ContentPackageModel)
+        .join(ContentBriefModel)
+        .filter(ContentBriefModel.workspace_id == user.workspace_id)
+    )
+    if status:
+        query = query.filter(PublicationJobModel.status == status)
+    jobs = query.order_by(PublicationJobModel.scheduled_at.desc()).limit(limit).all()
+    return [
+        PublicationJobResponse(
+            id=str(j.id),
+            variant_id=str(j.variant_id),
+            platform=str(j.platform),
+            scheduled_at=cast(datetime, j.scheduled_at),
+            idempotency_key=str(j.idempotency_key),
+            status=ContentStatus(str(j.status)),
+            attempt_count=int(j.attempt_count) if j.attempt_count is not None else 0,
+            error_message=str(j.error_message) if j.error_message else None,
+        )
+        for j in jobs
+    ]

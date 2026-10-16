@@ -234,7 +234,7 @@ def list_signals(
     trust_level: Optional[str] = Query(None, description="Filter by trust level: 'A', 'B', 'C'"),
     min_score: Optional[float] = Query(None, description="Minimum qualification score (0.0 to 5.0)"),
     status_filter: Optional[str] = Query(None, alias="status", description="Filter by status"),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=100),
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer", "ServiceAgent")),
 ):

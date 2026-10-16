@@ -2,7 +2,7 @@ import os
 from typing import cast, Dict, Any, Optional
 from datetime import datetime
 from langchain_core.runnables import RunnableConfig
-from fastapi import APIRouter, Depends, HTTPException, Body, status
+from fastapi import APIRouter, Depends, HTTPException, Body, status, Query
 from packages.resilience.circuit_breaker import resolve_cycle_budget, BudgetExceededException
 from packages.contracts.schemas import (
     ApprovalRequest,
@@ -305,11 +305,12 @@ Garde le style professionnel et direct. Ne génère aucune hallucination."""
 
 @router.get("/v1/inbox")
 def get_review_inbox(
+    limit: int = Query(50, ge=1, le=100, description="Max inbox items to return (1-100)"),
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer", "ServiceAgent"))
 ):
     """Fetches all items awaiting human review in caller's workspace (IN_REVIEW status)."""
-    pending = repo.get_inbox_variants(user.workspace_id)
+    pending = repo.get_inbox_variants(user.workspace_id, limit=limit)
     return [
         {
             "id": v.id,

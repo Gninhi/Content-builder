@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional, cast
 from datetime import datetime
 from packages.contracts.schemas import SourceIngestRequest, SourceResponse
@@ -52,12 +52,13 @@ def ingest_source(
 @router.get("/v1/sources", response_model=List[SourceResponse])
 def list_sources(
     workspace_id: Optional[str] = None,
+    limit: int = Query(50, ge=1, le=100, description="Max sources to return (1-100)"),
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer", "ServiceAgent"))
 ):
     if workspace_id and workspace_id != user.workspace_id:
         raise HTTPException(status_code=403, detail="Access to other workspace sources is forbidden.")
-    sources = repo.list_sources(user.workspace_id)
+    sources = repo.list_sources(user.workspace_id, limit=limit)
     return [
         SourceResponse(
             id=str(s.id),

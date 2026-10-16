@@ -1,6 +1,6 @@
 from typing import cast, Dict, Any, Optional
 from langchain_core.runnables import RunnableConfig
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from packages.resilience.circuit_breaker import resolve_cycle_budget, BudgetExceededException
 from packages.contracts.schemas import (
     IdeaResearchRequest,
@@ -175,12 +175,13 @@ def research_ideas(
 @router.get("/v1/ideas")
 def list_ideas(
     workspace_id: Optional[str] = None,
+    limit: int = Query(50, ge=1, le=100, description="Max ideas to return (1-100)"),
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer", "ServiceAgent"))
 ):
     if workspace_id and workspace_id != user.workspace_id:
         raise HTTPException(status_code=403, detail="Access to other workspace ideas is forbidden.")
-    ideas = repo.list_ideas(user.workspace_id)
+    ideas = repo.list_ideas(user.workspace_id, limit=limit)
     return [
         {
             "id": i.id,

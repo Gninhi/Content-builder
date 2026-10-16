@@ -207,8 +207,13 @@ class ContentOpsRepository:
         self.db.refresh(source)
         return source
 
-    def list_sources(self, workspace_id: str) -> List[ContentSourceModel]:
-        return self.db.query(ContentSourceModel).filter(ContentSourceModel.workspace_id == workspace_id).all()
+    def list_sources(self, workspace_id: str, limit: int = 50) -> List[ContentSourceModel]:
+        return (
+            self.db.query(ContentSourceModel)
+            .filter(ContentSourceModel.workspace_id == workspace_id)
+            .limit(limit)
+            .all()
+        )
 
     # ----------------- Veille Sources -----------------
     def create_veille_source(
@@ -588,11 +593,11 @@ class ContentOpsRepository:
         self.db.refresh(idea)
         return idea
 
-    def list_ideas(self, workspace_id: str, status: Optional[str] = None) -> List[IdeaModel]:
+    def list_ideas(self, workspace_id: str, status: Optional[str] = None, limit: int = 50) -> List[IdeaModel]:
         q = self.db.query(IdeaModel).filter(IdeaModel.workspace_id == workspace_id)
         if status:
             q = q.filter(IdeaModel.status == status)
-        return q.order_by(IdeaModel.total_score.desc()).all()
+        return q.order_by(IdeaModel.total_score.desc()).limit(limit).all()
 
     def get_idea_by_signal_id(self, signal_id: str, workspace_id: str) -> Optional[IdeaModel]:
         """Finds an existing idea created from a specific monitoring signal for idempotency."""
@@ -1036,7 +1041,7 @@ class ContentOpsRepository:
         return run
 
     # ----------------- Workspace Isolated Queries -----------------
-    def get_inbox_variants(self, workspace_id: str) -> List[ContentVariantModel]:
+    def get_inbox_variants(self, workspace_id: str, limit: int = 50) -> List[ContentVariantModel]:
         return (
             self.db.query(ContentVariantModel)
             .join(ContentPackageModel)
@@ -1045,6 +1050,7 @@ class ContentOpsRepository:
                 ContentBriefModel.workspace_id == workspace_id,
                 ContentVariantModel.status == ContentStatus.IN_REVIEW.value
             )
+            .limit(limit)
             .all()
         )
 
