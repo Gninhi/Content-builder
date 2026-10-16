@@ -1,4 +1,5 @@
 import os
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, List, cast
 from sqlalchemy.orm import Session
@@ -26,6 +27,8 @@ from packages.connectors.social.exceptions import (
     SocialAuthenticationError,
 )
 from packages.observability.tracing import ObservabilityTracer
+
+logger = logging.getLogger("PublisherWorker")
 
 
 class PublisherWorker:
@@ -192,11 +195,13 @@ class PublisherWorker:
             or os.getenv("GLOBAL_KILL_SWITCH", "false").lower() in ("true", "1", "yes")
             or os.getenv("KILL_SWITCH_GLOBAL", "false").lower() in ("true", "1", "yes")
         )
-        workspace = None
-        ws_id = "ws_default"
-        if variant.package and variant.package.brief:
-            ws_id = str(variant.package.brief.workspace_id)
-            workspace = self.db.query(WorkspaceModel).filter(WorkspaceModel.id == ws_id).first()
+        if not (variant.package and variant.package.brief and variant.package.brief.workspace_id):
+            setattr(job, "status", ContentStatus.PUBLISH_FAILED.value)
+            setattr(job, "error_message", f"Integrity error: Variant '{variant.id}' has no associated brief/workspace hierarchy.")
+            self.db.commit()
+            raise ValueError(job.error_message)
+        ws_id = str(variant.package.brief.workspace_id)
+        workspace = self.db.query(WorkspaceModel).filter(WorkspaceModel.id == ws_id).first()
 
         if workspace and getattr(workspace, "kill_switch_enabled", False):
             kill_switch = True
@@ -265,6 +270,7 @@ class PublisherWorker:
         trace_id = str(variant.package_id if variant.package else job.idempotency_key)
 
         # 4. Delegate to platform publisher
+        pub_result = None
         try:
             publisher = self.resolve_publisher(str(variant.platform), ws_id)
             content_text = render_publishable_text(variant)
@@ -333,6 +339,35 @@ class PublisherWorker:
             raise unk_exc
 
         except Exception as exc:
+            if pub_result is not None:
+                logger.error(
+                    f"CRITICAL: Post succeeded on external network ({variant.platform} id={pub_result.platform_post_id}), "
+                    f"but database post-processing/commit failed: {exc}. Transitioning to PUBLISH_UNKNOWN."
+                )
+                try:
+                    self.db.rollback()
+                    ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISH_UNKNOWN)
+                    job.status = ContentStatus.PUBLISH_UNKNOWN.value
+                    job.error_message = (
+                        f"PUBLISH_UNKNOWN: Post succeeded externally (id={pub_result.platform_post_id}), "
+                        f"but local DB transaction failed: {str(exc)}"
+                    )
+                    if variant:
+                        variant.status = ContentStatus.PUBLISH_UNKNOWN.value
+                    self.db.commit()
+                except Exception as rollback_err:
+                    logger.critical(f"FATAL: Database error during emergency rollback to PUBLISH_UNKNOWN: {rollback_err}")
+
+                ObservabilityTracer.record_score(
+                    name="publication_unknown",
+                    value=0.5,
+                    trace_id=trace_id,
+                    comment=f"PUBLISH_UNKNOWN: Network succeeded (id={pub_result.platform_post_id}) but DB failed: {str(exc)}"
+                )
+                raise SocialPublishUnknownError(
+                    f"Post succeeded on {variant.platform} (id={pub_result.platform_post_id}) but local database transaction failed: {str(exc)}"
+                )
+
             ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISH_FAILED)
             setattr(job, "status", ContentStatus.PUBLISH_FAILED.value)
             setattr(job, "error_message", str(exc))
@@ -369,8 +404,10 @@ class PublisherWorker:
         resolution = manual_resolution.upper().strip()
 
         if resolution == "CONFIRMED_PUBLISHED":
-            post_id = external_post_id or f"reconciled_{job.id}"
-            link = permalink or f"https://reconciled.platform.com/posts/{post_id}"
+            if not external_post_id:
+                raise ValueError("Reconciliation as CONFIRMED_PUBLISHED requires providing a valid external_post_id.")
+            post_id = external_post_id
+            link = permalink or f"https://{variant.platform}.com/posts/{post_id}"
 
             post = self.repo.record_published_post(
                 job_id=str(job.id),
