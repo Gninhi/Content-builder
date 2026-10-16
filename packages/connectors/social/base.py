@@ -105,6 +105,11 @@ class SocialPublisher(ABC):
         """Retrieves the current status of a post on the platform."""
         pass
 
+    @abstractmethod
+    def verify_connection(self) -> Dict[str, Any]:
+        """Verifies active connection / credentials in read-only mode without publishing."""
+        pass
+
 
 class BaseSocialPublisher(SocialPublisher):
     """
@@ -119,6 +124,18 @@ class BaseSocialPublisher(SocialPublisher):
     @property
     def is_sandbox(self) -> bool:
         return self._sandbox_mode
+
+    def verify_connection(self) -> Dict[str, Any]:
+        """Default read-only connection verification for sandbox mode or base implementation."""
+        if self.is_sandbox:
+            return {
+                "status": "OPERATIONAL",
+                "provider": self.provider.value,
+                "mode": "sandbox",
+                "account_id": "sandbox_mock_account",
+                "verified_at": datetime.now(timezone.utc).isoformat(),
+            }
+        raise NotImplementedError(f"verify_connection() not implemented for provider '{self.provider.value}'.")
 
     @staticmethod
     def resolve_sandbox_mode(explicit_mode: Optional[bool] = None) -> bool:

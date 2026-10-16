@@ -129,6 +129,29 @@ class LinkedInSocialPublisher(BaseSocialPublisher):
         except httpx.RequestError as exc:
             raise SocialNetworkError(f"Network error contacting LinkedIn userinfo: {exc}", provider=self.provider.value)
 
+    def verify_connection(self) -> Dict[str, Any]:
+        """
+        Verifies that the LinkedIn connection and access token are active and valid,
+        fetching member identity without performing any public posting (read-only).
+        """
+        if self.sandbox_mode:
+            return {
+                "status": "OPERATIONAL",
+                "provider": self.provider.value,
+                "mode": "sandbox",
+                "account_id": "urn:li:person:sandbox_sub_12345",
+                "verified_at": datetime.now(timezone.utc).isoformat(),
+            }
+        self.check_token_liveness()
+        author_urn = self.resolve_author_urn()
+        return {
+            "status": "OPERATIONAL",
+            "provider": self.provider.value,
+            "mode": "live",
+            "account_id": author_urn,
+            "verified_at": datetime.now(timezone.utc).isoformat(),
+        }
+
     def validate_content(self, content: str) -> None:
         """Validates body constraints for LinkedIn personal posts (10 to 3,000 characters)."""
         body = content.strip()

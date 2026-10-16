@@ -527,19 +527,14 @@ def test_social_connection(
     worker = PublisherWorker(db)
     try:
         publisher = worker.resolve_publisher(provider_clean, user.workspace_id)
-        timestamp_str = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
-        test_content = f"Vérification ContentOps : le connecteur {provider_clean.upper()} est 100% opérationnel à {timestamp_str}."
-        res = publisher.publish(
-            content=test_content
-        )
+        verification = publisher.verify_connection()
         return {
             "status": "OPERATIONAL",
             "provider": provider_clean,
-            "external_post_id": res.platform_post_id,
-            "url": res.permalink_url,
-            "verified_at": res.published_at.isoformat() if res.published_at else datetime.now(timezone.utc).isoformat(),
-            "receipt": res.metadata,
-            "message": f"Connecteur {provider_clean.upper()} vérifié et 100% opérationnel !"
+            "account_id": verification.get("account_id"),
+            "mode": verification.get("mode", "sandbox"),
+            "verified_at": verification.get("verified_at", datetime.now(timezone.utc).isoformat()),
+            "message": f"Connecteur {provider_clean.upper()} vérifié et 100% opérationnel (lecture seule)."
         }
     except Exception as e:
         raise HTTPException(
