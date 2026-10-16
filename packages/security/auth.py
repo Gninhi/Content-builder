@@ -52,14 +52,16 @@ def get_key_ring() -> Dict[str, str]:
 _KEY_RING: Dict[str, str] = get_key_ring()
 
 
+from packages.security.env import is_production, get_app_env
+
+
 def validate_jwt_configuration() -> None:
     """
     Enforces fail-closed validation of JWT keys in production.
     Raises RuntimeError if insecure defaults or weak keys are used.
     """
     load_dotenv()
-    env = (os.getenv("ENV") or "production").strip().lower()
-    if env in ("production", "prod"):
+    if is_production():
         secret = os.getenv("JWT_SECRET_KEY", "")
         if not secret or secret == DEFAULT_DEV_JWT_SECRET or len(secret) < 32:
             raise RuntimeError(

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from packages.security.auth import create_access_token, decode_access_token, Role
+from packages.security.env import is_production
 from packages.security.passwords import hash_password, verify_password, validate_password_strength
 from packages.security.tokens import generate_crypto_token, hash_crypto_token, generate_refresh_token
 from packages.security.email_service import get_email_service
@@ -21,8 +22,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15")
 
 
 def _is_cookie_secure(request: Request) -> bool:
-    env = (os.getenv("ENV") or "dev").strip().lower()
-    if env in ("production", "prod"):
+    if is_production():
         return True
     if os.getenv("COOKIE_SECURE", "false").lower() in ("true", "1", "yes"):
         return True
@@ -104,11 +104,6 @@ class SwitchWorkspaceRequest(BaseModel):
     workspace_id: str = Field(..., description="Identifiant du workspace cible")
 
 
-class DevTokenRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    user_id: str = Field("dev_user", description="ID de l'utilisateur")
-    role: str = Field(Role.EDITOR.value, description="Rôle RBAC (Owner, Editor, Viewer, ServiceAgent)")
-    workspace_id: str = Field("ws_default", description="ID du workspace tenant")
 
 
 class UserSummary(BaseModel):
@@ -838,46 +833,3 @@ def start_demo_session(
     )
 
 
-@router.post("/dev-token")
-def issue_dev_token(req: DevTokenRequest):
-    """
-    Issues signed JWT access tokens strictly in local development environment (ENV=dev).
-    Blocked in production.
-    """
-    env = (os.getenv("ENV") or "production").strip().lower()
-    if env not in ("dev", "development", "local", "test"):
-        raise HTTPException(
-            status_code=403,
-            detail="Dev token generation is strictly disabled in non-dev environments.",
-        )
-    session_jti = uuid.uuid4().hex
-    token = create_access_token(
-        user_id=req.user_id,
-        role=req.role,
-        workspace_id=req.workspace_id,
-        jti=session_jti,
-    )
-    try:
-        from infra.db.database import SessionLocal
-        db = SessionLocal()
-        try:
-            repo = ContentOpsRepository(db)
-            repo.get_or_create_user(req.user_id, default_role=req.role, workspace_id=req.workspace_id)
-            repo.create_session(
-                user_id=req.user_id,
-                token_jti=session_jti,
-                expires_at=utc_now() + timedelta(hours=24),
-                user_agent="DevClient/1.0",
-                ip_address="127.0.0.1",
-            )
-        finally:
-            db.close()
-    except Exception:
-        pass
-
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "role": req.role,
-        "workspace_id": req.workspace_id,
-    }

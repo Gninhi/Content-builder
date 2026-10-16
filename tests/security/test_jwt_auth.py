@@ -125,22 +125,20 @@ def test_rbac_viewer_cannot_approve_content():
 
 
 def test_dev_token_endpoint_behavior():
-    """Dev token generation must work when ENV=dev and fail in production."""
+    """Dev token backdoor endpoint is permanently removed and returns 404."""
     os.environ["ENV"] = "dev"
     res_dev = client.post(
         "/v1/auth/dev-token",
         json={"user_id": "dev_user", "role": "Editor", "workspace_id": "ws_default"}
     )
-    assert res_dev.status_code == 200
-    assert "access_token" in res_dev.json()
+    assert res_dev.status_code == 404
 
     os.environ["ENV"] = "production"
     res_prod = client.post(
         "/v1/auth/dev-token",
         json={"user_id": "dev_user", "role": "Editor", "workspace_id": "ws_default"}
     )
-    assert res_prod.status_code in [403, 404]
-    os.environ["ENV"] = "dev"
+    assert res_prod.status_code == 404
 
 
 def test_jwt_key_rotation_with_kid(monkeypatch):

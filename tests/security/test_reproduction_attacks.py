@@ -31,17 +31,18 @@ def setup_tenants():
 
 def test_reproduce_sec_v2_01_dev_token_default_env(monkeypatch):
     """
-    CRITIQUE SEC-V2-01: When ENV is not defined, /v1/auth/dev-token must FAIL with 403.
-    Current buggy behavior: os.getenv('ENV', 'dev') defaults to 'dev' and allows forging tokens!
+    SEC-V2-01: When ENV is not defined or regardless of environment,
+    /v1/auth/dev-token route has been permanently deleted and must return 404.
     """
     monkeypatch.delenv("ENV", raising=False)
+    monkeypatch.delenv("APP_ENV", raising=False)
     response = client.post(
         "/v1/auth/dev-token",
         json={"user_id": "attacker", "role": "Owner", "workspace_id": "ws_victim"}
     )
-    # Production ready expectation: MUST be 403 Forbidden when ENV is not explicitly 'dev'
-    assert response.status_code == 403, (
-        f"VULNERABILITY REPRODUCED: Unset ENV allowed dev-token generation with status {response.status_code}"
+    # The backdoor endpoint has been permanently deleted
+    assert response.status_code == 404, (
+        f"Expected 404 Not Found for removed dev-token route, got {response.status_code}"
     )
 
 

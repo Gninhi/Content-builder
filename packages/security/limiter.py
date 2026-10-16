@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from packages.security.auth import decode_access_token
+from packages.security.env import get_app_env
 
 logger = logging.getLogger("security.limiter")
 
@@ -15,7 +16,7 @@ _storage_diagnostic: Dict[str, Any] = {
     "effective_uri": "memory://",
     "status": "uninitialized",
     "degraded": False,
-    "environment": os.getenv("ENVIRONMENT", os.getenv("APP_ENV", "development")).lower(),
+    "environment": get_app_env(),
 }
 
 
@@ -84,7 +85,7 @@ def _init_limiter() -> Limiter:
     Initializes SlowAPI Limiter with robust storage resolution and clear diagnostic logging.
     Guarantees that uncontactable Redis instances do not silently break or cause crash cascades.
     """
-    env = os.getenv("ENVIRONMENT", os.getenv("APP_ENV", "development")).lower()
+    env = get_app_env()
     candidate = os.getenv("RATE_LIMIT_STORAGE_URI") or os.getenv("REDIS_URL")
     allow_memory_fallback = os.getenv("RATE_LIMIT_ALLOW_MEMORY_FALLBACK", "true").lower() in ("true", "1", "yes")
     default_limits: list[Any] = [os.getenv("RATE_LIMIT_DEFAULT", "200/minute")]

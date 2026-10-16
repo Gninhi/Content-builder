@@ -83,7 +83,8 @@ class EncryptedOAuthTokenVault(BaseOAuthTokenVault):
         db_session: Optional[Any] = None,
         session_factory: Optional[Callable[[], Any]] = None
     ):
-        env = os.getenv("ENV", "production").lower()
+        from packages.security.env import get_app_env
+        env = get_app_env()
 
         self._key_ring: Dict[str, bytes] = {}
         if key_ring:
