@@ -457,7 +457,7 @@ class NVIDIAProviderAdapter(BaseLLMAdapter):
             return None
 
         from langchain_nvidia_ai_endpoints import ChatNVIDIA
-        base_url = self.get_base_url()
+        base_url = kwargs.pop("base_url", None) or self.get_base_url()
 
         # Resolve model aliases
         if model_id in ("glm-5.3", "glm-5.3-flash", "default"):

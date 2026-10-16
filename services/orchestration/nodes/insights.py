@@ -1,3 +1,4 @@
+import os
 from typing import Dict, Any
 import logging
 from packages.prompts.registry import PromptRegistry
@@ -67,7 +68,8 @@ def generate_strategy_insights_node(state: StrategyInsightsState) -> Dict[str, A
             allow_none_if_unconfigured=True
         )
 
-    if model is None:
+    allow_cross_fallback = os.getenv("ALLOW_CROSS_PROVIDER_FALLBACK", "false").lower() in ("true", "1", "yes")
+    if model is None and allow_cross_fallback:
         try:
             model = get_gemini_model(model_type="reasoning", temperature=0.2, workspace_id=workspace_id)
         except Exception:

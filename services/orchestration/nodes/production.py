@@ -1,3 +1,4 @@
+import os
 import time
 import uuid
 import logging
@@ -125,8 +126,9 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
             logger.warning(f"LLM resolution failed for production node: {err}. Falling back to default/deterministic mode.")
             model, resolved_ctx = None, None
 
-    # Backwards compatibility fallback if monkeypatched in unit tests
-    if model is None:
+    # Sovereign fallback guard: Never silently fallback to Gemini without explicit workspace/system consent
+    allow_cross_fallback = os.getenv("ALLOW_CROSS_PROVIDER_FALLBACK", "false").lower() in ("true", "1", "yes")
+    if model is None and allow_cross_fallback:
         try:
             model = get_gemini_model(model_type="reasoning", temperature=0.4, workspace_id=workspace_id)
         except Exception:
