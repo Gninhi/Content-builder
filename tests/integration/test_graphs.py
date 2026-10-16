@@ -41,7 +41,15 @@ def test_content_production_graph_execution():
         "brand_voice": "Direct et expert",
         "prohibited_topics": ["crypto"],
         "cta_policy": {"allowed_ctas": ["Partagez votre avis"]},
-        "sources": [{"canonical_url": "https://example.com/source", "facts": []}],
+        "sources": [
+            {
+                "canonical_url": "https://example.com/source",
+                "facts": [
+                    "80% des projets IA échouent sans gouvernance éditoriale claire",
+                    "L'IA nécessite des garde-fous pour garantir la véracité des affirmations"
+                ]
+            }
+        ],
         "requirements": {},
         "generated_variants": [],
         "qa_results": {},

@@ -43,7 +43,15 @@ def verify_claim_against_sources(claim_text: str, sources: List[Any]) -> tuple[b
     combined_source_text = ""
     for s in sources:
         if isinstance(s, dict):
-            combined_source_text += " " + str(s.get("content", "")) + " " + str(s.get("summary", "")) + " " + str(s.get("title", ""))
+            facts_text = " ".join(str(f) for f in s.get("facts", []) if f)
+            combined_source_text += (
+                " " + str(s.get("content", ""))
+                + " " + str(s.get("summary", ""))
+                + " " + str(s.get("title", ""))
+                + " " + str(s.get("excerpt", ""))
+                + " " + str(s.get("raw_content", ""))
+                + " " + facts_text
+            )
         elif isinstance(s, str):
             combined_source_text += " " + s
         elif hasattr(s, "content"):
