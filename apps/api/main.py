@@ -287,12 +287,13 @@ async def security_and_size_middleware(request: Request, call_next):
     content_length = request.headers.get("content-length")
     if content_length:
         try:
-            if int(content_length) > MAX_REQUEST_BODY_SIZE:
+            max_size = 2 * 1024 * 1024 if request.url.path.endswith("/me/avatar") else MAX_REQUEST_BODY_SIZE
+            if int(content_length) > max_size:
                 return JSONResponse(
                     status_code=413,
                     content={
                         "error": "payload_too_large",
-                        "detail": f"La taille de la requête ({int(content_length)} octets) dépasse la limite autorisée ({MAX_REQUEST_BODY_SIZE} octets)."
+                        "detail": f"La taille de la requête ({int(content_length)} octets) dépasse la limite autorisée ({max_size} octets)."
                     },
                     headers={"X-Correlation-ID": corr_id}
                 )
