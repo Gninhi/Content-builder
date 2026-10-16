@@ -313,6 +313,7 @@ class UserRefreshTokenModel(Base):
     family_id = Column(String(64), index=True, nullable=False)
     expires_at = Column(DateTime, nullable=False)
     is_revoked = Column(Boolean, default=False, nullable=False)
+    revoked_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utc_now, nullable=False)
 
     user = relationship("UserModel", back_populates="refresh_tokens")

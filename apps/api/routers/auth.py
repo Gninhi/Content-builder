@@ -505,8 +505,48 @@ def refresh_session(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # REUSE DETECTION: if revoked, breach or replay detected -> revoke family
+    # REUSE DETECTION WITH 20-SECOND GRACE WINDOW (RFC 6749 BCP)
     if rt.is_revoked:
+        revoked_at_dt = ensure_utc(cast(Optional[datetime], getattr(rt, "revoked_at", None))) or ensure_utc(cast(Optional[datetime], rt.created_at))
+        if revoked_at_dt and (utc_now() - revoked_at_dt).total_seconds() <= 20:
+            active_rt = repo.get_active_refresh_token_in_family(str(rt.family_id))
+            if active_rt:
+                user = repo.get_user(str(active_rt.user_id))
+                if user and user.is_active:
+                    workspaces = repo.get_user_workspaces(str(user.id))
+                    target_ws = workspaces[0]["workspace_id"] if workspaces else "ws_default"
+                    target_role = workspaces[0]["role"] if workspaces else Role.VIEWER.value
+                    session_jti = uuid.uuid4().hex
+                    access_token = create_access_token(
+                        user_id=str(user.id),
+                        role=target_role,
+                        workspace_id=target_ws,
+                        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+                        jti=session_jti,
+                    )
+                    ws_list = [
+                        WorkspaceMembershipSummary(
+                            workspace_id=w["workspace_id"],
+                            name=w["name"],
+                            role=w["role"],
+                            timezone=w.get("timezone", "UTC"),
+                            is_owner=w.get("is_owner", False),
+                            is_demo=False,
+                        )
+                        for w in workspaces
+                    ]
+                    return LoginResponse(
+                        access_token=access_token,
+                        token_type="bearer",
+                        user_id=str(user.id),
+                        role=target_role,
+                        workspace_id=target_ws,
+                        user=_build_user_summary(user),
+                        workspaces=ws_list,
+                        is_demo=False,
+                    )
+
+        # Replay outside grace window: breach detected -> revoke family
         repo.revoke_refresh_token_family(str(rt.family_id))
         _clear_refresh_cookie(response)
         repo.record_audit_log(
@@ -543,15 +583,15 @@ def refresh_session(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # ROTATION
-    repo.revoke_refresh_token(str(rt.id))
+    # ATOMIC ROTATION
     new_raw_refresh, new_token_hash, family_id = generate_refresh_token(family_id=str(rt.family_id))
     refresh_expires_at = utc_now() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    repo.create_refresh_token(
+    repo.rotate_refresh_token_atomic(
+        old_token_id=str(rt.id),
         user_id=str(user.id),
-        token_hash=new_token_hash,
+        new_token_hash=new_token_hash,
         family_id=family_id,
-        expires_at=refresh_expires_at,
+        new_expires_at=refresh_expires_at,
     )
     _set_refresh_cookie(response, new_raw_refresh, request)
 

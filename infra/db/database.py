@@ -70,6 +70,11 @@ def init_db():
             if "signal_id" not in columns:
                 with engine.begin() as conn:
                     conn.execute(text("ALTER TABLE ideas ADD COLUMN signal_id VARCHAR(64)"))
+        if "user_refresh_tokens" in inspector.get_table_names():
+            columns = [c["name"] for c in inspector.get_columns("user_refresh_tokens")]
+            if "revoked_at" not in columns:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE user_refresh_tokens ADD COLUMN revoked_at DATETIME"))
     except Exception:
         pass
 

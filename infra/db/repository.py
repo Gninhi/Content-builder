@@ -1552,8 +1552,39 @@ class ContentOpsRepository:
         if not rt:
             return False
         setattr(rt, "is_revoked", True)
+        setattr(rt, "revoked_at", utc_now())
         self.db.commit()
         return True
+
+    def rotate_refresh_token_atomic(
+        self,
+        old_token_id: str,
+        user_id: str,
+        new_token_hash: str,
+        family_id: str,
+        new_expires_at: datetime,
+    ) -> UserRefreshTokenModel:
+        """
+        Atomically revokes old refresh token with a timestamp and inserts new token in a single transaction.
+        """
+        old_rt = self.db.query(UserRefreshTokenModel).filter(UserRefreshTokenModel.id == old_token_id).first()
+        if old_rt:
+            setattr(old_rt, "is_revoked", True)
+            setattr(old_rt, "revoked_at", utc_now())
+
+        new_rt = UserRefreshTokenModel(
+            id=f"rt_{uuid.uuid4().hex[:12]}",
+            user_id=user_id,
+            token_hash=new_token_hash,
+            family_id=family_id,
+            expires_at=new_expires_at,
+            is_revoked=False,
+            created_at=utc_now(),
+        )
+        self.db.add(new_rt)
+        self.db.commit()
+        self.db.refresh(new_rt)
+        return new_rt
 
     def get_active_refresh_token_in_family(self, family_id: str) -> Optional[UserRefreshTokenModel]:
         """Returns the most recent non-revoked active refresh token in a family for rotation leeway."""
