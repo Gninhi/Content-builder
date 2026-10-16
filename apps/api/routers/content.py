@@ -6,7 +6,7 @@ from packages.contracts.schemas import (
     ApprovalRequest,
     ApprovalResponse,
 )
-from packages.domain.state_machine import ContentStatus
+from packages.domain.state_machine import ContentStatus, ContentStateMachine
 from services.orchestration.graphs.content_production import graph as content_production_graph
 from packages.observability.tracing import ObservabilityTracer
 from apps.api.dependencies import get_repository, UserContext, require_roles
@@ -220,13 +220,15 @@ def rewrite_content_variant(
             model = get_gemini_model(model_type="reasoning", temperature=0.3, workspace_id=user.workspace_id)
         except Exception:
             model = None
-    revised_hook: str = str(variant.hook or "")
-    revised_body: str = str(variant.body or "")
-    revised_cta: str = str(variant.cta or "")
 
-    if model is not None:
-        try:
-            prompt = f"""Tu es un expert éditorial ContentOps de haut niveau.
+    if model is None:
+        raise HTTPException(
+            status_code=503,
+            detail="LLM service unavailable for automated rewriting. Please configure a valid LLM provider or edit the variant manually."
+        )
+
+    try:
+        prompt = f"""Tu es un expert éditorial ContentOps de haut niveau.
 L'utilisateur a examiné le post {variant.platform} suivant et a formulé ce retour critique à intégrer impérativement :
 FEEDBACK DU RELECTEUR : "{feedback}"
 
@@ -237,18 +239,21 @@ Call to Action (CTA) : {variant.cta}
 
 Mission : Réécris ce post en intégrant scrupuleusement le feedback du relecteur.
 Garde le style professionnel et direct. Ne génère aucune hallucination."""
-            res = invoke_structured_output(model=model, schema_cls=GeneratedVariant, prompt=prompt)
-            if res and res.body:
-                revised_hook = str(res.hook or "")
-                revised_body = str(res.body or "")
-                revised_cta = str(res.cta or variant.cta or "")
-        except Exception:
-            revised_body = f"{variant.body}\n\n[Révision suite au retour : {feedback}]"
-    else:
-        revised_body = f"{variant.body}\n\n[Révision suite au retour : {feedback}]"
+        res = invoke_structured_output(model=model, schema_cls=GeneratedVariant, prompt=prompt)
+        if not res or not res.body:
+            raise ValueError("LLM returned empty rewrite output.")
+        revised_hook = str(res.hook or variant.hook or "")
+        revised_body = str(res.body)
+        revised_cta = str(res.cta or variant.cta or "")
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Automated rewriting failed: {str(e)}. No changes applied to prevent corrupting variant with review feedback."
+        )
 
-    # Update variant with revised content and recalculate payload hash
+    # Update variant with revised content and recalculate canonical payload hash (matching publisher)
     new_payload: Dict[str, Any] = {
+        "platform": variant.platform,
         "hook": revised_hook,
         "body": revised_body,
         "cta": revised_cta,
@@ -258,11 +263,20 @@ Garde le style professionnel et direct. Ne génère aucune hallucination."""
     }
     new_hash = compute_payload_hash(new_payload)
 
-    setattr(variant, "hook", revised_hook)
-    setattr(variant, "body", revised_body)
-    setattr(variant, "cta", revised_cta)
-    setattr(variant, "payload_hash", new_hash)
-    setattr(variant, "status", ContentStatus.IN_REVIEW.value)
+    variant.hook = revised_hook
+    variant.body = revised_body
+    variant.cta = revised_cta
+    variant.payload_hash = new_hash
+
+    # Follow canonical state transitions: REWRITE_REQUESTED -> DRAFT -> IN_REVIEW
+    current_status = ContentStatus.parse(str(variant.status))
+    if current_status == ContentStatus.REWRITE_REQUESTED:
+        ContentStateMachine.transition(current_status, ContentStatus.DRAFT)
+        ContentStateMachine.transition(ContentStatus.DRAFT, ContentStatus.IN_REVIEW)
+    elif current_status != ContentStatus.IN_REVIEW:
+        ContentStateMachine.transition(current_status, ContentStatus.IN_REVIEW)
+    variant.status = ContentStatus.IN_REVIEW.value
+
     repo.db.commit()
     repo.db.refresh(variant)
 
