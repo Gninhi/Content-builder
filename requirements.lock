@@ -1,6 +1,7 @@
 # ContentOps Production Dependency Lockfile
 # Generated deterministically without local filesystem paths
 
+aiohttp==3.14.5
 aiosqlite==0.22.1
 alembic==1.13.3
 cryptography==42.0.5
