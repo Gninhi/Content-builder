@@ -1,5 +1,8 @@
 import os
+import logging
 from typing import List, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 
 class TavilySearchConnector:
@@ -34,8 +37,8 @@ class TavilySearchConnector:
                     })
                 if results:
                     return results
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Tavily search API failed for query %r: %s", query, exc)
 
         # Robust deterministic fallback for offline/sandbox/testing
         return [

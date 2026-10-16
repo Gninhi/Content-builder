@@ -3,10 +3,13 @@ import hashlib
 import json
 import os
 import uuid
+import logging
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+logger = logging.getLogger(__name__)
 
 
 class BaseOAuthTokenVault(ABC):
@@ -241,8 +244,8 @@ class EncryptedOAuthTokenVault(BaseOAuthTokenVault):
                     if account and account.status != "REVOKED" and account.encrypted_token_blob:
                         stored_value = str(account.encrypted_token_blob)
                         self._storage[storage_key] = stored_value
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Failed to retrieve social account from database: %s", exc)
 
         if not stored_value:
             return None

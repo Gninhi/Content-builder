@@ -2,8 +2,11 @@ import os
 import uuid
 import urllib.parse
 from datetime import datetime, timezone, timedelta
+import logging
 from typing import Dict, Any, List, Optional
 import httpx
+
+logger = logging.getLogger(__name__)
 
 from packages.connectors.social.base import (
     BaseSocialConnector,
@@ -259,8 +262,8 @@ class LinkedInSocialPublisher(BaseSocialPublisher):
             if not post_urn and resp.text:
                 try:
                     post_urn = resp.json().get("id")
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Failed to parse JSON body for LinkedIn post URN: %s", exc)
             if not post_urn:
                 post_urn = f"urn:li:share:{uuid.uuid4().hex[:12]}"
 
@@ -332,7 +335,8 @@ class LinkedInSocialPublisher(BaseSocialPublisher):
                 headers=headers
             )
             return resp.status_code in (200, 204)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Error deleting LinkedIn post %s: %s", platform_post_id, exc)
             return False
 
     def get_status(self, platform_post_id: str) -> PublicationStatus:
@@ -356,7 +360,8 @@ class LinkedInSocialPublisher(BaseSocialPublisher):
             elif resp.status_code == 404:
                 return PublicationStatus.DELETED
             return PublicationStatus.FAILED
-        except Exception:
+        except Exception as exc:
+            logger.warning("Error fetching status for LinkedIn post %s: %s", platform_post_id, exc)
             return PublicationStatus.FAILED
 
 

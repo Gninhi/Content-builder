@@ -1,8 +1,11 @@
 import os
 import uuid
+import logging
 from typing import Optional, List, Any, cast
 from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
+
+logger = logging.getLogger(__name__)
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from packages.security.auth import create_access_token, decode_access_token, Role
 from packages.security.env import is_production
@@ -443,8 +446,8 @@ def login_with_password(
             user_agent=user_agent,
             ip_address=client_ip,
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Failed to record login session: %s", exc)
 
     repo.record_audit_log(
         user_id=user_id,
@@ -633,8 +636,8 @@ def refresh_session(
             user_agent=user_agent,
             ip_address=client_ip,
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Failed to record session during email verification: %s", exc)
 
     ws_list = [
         WorkspaceMembershipSummary(
@@ -693,8 +696,8 @@ def logout(
                 if sess:
                     setattr(sess, "is_revoked", True)
                     repo.db.commit()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to revoke session on logout: %s", exc)
 
     _clear_refresh_cookie(response)
     return {"message": "Déconnexion réussie."}
@@ -815,8 +818,8 @@ def start_demo_session(
 
     try:
         repo.cleanup_expired_demo_workspaces()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Failed to cleanup expired demo workspaces: %s", exc)
 
     user, ws, role = repo.create_demo_workspace_session(duration_minutes=120)
 
@@ -848,8 +851,8 @@ def start_demo_session(
             user_agent=user_agent,
             ip_address=client_ip,
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Failed to record demo session: %s", exc)
 
     ws_list = [
         WorkspaceMembershipSummary(

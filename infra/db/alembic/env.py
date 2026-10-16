@@ -9,8 +9,8 @@ import infra.db.models  # noqa: F401 - register all tables
 
 config = context.config
 
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+if config.config_file_name is not None and not os.getenv("PYTEST_CURRENT_TEST"):
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 
