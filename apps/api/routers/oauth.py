@@ -1,5 +1,7 @@
 import os
 import json
+import html
+import secrets
 import uuid
 import urllib.parse
 from datetime import datetime, timezone, timedelta
@@ -136,7 +138,17 @@ def oauth_callback(
 
     if error:
         if is_browser:
-            allowed_origins_json = json.dumps(_get_allowed_target_origins())
+            nonce = secrets.token_urlsafe(16)
+            allowed_origins_json = json.dumps(_get_allowed_target_origins()).replace("<", "\\u003c").replace(">", "\\u003e")
+            safe_error = html.escape(str(error or ""))
+            safe_error_desc = html.escape(str(error_description or "Annulation"))
+            safe_provider = html.escape(str(provider_clean.upper()))
+            post_err_payload = json.dumps({
+                "type": "CONTENTOPS_OAUTH_ERROR",
+                "provider": provider_clean,
+                "error": str(error or "")
+            }).replace("<", "\\u003c").replace(">", "\\u003e")
+
             err_html = f"""<!DOCTYPE html>
 <html lang="fr">
 <head><meta charset="utf-8"><title>Échec OAuth</title>
@@ -151,22 +163,36 @@ button {{ background: #dc2626; color: white; border: none; border-radius: 8px; p
 <body>
 <div class="card">
     <h2>Autorisation Refusée</h2>
-    <p>L'autorisation pour <strong>{provider_clean.upper()}</strong> a été interrompue : {error} ({error_description or 'Annulation'})</p>
-    <button onclick="window.close()">Fermer cet onglet</button>
+    <p>L'autorisation pour <strong>{safe_provider}</strong> a été interrompue : {safe_error} ({safe_error_desc})</p>
+    <button id="close-btn">Fermer cet onglet</button>
 </div>
-<script>
-if (window.opener) {{
-    var allowedOrigins = {allowed_origins_json};
-    for (var i = 0; i < allowedOrigins.length; i++) {{
-        try {{
-            window.opener.postMessage({{ type: 'CONTENTOPS_OAUTH_ERROR', provider: '{provider_clean}', error: '{error}' }}, allowedOrigins[i]);
-        }} catch(e) {{}}
+<script type="application/json" id="oauth-error-payload" nonce="{nonce}">{post_err_payload}</script>
+<script type="application/json" id="oauth-origins" nonce="{nonce}">{allowed_origins_json}</script>
+<script nonce="{nonce}">
+document.addEventListener("DOMContentLoaded", function() {{
+    var closeBtn = document.getElementById("close-btn");
+    if (closeBtn) {{
+        closeBtn.addEventListener("click", function() {{ window.close(); }});
     }}
-}}
+    if (window.opener) {{
+        var errEl = document.getElementById("oauth-error-payload");
+        var errData = errEl ? JSON.parse(errEl.textContent) : null;
+        var originsEl = document.getElementById("oauth-origins");
+        var allowedOrigins = originsEl ? JSON.parse(originsEl.textContent) : [];
+        if (errData) {{
+            for (var i = 0; i < allowedOrigins.length; i++) {{
+                try {{
+                    window.opener.postMessage(errData, allowedOrigins[i]);
+                }} catch(e) {{}}
+            }}
+        }}
+    }}
+}});
 </script>
 </body>
 </html>"""
-            return HTMLResponse(content=err_html, status_code=400)
+            csp = f"default-src 'self'; script-src 'self' 'nonce-{nonce}'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none';"
+            return HTMLResponse(content=err_html, status_code=400, headers={"Content-Security-Policy": csp})
         raise HTTPException(
             status_code=400,
             detail=f"OAuth authorization denied by provider: {error} ({error_description or 'No detail'})"
@@ -341,12 +367,25 @@ if (window.opener) {{
     }
 
     if is_browser:
-        allowed_origins_json = json.dumps(_get_allowed_target_origins())
-        html = f"""<!DOCTYPE html>
+        nonce = secrets.token_urlsafe(16)
+        allowed_origins_json = json.dumps(_get_allowed_target_origins()).replace("<", "\\u003c").replace(">", "\\u003e")
+        safe_account_name = html.escape(str(account_name or ""))
+        safe_account_id = html.escape(str(account_id or ""))
+        safe_provider = html.escape(str(provider_clean.upper()))
+
+        post_data = {
+            "type": "CONTENTOPS_OAUTH_SUCCESS",
+            "provider": str(provider_clean),
+            "account_id": str(account_id),
+            "account_name": str(account_name or ""),
+        }
+        safe_json_payload = json.dumps(post_data).replace("<", "\\u003c").replace(">", "\\u003e")
+
+        html_content = f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <title>Compte {provider_clean.upper()} Connecté</title>
+  <title>Compte {safe_provider} Connecté</title>
   <style>
     body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #030712; color: #f9fafb; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
     .card {{ background: #111827; border: 1px solid #10b981; border-radius: 16px; padding: 36px 40px; max-width: 440px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }}
@@ -362,32 +401,42 @@ if (window.opener) {{
   <div class="card">
     <div class="icon">✓</div>
     <h2>Compte Connecté avec Succès !</h2>
-    <p>Votre compte <strong>{provider_clean.upper()}</strong> est synchronisé avec ContentOps.</p>
-    <div class="acc">{account_name} ({account_id})</div>
+    <p>Votre compte <strong>{safe_provider}</strong> est synchronisé avec ContentOps.</p>
+    <div class="acc">{safe_account_name} ({safe_account_id})</div>
     <br>
-    <button class="btn" onclick="window.close()">Fermer cet onglet</button>
+    <button id="close-btn" class="btn">Fermer cet onglet</button>
   </div>
-  <script>
-    if (window.opener) {{
-      var allowedOrigins = {allowed_origins_json};
-      for (var i = 0; i < allowedOrigins.length; i++) {{
-        try {{
-          window.opener.postMessage({{
-            type: 'CONTENTOPS_OAUTH_SUCCESS',
-            provider: '{provider_clean}',
-            account_id: '{account_id}',
-            account_name: '{account_name}'
-          }}, allowedOrigins[i]);
-        }} catch (e) {{}}
+  <script type="application/json" id="oauth-success-payload" nonce="{nonce}">{safe_json_payload}</script>
+  <script type="application/json" id="oauth-origins" nonce="{nonce}">{allowed_origins_json}</script>
+  <script nonce="{nonce}">
+    document.addEventListener("DOMContentLoaded", function() {{
+      var closeBtn = document.getElementById("close-btn");
+      if (closeBtn) {{
+        closeBtn.addEventListener("click", function() {{ window.close(); }});
       }}
-      setTimeout(function() {{ window.close(); }}, 1200);
-    }} else {{
-      setTimeout(function() {{ window.location.href = '/ui/#connections?oauth=success&provider={provider_clean}'; }}, 1500);
-    }}
+      var dataEl = document.getElementById("oauth-success-payload");
+      var data = dataEl ? JSON.parse(dataEl.textContent) : null;
+      var originsEl = document.getElementById("oauth-origins");
+      var allowedOrigins = originsEl ? JSON.parse(originsEl.textContent) : [];
+      if (window.opener && data) {{
+        for (var i = 0; i < allowedOrigins.length; i++) {{
+          try {{
+            window.opener.postMessage(data, allowedOrigins[i]);
+          }} catch (e) {{}}
+        }}
+        setTimeout(function() {{ window.close(); }}, 1200);
+      }} else if (data) {{
+        var prov = encodeURIComponent(data.provider || '');
+        setTimeout(function() {{
+          window.location.href = '/ui/#connections?oauth=success&provider=' + prov;
+        }}, 1500);
+      }}
+    }});
   </script>
 </body>
 </html>"""
-        return HTMLResponse(content=html)
+        csp = f"default-src 'self'; script-src 'self' 'nonce-{nonce}'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none';"
+        return HTMLResponse(content=html_content, headers={"Content-Security-Policy": csp})
 
     return payload
 
