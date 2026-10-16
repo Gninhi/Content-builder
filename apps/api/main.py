@@ -142,38 +142,43 @@ async def lifespan(app: FastAPI):
         if stale_orphan_jobs:
             db.commit()
 
-        repo = ContentOpsRepository(db)
-        repo.ensure_default_users()
-        default_ws = repo.get_workspace("ws_default")
-        if not default_ws:
-            ws = repo.create_workspace(name="Default Editorial Workspace", timezone="UTC", owner_id="owner_martial")
-            # Force the ID to be ws_default for consistent quickstart
-            ws.id = "ws_default"  # type: ignore[assignment]
-            db.commit()
+        app_env = os.getenv("APP_ENV", "production").lower()
+        enable_fixtures = os.getenv("ENABLE_DEV_FIXTURES", "false").lower() in ("true", "1", "yes")
+        if app_env in ("development", "test", "local") or enable_fixtures:
+            repo = ContentOpsRepository(db)
+            default_ws = repo.get_workspace("ws_default")
+            if not default_ws:
+                ws = repo.create_workspace(name="Default Editorial Workspace", timezone="UTC", owner_id="owner_martial")
+                # Force the ID to be ws_default for consistent quickstart
+                ws.id = "ws_default"  # type: ignore[assignment]
+                db.commit()
 
-            repo.create_or_version_brand_profile(
-                workspace_id="ws_default",
-                audience=["Tech Leads", "AI Engineers", "CTOs", "Founders"],
-                voice="Expert, pragmatique, direct, orienté retour d'expérience et architecture sans jargon creux.",
-                pillars=["IA générative & LLMs", "Systèmes multi-agents & LangGraph", "Automatisation d'entreprise"],
-                prohibited_topics=["Spéculation crypto", "Rumeurs non vérifiées", "Dénigrement concurrent direct"],
-                cta_policy={
-                    "allowed_ctas": ["Partagez votre avis en commentaire", "Visiter le dépôt GitHub", "S'inscrire à la veille"],
-                    "max_per_post": 1
-                }
-            )
-            # Add an initial high-quality source
-            repo.add_source(
-                workspace_id="ws_default",
-                source_type="url",
-                canonical_url="https://arxiv.org/abs/2402.01234",
-                raw_content_ref="storage/sources/initial_benchmark.txt",
-                extracted_facts=[
-                    {"fact_id": "fact_1", "claim": "Les architectures agentiques déterministes réduisent de 73% le taux d'erreur par rapport aux chaînes libres.", "confidence": 0.95},
-                    {"fact_id": "fact_2", "claim": "L'intervention humaine asynchrone (HITL) permet d'atteindre 99.4% de conformité de marque.", "confidence": 0.98}
-                ],
-                provenance={"source": "Benchmark Systèmes Agentiques 2026", "author": "Research Lab"}
-            )
+                repo.create_or_version_brand_profile(
+                    workspace_id="ws_default",
+                    audience=["Tech Leads", "AI Engineers", "CTOs", "Founders"],
+                    voice="Expert, pragmatique, direct, orienté retour d'expérience et architecture sans jargon creux.",
+                    pillars=["IA générative & LLMs", "Systèmes multi-agents & LangGraph", "Automatisation d'entreprise"],
+                    prohibited_topics=["Spéculation crypto", "Rumeurs non vérifiées", "Dénigrement concurrent direct"],
+                    cta_policy={
+                        "allowed_ctas": ["Partagez votre avis en commentaire", "Visiter le dépôt GitHub", "S'inscrire à la veille"],
+                        "max_per_post": 1
+                    }
+                )
+                # Add an initial high-quality source
+                repo.add_source(
+                    workspace_id="ws_default",
+                    source_type="url",
+                    canonical_url="https://arxiv.org/abs/2402.01234",
+                    raw_content_ref="storage/sources/initial_benchmark.txt",
+                    extracted_facts=[
+                        {"fact_id": "fact_1", "claim": "Les architectures agentiques déterministes réduisent de 73% le taux d'erreur par rapport aux chaînes libres.", "confidence": 0.95},
+                        {"fact_id": "fact_2", "claim": "L'intervention humaine asynchrone (HITL) permet d'atteindre 99.4% de conformité de marque.", "confidence": 0.98}
+                    ],
+                    provenance={"source": "Benchmark Systèmes Agentiques 2026", "author": "Research Lab"}
+                )
+            repo.ensure_default_users()
+        else:
+            logger.info("Production mode: skipping default user and workspace fixture seeding.")
     finally:
         db.close()
 
