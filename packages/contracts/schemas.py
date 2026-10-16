@@ -208,6 +208,12 @@ class PublishedPostResponse(BaseModel):
     receipt: Dict[str, Any]
 
 
+class PublicationReconcileRequest(BaseModel):
+    resolution: str  # "CONFIRMED_PUBLISHED" or "CONFIRMED_FAILED"
+    external_post_id: Optional[str] = None
+    permalink: Optional[str] = None
+
+
 # Analytics & Strategy Insights (PRD Section 3 & 6)
 class MetricSnapshotCreate(BaseModel):
     post_id: str
