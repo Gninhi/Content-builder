@@ -16,6 +16,7 @@ from infra.db.models import (
 )
 from packages.domain.state_machine import ContentStatus, ContentStateMachine
 from packages.domain.idempotency import compute_payload_hash
+from packages.domain.rendering import render_publishable_text, extract_publishable_media
 from packages.connectors.social.base import SocialPublisher, SocialPublisherRegistry
 from packages.connectors.social.linkedin import LinkedInSocialPublisher, LinkedInConnector
 from packages.connectors.social.x_twitter import XSocialPublisher, XTwitterConnector
@@ -266,10 +267,11 @@ class PublisherWorker:
         # 4. Delegate to platform publisher
         try:
             publisher = self.resolve_publisher(str(variant.platform), ws_id)
-            content_text = str(variant.body)
+            content_text = render_publishable_text(variant)
+            media_urls = extract_publishable_media(variant)
             pub_result = publisher.publish(
                 content=content_text,
-                media_urls=None,
+                media_urls=media_urls or None,
                 options={"job_id": job_id, "idempotency_key": str(job.idempotency_key)}
             )
 
