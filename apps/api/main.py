@@ -19,7 +19,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from infra.db.database import init_db, SessionLocal
-from infra.db.repository import ContentOpsRepository
+from infra.db.repository import ContentOpsRepository, NotFoundError
 from packages.security.limiter import limiter, safe_rate_limit_exceeded_handler, get_storage_status
 from packages.resilience.circuit_breaker import BudgetExceededException
 from packages.observability.correlation import set_correlation_id
@@ -341,6 +341,14 @@ async def budget_exceeded_handler(request: Request, exc: BudgetExceededException
     return JSONResponse(
         status_code=429,
         content={"error": "budget_exceeded", "detail": f"LLM cycle budget exceeded: {str(exc)}"}
+    )
+
+
+@app.exception_handler(NotFoundError)
+async def not_found_handler(request: Request, exc: NotFoundError):
+    return JSONResponse(
+        status_code=404,
+        content={"error": "not_found", "detail": str(exc)}
     )
 
 

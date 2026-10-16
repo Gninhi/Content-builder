@@ -35,14 +35,30 @@ from packages.domain.state_machine import ContentStatus, ContentStateMachine
 from packages.domain.idempotency import compute_payload_hash, compute_idempotency_key
 
 
+class NotFoundError(Exception):
+    """Raised when an entity or resource is not found in repository."""
+    pass
+
+
+class WorkspaceNotFoundError(NotFoundError):
+    """Raised when a specified workspace is not found."""
+    pass
+
+
 class ContentOpsRepository:
     def __init__(self, db: Session):
         self.db = db
 
     # ----------------- Workspaces -----------------
-    def create_workspace(self, name: str, timezone: str = "UTC", owner_id: str = "owner_1") -> WorkspaceModel:
+    def create_workspace(
+        self,
+        name: str,
+        timezone: str = "UTC",
+        owner_id: str = "owner_1",
+        workspace_id: Optional[str] = None
+    ) -> WorkspaceModel:
         ws = WorkspaceModel(
-            id=f"ws_{uuid.uuid4().hex[:12]}",
+            id=workspace_id or f"ws_{uuid.uuid4().hex[:12]}",
             name=name,
             timezone=timezone,
             owner_id=owner_id
@@ -72,23 +88,12 @@ class ContentOpsRepository:
         return None
 
     def ensure_workspace(self, workspace_id: str, name: Optional[str] = None, owner_id: str = "system") -> WorkspaceModel:
-        """Finds or creates a workspace to maintain referential integrity across test and production environments."""
+        """Validates that a workspace exists and returns it. Raises WorkspaceNotFoundError if absent."""
         ws = self.get_workspace(workspace_id)
         if not ws:
-            # Check if workspace was added to the pending session objects in the same transaction
-            for obj in self.db.new:
-                if isinstance(obj, WorkspaceModel) and getattr(obj, "id", None) == workspace_id:
-                    return obj
-            ws = WorkspaceModel(
-                id=workspace_id,
-                name=name or f"Workspace {workspace_id}",
-                timezone="UTC",
-                owner_id=owner_id
-            )
-            self.db.add(ws)
-            self.db.commit()
-            self.db.refresh(ws)
+            raise WorkspaceNotFoundError(f"Workspace '{workspace_id}' not found.")
         return ws
+
 
 
     def get_workspace_llm_settings(self, workspace_id: str) -> Optional[WorkspaceLLMSettingsModel]:
@@ -139,6 +144,7 @@ class ContentOpsRepository:
         prohibited_topics: List[str],
         cta_policy: Dict[str, Any]
     ) -> BrandProfileModel:
+        self.ensure_workspace(workspace_id)
         latest = (
             self.db.query(BrandProfileModel)
             .filter(BrandProfileModel.workspace_id == workspace_id)
@@ -179,6 +185,7 @@ class ContentOpsRepository:
         provenance: Dict[str, Any],
         canonical_url: Optional[str] = None
     ) -> ContentSourceModel:
+        self.ensure_workspace(workspace_id)
         # Deduplication check via canonical_url or content hash
         if canonical_url:
             existing = (
