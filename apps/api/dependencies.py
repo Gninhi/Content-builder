@@ -2,7 +2,7 @@ from typing import Optional
 from fastapi import HTTPException, Depends, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from infra.db.database import get_db
+from infra.db.database import get_db, set_db_workspace_context
 from infra.db.repository import ContentOpsRepository
 from packages.security.auth import decode_access_token
 
@@ -81,6 +81,9 @@ def get_current_user(
                 headers={"WWW-Authenticate": "Bearer"}
             )
 
+    # Bind workspace context for multi-tenant isolation & PostgreSQL RLS
+    set_db_workspace_context(db, workspace_id)
+
     return UserContext(user_id=user_id, role=role, workspace_id=workspace_id, jti=jti)
 
 
@@ -120,6 +123,7 @@ def require_roles(*allowed_roles: str):
                 status_code=403,
                 detail=f"Action forbidden for role '{user.role}'. Required: {allowed_roles}"
             )
+        set_db_workspace_context(db, user.workspace_id)
         return user
     return role_checker
 

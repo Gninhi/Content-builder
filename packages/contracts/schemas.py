@@ -49,7 +49,7 @@ class BrandProfileResponse(BaseModel):
 
 # Sources & Provenance
 class SourceIngestRequest(BaseModel):
-    workspace_id: str
+    workspace_id: Optional[str] = None
     type: str = Field("url", description="url, note, text, or rss")
     url: Optional[str] = None
     raw_text: Optional[str] = None

@@ -454,6 +454,7 @@ class SignalModel(Base):
     facts = Column(JSON, default=list, nullable=False)  # [{"fact": "...", "source_url": "...", "quote": "..."}]
     executive_takeaway = Column(Text, nullable=False)  # Why it matters for tech leaders / execs
     raw_content_ref = Column(Text, nullable=True)
+    enrichment_status = Column(String(32), default="deterministic_only", nullable=False)
     status = Column(String(32), default="QUALIFIED", nullable=False, index=True)  # "NEW", "QUALIFIED", "REJECTED", "CONVERTED"
     is_synthetic = Column(Boolean, default=False, nullable=False)  # True for demo mode
     created_at = Column(DateTime, default=utc_now, nullable=False, index=True)

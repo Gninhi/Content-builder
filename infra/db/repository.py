@@ -45,9 +45,25 @@ class WorkspaceNotFoundError(NotFoundError):
     pass
 
 
+from infra.db.repos import (
+    WorkspaceRepository,
+    VeilleRepository,
+    EditorialRepository,
+    PublishingRepository,
+    AuthRepository,
+    LLMSettingsRepository,
+)
+
+
 class ContentOpsRepository:
     def __init__(self, db: Session):
         self.db = db
+        self.workspaces = WorkspaceRepository(db, self)
+        self.veille = VeilleRepository(db, self)
+        self.editorial = EditorialRepository(db, self)
+        self.publishing = PublishingRepository(db, self)
+        self.auth = AuthRepository(db, self)
+        self.llm_settings = LLMSettingsRepository(db, self)
 
     # ----------------- Workspaces -----------------
     def create_workspace(
@@ -447,6 +463,7 @@ class ContentOpsRepository:
         canonical_url: Optional[str] = None,
         source_id: Optional[str] = None,
         raw_content_ref: Optional[str] = None,
+        enrichment_status: str = "deterministic_only",
         status: str = "QUALIFIED",
         is_synthetic: bool = False,
         max_dedup_days: int = 90
@@ -471,6 +488,7 @@ class ContentOpsRepository:
             if qualification_score > existing.qualification_score:
                 existing.qualification_score = round(qualification_score, 2)
                 existing.qualification_criteria = qualification_criteria
+                existing.enrichment_status = enrichment_status
                 if facts:
                     existing.facts = facts
                 self.db.commit()
@@ -493,6 +511,7 @@ class ContentOpsRepository:
             facts=facts,
             executive_takeaway=executive_takeaway.strip(),
             raw_content_ref=raw_content_ref,
+            enrichment_status=enrichment_status,
             status=status,
             is_synthetic=is_synthetic,
             created_at=utc_now()

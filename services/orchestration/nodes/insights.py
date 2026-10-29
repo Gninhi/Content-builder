@@ -119,6 +119,21 @@ def generate_strategy_insights_node(state: StrategyInsightsState) -> Dict[str, A
         except Exception as e:
             logger.warning(f"Strategy insights LLM generation failed: {e}")
 
+    strict_llm = bool(
+        state.get("strict_llm")
+        or os.getenv("STRICT_LLM_AVAILABILITY", "false").lower() in ("true", "1", "yes")
+    )
+    if strict_llm:
+        return {
+            "hypotheses": [],
+            "recommendations": [],
+            "status": "LLM_PROVIDERS_DOWN",
+            "message": "Fournisseurs LLM indisponibles en mode strict.",
+            "run_id": trace_meta["run_id"],
+            "resolved_llm": None,
+            "cycle_budget": budget,
+        }
+
     # 2. Deterministic structured fallback (ensures tests and offline runs succeed)
     hypotheses = [
         {

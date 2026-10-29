@@ -141,12 +141,18 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
             model = None
 
     variants = []
+    qa_feedback_history = list(state.get("qa_feedback_history") or [])
+    rewrite_instructions = state.get("rewrite_instructions")
+    previous_variant = state.get("previous_variant")
 
     for platform in platforms:
         budget.check_budget()
         variant_data = None
         variant_latency = 0.0
         variant_cost: Dict[str, Any] = {}
+        platform_feedback = [
+            fb for fb in qa_feedback_history if fb.get("platform") in (platform, None, "")
+        ]
 
         # 1. Try LLM generation with multi-provider structured outputs
         if model is not None:
@@ -164,6 +170,25 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
                         "platform": platform
                     }
                 )
+                if isinstance(previous_variant, dict) and rewrite_instructions:
+                    rendered_prompt += (
+                        f"\n\n[MODE RÉÉCRITURE]\n"
+                        f"Brouillon actuel ({platform}) :\n"
+                        f"Hook : {previous_variant.get('hook', '')}\n"
+                        f"Body : {previous_variant.get('body', '')}\n"
+                        f"CTA : {previous_variant.get('cta', '')}\n"
+                        f"Instructions de réécriture du relecteur : {rewrite_instructions}\n"
+                    )
+                if platform_feedback:
+                    hints_text = "\n".join(
+                        f"- [{fb.get('rule_id')}] {fb.get('reason')} -> Action requise : {fb.get('remediation_hint')}"
+                        for fb in platform_feedback
+                    )
+                    rendered_prompt += (
+                        f"\n\n[CORRECTION QUALITY GATE OBLIGATOIRE (Tentative #{int(state.get('qa_attempt') or 0) + 1})]\n"
+                        f"La tentative précédente a échoué aux contrôles suivants :\n{hints_text}\n"
+                        f"Corrige impérativement chacune de ces erreurs dans cette nouvelle version."
+                    )
                 start_t = time.perf_counter()
                 callback = ObservabilityTracer.get_callback_handler()
                 callbacks = [callback] if callback else []

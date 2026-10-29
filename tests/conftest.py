@@ -9,3 +9,13 @@ os.environ.setdefault("LIVE_PUBLISHING_ENABLED", "false")
 os.environ.setdefault("REQUIRE_EMAIL_VERIFICATION", "false")
 os.environ.setdefault("ENABLE_BACKGROUND_DAEMONS", "false")
 os.environ.setdefault("ENABLE_DEV_FIXTURES", "true")
+
+import pytest
+from infra.db.database import init_db
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _ensure_test_db_initialized():
+    """Ensure SQLAlchemy tables and migrations are initialized before any test runs."""
+    init_db()
+

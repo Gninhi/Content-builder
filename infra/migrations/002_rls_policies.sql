@@ -35,3 +35,31 @@ CREATE POLICY briefs_isolation_policy ON content_briefs
 CREATE POLICY agent_runs_isolation_policy ON agent_runs
     FOR ALL
     USING (workspace_id = current_workspace_id());
+
+-- Extended RLS coverage for Veille, Signals, Social Accounts, and LLM Settings
+ALTER TABLE veille_sources ENABLE ROW LEVEL SECURITY;
+ALTER TABLE veille_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE signals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workspace_llm_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE connected_social_accounts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY veille_sources_isolation_policy ON veille_sources
+    FOR ALL
+    USING (workspace_id = current_workspace_id());
+
+CREATE POLICY veille_runs_isolation_policy ON veille_runs
+    FOR ALL
+    USING (workspace_id = current_workspace_id());
+
+CREATE POLICY signals_isolation_policy ON signals
+    FOR ALL
+    USING (workspace_id = current_workspace_id());
+
+CREATE POLICY workspace_llm_settings_isolation_policy ON workspace_llm_settings
+    FOR ALL
+    USING (workspace_id = current_workspace_id());
+
+CREATE POLICY connected_social_accounts_isolation_policy ON connected_social_accounts
+    FOR ALL
+    USING (workspace_id = current_workspace_id());
+

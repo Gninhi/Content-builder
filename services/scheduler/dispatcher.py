@@ -42,21 +42,30 @@ class SchedulerDispatcher:
                 })
         return results
 
+    @staticmethod
+    def _poll_due_jobs_once() -> List[Dict[str, Any]]:
+        from infra.db.database import get_db_session
+
+        with get_db_session() as db:
+            dispatcher = SchedulerDispatcher(db)
+            return dispatcher.process_due_jobs()
+
     async def run_daemon_loop(self, poll_interval_seconds: int = 15, stop_event: Any = None) -> None:
         """
         Continuous async background loop polling for due publication jobs.
-        Safe for long-running service execution in FastAPI lifespan or standalone daemon.
+        Offloads synchronous DB and HTTP publishing calls via asyncio.to_thread
+        to prevent blocking the FastAPI event loop.
         """
         import asyncio
         import logging
-        from infra.db.database import get_db_session
 
         log = logging.getLogger("SchedulerDispatcher")
         log.info(f"Starting SchedulerDispatcher daemon loop (poll interval: {poll_interval_seconds}s)")
         while stop_event is None or not stop_event.is_set():
-            with get_db_session() as db:
-                dispatcher = SchedulerDispatcher(db)
-                dispatcher.process_due_jobs()
+            try:
+                await asyncio.to_thread(self._poll_due_jobs_once)
+            except Exception as e:
+                log.error(f"Error in SchedulerDispatcher daemon loop: {e}", exc_info=True)
 
             try:
                 if stop_event:

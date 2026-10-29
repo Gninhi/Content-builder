@@ -40,13 +40,13 @@ PUBLISHED ➔ MEASURED ➔ ARCHIVED
 ```
 
 ### Invariants Non Négociables :
-1. **Validation Humaine Obligatoire (HITL)** : Aucun contenu ne peut passer à l'état `APPROVED` ou `SCHEDULED` sans validation explicite d'un utilisateur authentifié disposant du rôle `Owner`.
+1. **Validation Humaine Obligatoire (HITL)** : Aucun contenu ne peut passer à l'état `APPROVED` ou `SCHEDULED` sans validation explicite d'un utilisateur authentifié disposant du rôle `Owner` ou `Editor` (`D-01`). La publication immédiate (`publish-now`), les connexions sociales OAuth, la gestion des modèles LLM et le Kill Switch sont réservés au rôle `Owner`.
 2. **Scellement SHA-256** : À l'approbation, le payload textuel complet (hook, body, cta, hashtags, media) est haché via SHA-256. Toute mutation ultérieure invalide l'approbation.
 3. **Publication « Au Plus Une Fois » (At-Most-Once)** : Le statut passe à `PUBLISHING` *avant* l'appel réseau vers les APIs LinkedIn ou X. En cas de timeout ou déconnexion, l'état bascule vers `PUBLISH_UNKNOWN`. Aucun réessai automatique n'est autorisé depuis cet état afin d'exclure tout risque de publication en doublon.
 
 ---
 
-## 3. Matrice des Rôles & Permissions (RBAC)
+## 3. Matrice des Rôles & Permissions (RBAC — Décision D-01)
 
 Le RBAC est appliqué strictement côté serveur sur toutes les routes API FastAPI (`require_roles(...)`) et reflété dans l'interface :
 
@@ -56,8 +56,8 @@ Le RBAC est appliqué strictement côté serveur sur toutes les routes API FastA
 | Idéation, veille et conversion en briefs | ✅ | ✅ | ❌ |
 | Édition de brouillons et soumission en revue | ✅ | ✅ | ❌ |
 | Demande de réécriture (`REWRITE_REQUESTED`) | ✅ | ✅ | ❌ |
-| **Approbation HITL (`APPROVED`)** | ✅ | ❌ | ❌ |
-| **Rejet définitif (`REJECTED`)** | ✅ | ❌ | ❌ |
+| **Approbation HITL (`APPROVED`) & Planification (`SCHEDULED`)** | ✅ | ✅ | ❌ |
+| **Rejet définitif (`REJECTED`)** | ✅ | ✅ | ❌ |
 | **Publication immédiate (`Publish Now`)** | ✅ | ❌ | ❌ |
 | Connexion et révocation OAuth des comptes sociaux | ✅ | ❌ | ❌ |
 | Configuration des modèles LLM et clés API | ✅ | ❌ | ❌ |

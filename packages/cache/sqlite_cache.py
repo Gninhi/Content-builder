@@ -80,6 +80,10 @@ class SQLiteLLMCache(BaseLLMCache):
                 conn.close()
 
     def set(self, key: str, value: Dict[str, Any], ttl_seconds: Optional[int] = None) -> None:
+        from packages.cache.factory import is_cacheable_llm_output
+        if not is_cacheable_llm_output(value):
+            logger.debug("Skipping SQLiteLLMCache.set for non-cacheable value on key %s", key)
+            return
         now = time.time()
         ttl = ttl_seconds if ttl_seconds is not None else self.default_ttl
         expires_at = now + ttl

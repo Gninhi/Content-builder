@@ -84,6 +84,12 @@ def research_ideas(
             detail=f"LLM cycle budget exceeded: {str(exc)}"
         )
 
+    if result.get("status") == "LLM_PROVIDERS_DOWN":
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"error_code": "LLM_PROVIDERS_DOWN", "message": "LLM providers unavailable for idea research."}
+        )
+
     generated = result.get("generated_ideas", [])
     run_id = result.get("run_id", "run_local")
 

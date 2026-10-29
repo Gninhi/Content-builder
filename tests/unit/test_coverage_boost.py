@@ -7,7 +7,7 @@ from typing import List, Optional
 
 from services.orchestration.nodes.analytics import normalize_metrics_node
 from services.orchestration.nodes.scheduling import schedule_job_node
-from services.orchestration.graphs.publishing import verify_approval_and_publish_node
+from services.orchestration.nodes.publishing import verify_approval_and_publish_node
 from services.orchestration.nodes.insights import generate_strategy_insights_node
 from packages.domain.state_machine import ContentStatus
 from packages.domain.idempotency import compute_payload_hash

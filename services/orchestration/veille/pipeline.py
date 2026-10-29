@@ -7,7 +7,9 @@ Now dynamically driven by the workspace source catalogue with fail-soft fault to
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 import email.utils
+import hashlib
 import logging
+import os
 import re
 from urllib.parse import urlparse
 
@@ -15,14 +17,18 @@ from infra.db.repository import ContentOpsRepository
 from infra.db.models import SignalModel, VeilleSourceModel
 from packages.security.prompt_injection import PromptInjectionGuard
 from packages.tools.web_search import WebSearchTool
+from packages.tools.browse import fetch_safe_url, extract_metadata_and_text
 from packages.tools.data_connectors import OfficialDataConnectors, OfficialDataSignalItem
+from packages.connectors.sources.web_extractor import WebExtractorConnector
 from packages.prompts.veille_queries import (
     SUPPORTED_AXES,
     AXIS_IA,
     AXIS_FRAMEWORKS,
     AXIS_METIERS,
+    SignalEnrichmentOutput,
     get_queries_for_axis,
     compute_qualification_score,
+    verify_quote_in_text,
 )
 
 logger = logging.getLogger(__name__)
@@ -41,13 +47,14 @@ METRIC_REGEX = re.compile(
 
 
 
-def parse_published_days_old(date_str: Optional[str]) -> int:
+def parse_published_days_old(date_str: Optional[str], allow_none: bool = False) -> Optional[int]:
     """
     Parses ISO-8601, RFC-2822, or common date strings into days elapsed since publication.
-    Returns 14 as safe default if unparseable or absent (penalizes vague dates honestly).
+    Returns None when allow_none=True and date is missing/unparseable so the qualification rubric
+    explicitly penalizes missing dates, or 14 for legacy callers.
     """
     if not date_str or not isinstance(date_str, str) or not date_str.strip():
-        return 14
+        return None if allow_none else 14
 
     date_str = date_str.strip()
     now_utc = datetime.now(timezone.utc)
@@ -74,7 +81,7 @@ def parse_published_days_old(date_str: Optional[str]) -> int:
     except Exception:
         pass
 
-    return 14
+    return None if allow_none else 14
 
 
 SYNTHETIC_DEMO_SIGNALS: List[Dict[str, Any]] = [
@@ -223,10 +230,169 @@ SYNTHETIC_DEMO_SIGNALS: List[Dict[str, Any]] = [
 class VeillePipeline:
     """Orchestrates collection, sanitization, qualification, and storage of monitoring signals."""
 
-    def __init__(self, repo: ContentOpsRepository):
+    def __init__(self, repo: ContentOpsRepository, max_enrichments_per_cycle: Optional[int] = None):
         self.repo = repo
         self.search_tool = WebSearchTool()
         self.connectors = OfficialDataConnectors
+        self.max_enrichments_per_cycle = (
+            max_enrichments_per_cycle
+            if max_enrichments_per_cycle is not None
+            else int(os.getenv("VEILLE_MAX_ENRICHMENTS_PER_CYCLE", "15"))
+        )
+        self._enrichments_used: int = 0
+
+    def _build_verified_facts(
+        self,
+        title: str,
+        text: str,
+        url: str,
+        llm_facts: Optional[List[Any]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Builds fact items with verbatim quote verification against the source text/title.
+        Never fabricates quotes absent from the source text.
+        """
+        full_corpus = f"{title}\n{text}".strip()
+        verified_list: List[Dict[str, Any]] = []
+
+        if llm_facts:
+            for lf in llm_facts:
+                claim = getattr(lf, "claim", None) or (lf.get("claim") if isinstance(lf, dict) else "")
+                quote = getattr(lf, "quote", None) or (lf.get("quote") if isinstance(lf, dict) else "")
+                src_url = getattr(lf, "source_url", None) or (lf.get("source_url") if isinstance(lf, dict) else url) or url
+                is_ver = verify_quote_in_text(quote, full_corpus)
+                if is_ver and claim:
+                    verified_list.append({
+                        "fact": claim[:280],
+                        "claim": claim[:280],
+                        "source_url": src_url,
+                        "quote": quote[:240],
+                        "verified": True,
+                    })
+
+        if verified_list:
+            return verified_list[:5]
+
+        # Deterministic extraction from real source text
+        extracted = WebExtractorConnector.extract_facts(text)
+        for item in extracted[:3]:
+            claim_str = item["claim"][:240]
+            is_ver = verify_quote_in_text(claim_str, full_corpus)
+            verified_list.append({
+                "fact": claim_str,
+                "claim": claim_str,
+                "source_url": url,
+                "quote": claim_str[:200],
+                "verified": is_ver,
+            })
+
+        if not verified_list:
+            fallback_quote = (text[:200] if len(text) >= 15 else title[:200]).strip()
+            verified_list.append({
+                "fact": fallback_quote,
+                "claim": fallback_quote,
+                "source_url": url,
+                "quote": fallback_quote,
+                "verified": verify_quote_in_text(fallback_quote, full_corpus),
+            })
+
+        return verified_list
+
+    def _enrich_candidate_if_budget_allows(
+        self,
+        *,
+        workspace_id: str,
+        title: str,
+        summary: str,
+        url: str,
+        axis: str,
+        source_name: str,
+        q_res: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Hybrid funnel enrichment (D-02):
+        - Enriches at most `self.max_enrichments_per_cycle` (default 15) qualified candidates per cycle.
+        - Optionally extracts full web page text and runs structured LLM enrichment (`SignalEnrichmentOutput`)
+          with strict quote verification (`verify_quote_in_text`).
+        - Falls back honestly to `lexical_fallback` or `deterministic_only` without fabricating data.
+        """
+        working_text = summary
+        raw_content_ref: Optional[str] = None
+        enrichment_status = "deterministic_only"
+
+        can_enrich = (
+            self._enrichments_used < self.max_enrichments_per_cycle
+            and (q_res["is_qualified"] or q_res["score"] >= 2.8)
+        )
+
+        if can_enrich and url and url.startswith(("http://", "https://")):
+            if len(working_text) < 280 and os.getenv("VEILLE_EXTRACT_FULL_TEXT", "false").lower() in ("true", "1", "yes"):
+                try:
+                    resp = fetch_safe_url(url, timeout=6.0)
+                    if resp.status_code == 200 and resp.text:
+                        meta = extract_metadata_and_text(resp.text, str(resp.url))
+                        extracted_body = (meta.get("content") or "").strip()
+                        if len(extracted_body) > len(working_text):
+                            working_text = PromptInjectionGuard.defang_text(extracted_body[:3000])
+                except Exception as ex:
+                    logger.debug(f"Documentary extraction skipped for {url}: {ex}")
+
+        if working_text:
+            digest = hashlib.sha256(working_text.encode("utf-8")).hexdigest()
+            raw_content_ref = f"sha256:{digest}"
+
+        if can_enrich and os.getenv("VEILLE_LLM_ENRICHMENT", "false").lower() in ("true", "1", "yes"):
+            self._enrichments_used += 1
+            try:
+                from services.orchestration.llm import resolve_and_get_llm
+                from services.orchestration.structured_output import invoke_structured_output
+
+                model, _ = resolve_and_get_llm(
+                    task_name="veille",
+                    workspace_id=workspace_id,
+                    temperature=0.1,
+                    allow_none_if_unconfigured=True,
+                )
+                if model is not None:
+                    prompt = (
+                        f"Analyse ce signal de veille ({axis}) provenant de '{source_name}' ({url}).\n"
+                        f"Titre: {title}\nContenu: {working_text[:2500]}\n"
+                        "Extrais uniquement des faits et citations verbatim présents dans le texte."
+                    )
+                    enriched = invoke_structured_output(
+                        model=model,
+                        schema_cls=SignalEnrichmentOutput,
+                        prompt=prompt,
+                    )
+                    if enriched:
+                        facts = self._build_verified_facts(title, working_text, url, llm_facts=enriched.facts)
+                        return {
+                            "summary": PromptInjectionGuard.defang_text(enriched.summary),
+                            "executive_takeaway": PromptInjectionGuard.defang_text(enriched.executive_takeaway),
+                            "facts": facts,
+                            "raw_content_ref": raw_content_ref,
+                            "enrichment_status": "llm_enriched",
+                        }
+                enrichment_status = "pending_llm"
+            except Exception as llm_err:
+                logger.warning(f"LLM signal enrichment failed for '{title[:60]}': {llm_err}")
+                enrichment_status = "lexical_fallback"
+        elif can_enrich:
+            self._enrichments_used += 1
+            enrichment_status = "lexical_fallback" if len(working_text) >= 120 else "deterministic_only"
+
+        facts = self._build_verified_facts(title, working_text, url)
+        top_fact = facts[0]["fact"][:160] if facts else title[:160]
+        exec_takeaway = (
+            f"[{axis.upper()} · {source_name}] Point clé vérifié : {top_fact}"
+        )
+        return {
+            "summary": working_text[:1200] if working_text else title,
+            "executive_takeaway": exec_takeaway[:320],
+            "facts": facts,
+            "raw_content_ref": raw_content_ref,
+            "enrichment_status": enrichment_status,
+        }
 
     def run_collection_cycle(
         self,
@@ -307,6 +473,7 @@ class VeillePipeline:
 
         # Real Live Collection Mode
         logger.info(f"Running Veille pipeline in LIVE mode for axes {target_axes}")
+        self._enrichments_used = 0
 
         # Ensure default sources exist if catalogue is empty
         active_sources = []
@@ -397,40 +564,39 @@ class VeillePipeline:
                         signals_discovered += 1
                         sanitized_title = PromptInjectionGuard.defang_text(item.title)
                         sanitized_snippet = PromptInjectionGuard.defang_text(item.snippet)
+                        real_days_old = parse_published_days_old(getattr(item, "published_date", None), allow_none=True)
 
-                        # Genuine quantitative regex check instead of simple isdigit()
-                        has_metrics = bool(METRIC_REGEX.search(sanitized_snippet) or METRIC_REGEX.search(sanitized_title))
-
-                        # Freshness based on real delta (defaulting to 7 days for general search)
                         q_res = compute_qualification_score(
                             trust_level=trust_target,
-                            days_old=7,
-                            has_concrete_facts=has_metrics,
-                            is_strategic=True,
-                            is_exec_relevant=True,
+                            days_old=real_days_old if real_days_old is not None else 7,
                             attribution_verified=True,
+                            title=sanitized_title,
+                            text=sanitized_snippet,
+                            axis=ax,
                         )
-
-                        facts = [
-                            {
-                                "fact": sanitized_snippet[:200],
-                                "source_url": item.url,
-                                "quote": sanitized_title
-                            }
-                        ]
-                        exec_takeaway = f"Signal identifié pour l'axe {ax.upper()} via {item.source_name} : impact potentiel sur la stratégie tech."
+                        enriched = self._enrich_candidate_if_budget_allows(
+                            workspace_id=workspace_id,
+                            title=sanitized_title,
+                            summary=sanitized_snippet,
+                            url=item.url,
+                            axis=ax,
+                            source_name=item.source_name or "Web Search",
+                            q_res=q_res,
+                        )
 
                         sig = self.repo.save_signal(
                             workspace_id=workspace_id,
                             title=sanitized_title,
-                            summary=sanitized_snippet,
+                            summary=enriched["summary"],
                             axis=ax,
                             trust_level=trust_target,
                             qualification_score=q_res["score"],
                             qualification_criteria=q_res["breakdown"],
-                            facts=facts,
-                            executive_takeaway=exec_takeaway,
+                            facts=enriched["facts"],
+                            executive_takeaway=enriched["executive_takeaway"],
                             canonical_url=item.url,
+                            raw_content_ref=enriched["raw_content_ref"],
+                            enrichment_status=enriched["enrichment_status"],
                             status="QUALIFIED" if q_res["is_qualified"] else "REJECTED",
                             is_synthetic=False,
                         )
@@ -495,8 +661,17 @@ class VeillePipeline:
         elif stype == "hackernews":
             query = custom_query or f"AI {source.axis}"
             raw_items = self.connectors.fetch_hackernews_signals(query=query, max_results=max_items)
+        elif stype == "huggingface":
+            query = custom_query or source.name or "llm"
+            raw_items = self.connectors.fetch_huggingface_signals(query=query, max_results=max_items)
+        elif stype == "semantic_scholar":
+            query = custom_query or source.name or "multi-agent LLM"
+            raw_items = self.connectors.fetch_semantic_scholar_papers(query=query, max_results=max_items)
+        elif stype == "crossref":
+            query = custom_query or source.name or "artificial intelligence governance"
+            raw_items = self.connectors.fetch_crossref_works(query=query, max_results=max_items)
         else:
-            # Fallback web / search
+            # Web source or search engine
             res = self.search_tool.search(query=source.name, max_results=max_items, workspace_id=workspace_id)
             if res.results:
                 raw_items = [
@@ -506,53 +681,72 @@ class VeillePipeline:
                         title=it.title,
                         url=it.url,
                         summary=it.snippet,
-                        published_date="",
+                        published_date=getattr(it, "published_date", None) or "",
                         metadata={"source_name": it.source_name},
                     )
                     for it in res.results
                 ]
+            elif source.url and source.url.startswith(("http://", "https://")):
+                try:
+                    resp = fetch_safe_url(source.url, timeout=6.0)
+                    if resp.status_code == 200 and resp.text:
+                        meta = extract_metadata_and_text(resp.text, str(resp.url))
+                        extracted_content = (meta.get("content") or "").strip()
+                        if len(extracted_content) >= 40:
+                            raw_items = [
+                                OfficialDataSignalItem(
+                                    source_type="web",
+                                    identifier=str(resp.url),
+                                    title=meta.get("title") or source.name,
+                                    url=meta.get("canonical_url") or str(resp.url),
+                                    summary=extracted_content[:1200],
+                                    published_date=meta.get("published_date") or "",
+                                    metadata={"source_name": source.name},
+                                )
+                            ]
+                except Exception as web_ex:
+                    logger.debug(f"Direct web extraction fallback failed for {source.url}: {web_ex}")
 
         results = []
         for c_item in raw_items:
             sanitized_title = PromptInjectionGuard.defang_text(c_item.title)
             sanitized_summary = PromptInjectionGuard.defang_text(c_item.summary)
 
-            # Compute real freshness from published_date
-            real_days_old = parse_published_days_old(c_item.published_date)
-
-            # Genuine quantitative metrics check with regex
-            has_metrics = bool(METRIC_REGEX.search(sanitized_summary) or METRIC_REGEX.search(sanitized_title))
+            # Compute real freshness from published_date (penalizing missing dates)
+            real_days_old = parse_published_days_old(c_item.published_date, allow_none=True)
 
             q_res = compute_qualification_score(
                 trust_level=source.trust_level,
                 days_old=real_days_old,
-                has_concrete_facts=has_metrics,
-                is_strategic=True,
-                is_exec_relevant=True,
                 attribution_verified=True,
+                title=sanitized_title,
+                text=sanitized_summary,
+                axis=source.axis,
             )
-
-            facts = [
-                {
-                    "fact": sanitized_summary[:200],
-                    "source_url": c_item.url,
-                    "quote": sanitized_title,
-                }
-            ]
-            exec_takeaway = f"Signal issu de la source officielle '{source.name}' ({source.axis.upper()})."
+            enriched = self._enrich_candidate_if_budget_allows(
+                workspace_id=workspace_id,
+                title=sanitized_title,
+                summary=sanitized_summary,
+                url=c_item.url,
+                axis=source.axis,
+                source_name=source.name,
+                q_res=q_res,
+            )
 
             sig = self.repo.save_signal(
                 workspace_id=workspace_id,
                 source_id=source.id,
                 title=sanitized_title,
-                summary=sanitized_summary,
+                summary=enriched["summary"],
                 axis=source.axis,
                 trust_level=source.trust_level,
                 qualification_score=q_res["score"],
                 qualification_criteria=q_res["breakdown"],
-                facts=facts,
-                executive_takeaway=exec_takeaway,
+                facts=enriched["facts"],
+                executive_takeaway=enriched["executive_takeaway"],
                 canonical_url=c_item.url,
+                raw_content_ref=enriched["raw_content_ref"],
+                enrichment_status=enriched["enrichment_status"],
                 status="QUALIFIED" if q_res["is_qualified"] else "REJECTED",
                 is_synthetic=False,
             )
@@ -599,39 +793,41 @@ class VeillePipeline:
         for c_item in raw_items:
             sanitized_title = PromptInjectionGuard.defang_text(c_item.title)
             sanitized_summary = PromptInjectionGuard.defang_text(c_item.summary)
-            trust_level = "A" if getattr(c_item.source_type, "value", c_item.source_type) in ("arxiv", "github", "rss") else "B"
-            has_metrics = bool(METRIC_REGEX.search(sanitized_summary) or METRIC_REGEX.search(sanitized_title))
-            real_days_old = parse_published_days_old(c_item.published_date)
+            stype_val = getattr(c_item.source_type, "value", c_item.source_type)
+            trust_level = "A" if stype_val in ("arxiv", "github", "rss") else "B"
+            real_days_old = parse_published_days_old(c_item.published_date, allow_none=True)
 
             q_res = compute_qualification_score(
                 trust_level=trust_level,
                 days_old=real_days_old,
-                has_concrete_facts=has_metrics,
-                is_strategic=True,
-                is_exec_relevant=True,
                 attribution_verified=True,
+                title=sanitized_title,
+                text=sanitized_summary,
+                axis=axis,
             )
-
-            facts = [
-                {
-                    "fact": sanitized_summary[:200],
-                    "source_url": c_item.url,
-                    "quote": sanitized_title
-                }
-            ]
-            exec_takeaway = f"Signal officiel ({getattr(c_item.source_type, 'value', c_item.source_type)}) pour l'axe {axis.upper()}."
+            enriched = self._enrich_candidate_if_budget_allows(
+                workspace_id=workspace_id,
+                title=sanitized_title,
+                summary=sanitized_summary,
+                url=c_item.url,
+                axis=axis,
+                source_name=str(stype_val),
+                q_res=q_res,
+            )
 
             sig = self.repo.save_signal(
                 workspace_id=workspace_id,
                 title=sanitized_title,
-                summary=sanitized_summary,
+                summary=enriched["summary"],
                 axis=axis,
                 trust_level=trust_level,
                 qualification_score=q_res["score"],
                 qualification_criteria=q_res["breakdown"],
-                facts=facts,
-                executive_takeaway=exec_takeaway,
+                facts=enriched["facts"],
+                executive_takeaway=enriched["executive_takeaway"],
                 canonical_url=c_item.url,
+                raw_content_ref=enriched["raw_content_ref"],
+                enrichment_status=enriched["enrichment_status"],
                 status="QUALIFIED" if q_res["is_qualified"] else "REJECTED",
                 is_synthetic=False,
             )

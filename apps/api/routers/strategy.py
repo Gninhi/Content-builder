@@ -72,6 +72,12 @@ def generate_strategy_insights(
             detail=f"LLM cycle budget exceeded: {str(exc)}"
         )
 
+    if result.get("status") == "LLM_PROVIDERS_DOWN":
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"error_code": "LLM_PROVIDERS_DOWN", "message": "LLM providers unavailable for strategy insights."}
+        )
+
 
     insights = [
         StrategyInsight(

@@ -57,6 +57,7 @@ class SignalResponse(BaseModel):
     qualification_criteria: Dict[str, Any]
     facts: List[Dict[str, Any]]
     executive_takeaway: str
+    enrichment_status: str = "deterministic_only"
     status: str
     is_synthetic: bool
     created_at: str
@@ -119,6 +120,7 @@ def _serialize_signal(sig) -> Dict[str, Any]:
         "qualification_criteria": sig.qualification_criteria or {},
         "facts": sig.facts or [],
         "executive_takeaway": sig.executive_takeaway,
+        "enrichment_status": getattr(sig, "enrichment_status", "deterministic_only") or "deterministic_only",
         "status": sig.status,
         "is_synthetic": sig.is_synthetic,
         "created_at": sig.created_at.isoformat() if sig.created_at else "",

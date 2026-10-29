@@ -64,6 +64,8 @@ def test_research_node_outputs_0_to_100_scores_and_clean_titles():
 def test_idea_deduplication_in_repository():
     with get_db_session() as db:
         repo = ContentOpsRepository(db)
+        if not repo.get_workspace("ws_dedup_test"):
+            repo.create_workspace(name="Dedup Test Workspace", workspace_id="ws_dedup_test")
         idea1 = repo.save_idea(
             workspace_id="ws_dedup_test",
             title="Titre Unique pour Test Déduplication",

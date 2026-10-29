@@ -1,6 +1,6 @@
 import uuid
 import logging
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional, List
 from langfuse.langchain import CallbackHandler
 from packages.security.pii import mask_pii
 

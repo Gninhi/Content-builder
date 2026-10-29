@@ -49,6 +49,26 @@ def get_db():
         db.close()
 
 
+def set_db_workspace_context(db, workspace_id: str) -> None:
+    """
+    Binds the active workspace_id to the SQLAlchemy session and, on PostgreSQL,
+    sets the transaction-local variable `app.current_workspace_id` used by RLS policies.
+    """
+    if not workspace_id or db is None:
+        return
+    try:
+        db.info["workspace_id"] = str(workspace_id)
+        bind = db.get_bind()
+        if bind is not None and bind.dialect.name == "postgresql":
+            from sqlalchemy import text
+            db.execute(
+                text("SELECT set_config('app.current_workspace_id', :ws_id, true)"),
+                {"ws_id": str(workspace_id)},
+            )
+    except Exception:
+        pass
+
+
 def init_db():
     """Initializes tables in database and applies backwards-compatible column additions."""
     import infra.db.models  # noqa: F401 - Ensure all model tables are registered on Base.metadata
@@ -71,6 +91,13 @@ def init_db():
             if "signal_id" not in columns:
                 with engine.begin() as conn:
                     conn.execute(text("ALTER TABLE ideas ADD COLUMN signal_id VARCHAR(64)"))
+        if "signals" in inspector.get_table_names():
+            columns = [c["name"] for c in inspector.get_columns("signals")]
+            if "enrichment_status" not in columns:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text("ALTER TABLE signals ADD COLUMN enrichment_status VARCHAR(32) DEFAULT 'deterministic_only'")
+                    )
         if "user_refresh_tokens" in inspector.get_table_names():
             columns = [c["name"] for c in inspector.get_columns("user_refresh_tokens")]
             if "revoked_at" not in columns:

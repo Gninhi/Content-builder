@@ -9,7 +9,7 @@
 
 ContentOps Harness n'est pas un autoposteur. C'est un **système de gouvernance éditoriale** destiné aux décideurs, reposant sur des garanties strictes :
 
-* **Validation Humaine Obligatoire (HITL)** : Aucune publication publique sans approbation explicite d'un utilisateur au rôle `Owner`.
+* **Validation Humaine Obligatoire (HITL)** : Aucune publication publique sans approbation explicite d'un utilisateur habilité (`Owner` ou `Editor`), et déclenchement immédiat (`publish-now`) réservé au rôle `Owner`.
 * **Publication « Au Plus Une Fois »** : Statut `PUBLISHING` avant l'appel réseau, bascule en `PUBLISH_UNKNOWN` sur incident sans retry automatique, clé d'idempotence unique.
 * **Scellement Cryptographique** : Tout contenu approuvé est scellé par son hash SHA-256.
 * **Isolation Multi-Tenant & RBAC** : Rôles `Owner`, `Editor`, `Viewer` appliqués côté serveur, coffre OAuth chiffré (AES-256-GCM), journal d'audit append-only.

@@ -185,7 +185,7 @@ class CycleBudget:
             return False
 
 
-def resolve_cycle_budget(state: Optional[Dict[str, Any]] = None) -> CycleBudget:
+def resolve_cycle_budget(state: Optional[Any] = None) -> CycleBudget:
     """
     Resolves an active CycleBudget from state or initializes a new one from environment variables.
     """
@@ -194,8 +194,8 @@ def resolve_cycle_budget(state: Optional[Dict[str, Any]] = None) -> CycleBudget:
         if isinstance(budget, CycleBudget):
             return budget
         if isinstance(budget, dict):
-            max_tokens_val = int(budget.get("max_tokens") or os.getenv("CYCLE_BUDGET_MAX_TOKENS", "50000"))
-            max_duration_val = float(budget.get("max_duration_seconds") or os.getenv("CYCLE_BUDGET_MAX_DURATION_SECONDS", "60.0"))
+            max_tokens_val = int(budget.get("max_tokens") or os.getenv("CYCLE_BUDGET_MAX_TOKENS") or "50000")
+            max_duration_val = float(budget.get("max_duration_seconds") or os.getenv("CYCLE_BUDGET_MAX_DURATION_SECONDS") or "60.0")
             cb = CycleBudget(max_tokens=max_tokens_val, max_duration_seconds=max_duration_val)
             cb.used_tokens = int(budget.get("used_tokens", 0))
             return cb
