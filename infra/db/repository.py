@@ -2100,43 +2100,6 @@ class ContentOpsRepository:
                 setattr(user_martial, "password_hash", default_pwd_hash)
             self.db.commit()
 
-        user_dev = self.get_user("dev_user")
-        if not user_dev:
-            self.create_user(
-                user_id="dev_user",
-                email="dev@contentops.internal",
-                password_hash=default_pwd_hash,
-                full_name="Dev User",
-                display_name="Dev Contributor",
-                job_title="Senior Content Strategist",
-                timezone="UTC",
-                language="fr",
-                theme="dark",
-                email_verified=True,
-                notification_preferences={
-                    "email_critical_alerts": True,
-                    "browser_push": False,
-                    "weekly_digest": True,
-                    "notify_on_approval": True,
-                },
-                ui_preferences={
-                    "density": "comfortable",
-                    "default_view": "inbox",
-                },
-            )
-            self.add_workspace_member("ws_default", "dev_user", "Editor")
-        else:
-            setattr(user_dev, "email_verified", True)
-            if not user_dev.password_hash:
-                setattr(user_dev, "password_hash", default_pwd_hash)
-            self.db.commit()
-
-        # Also ensure login_test has email_verified=True if present
-        login_test = self.get_user_by_email("login_test@contentops.internal")
-        if login_test and not login_test.email_verified:
-            setattr(login_test, "email_verified", True)
-            self.db.commit()
-
 
 
 
