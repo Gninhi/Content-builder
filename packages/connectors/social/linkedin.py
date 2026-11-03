@@ -6,8 +6,6 @@ import logging
 from typing import Dict, Any, List, Optional
 import httpx
 
-logger = logging.getLogger(__name__)
-
 from packages.connectors.social.base import (
     BaseSocialConnector,
     BaseSocialPublisher,
@@ -27,6 +25,8 @@ from packages.connectors.social.exceptions import (
     SocialPublishUnknownError,
     TokenExpiringSoonError,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class LinkedInSocialPublisher(BaseSocialPublisher):

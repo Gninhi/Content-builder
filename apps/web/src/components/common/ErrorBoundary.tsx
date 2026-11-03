@@ -47,7 +47,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (this.props.onNavigate) {
       this.props.onNavigate('dashboard');
     } else {
-      window.location.hash = 'dashboard';
+      window.location.assign('/ui/dashboard');
     }
   };
 

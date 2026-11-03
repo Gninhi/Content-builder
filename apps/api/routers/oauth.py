@@ -67,8 +67,8 @@ def start_oauth_flow(
         )
         if not client_id:
             raise HTTPException(
-                status_code=500,
-                detail="LINKEDIN_CLIENT_ID is not configured in environment."
+                status_code=503,
+                detail="LINKEDIN_CLIENT_ID is not configured in environment. Please add it to .env."
             )
         
         # Scopes: openid profile w_member_social (r_liteprofile is deprecated)
@@ -83,15 +83,15 @@ def start_oauth_flow(
         auth_url = f"https://www.linkedin.com/oauth/v2/authorization?{urllib.parse.urlencode(params)}"
 
     else:  # X (Twitter)
-        client_id = os.getenv("X_CLIENT_ID") or os.getenv("X_API_KEY")
+        client_id = os.getenv("X_CLIENT_ID")
         redirect_uri = os.getenv(
             "X_REDIRECT_URI",
             "http://localhost:8000/v1/oauth/callback/x"
         )
         if not client_id:
             raise HTTPException(
-                status_code=500,
-                detail="X_CLIENT_ID is not configured in environment."
+                status_code=503,
+                detail="X_CLIENT_ID (OAuth 2.0 Client ID) is not configured in environment. Do not use OAuth 1.0a API Key here."
             )
 
         # Scopes: tweet.read tweet.write users.read offline.access
@@ -289,14 +289,17 @@ document.addEventListener("DOMContentLoaded", function() {{
         )
 
     else:  # X (Twitter)
-        client_id = os.getenv("X_CLIENT_ID") or os.getenv("X_API_KEY")
-        client_secret = os.getenv("X_CLIENT_SECRET") or os.getenv("X_API_SECRET")
+        client_id = os.getenv("X_CLIENT_ID")
+        client_secret = os.getenv("X_CLIENT_SECRET")
         redirect_uri = os.getenv(
             "X_REDIRECT_URI",
             "http://localhost:8000/v1/oauth/callback/x"
         )
         if not client_id:
-            raise HTTPException(status_code=500, detail="X credentials missing on server.")
+            raise HTTPException(
+                status_code=503,
+                detail="X_CLIENT_ID (OAuth 2.0 Client ID) is not configured on server."
+            )
 
         token_url = "https://api.x.com/2/oauth2/token"
         data = {
@@ -428,7 +431,7 @@ document.addEventListener("DOMContentLoaded", function() {{
       }} else if (data) {{
         var prov = encodeURIComponent(data.provider || '');
         setTimeout(function() {{
-          window.location.href = '/ui/#connections?oauth=success&provider=' + prov;
+          window.location.href = '/ui/connections?oauth=success&provider=' + prov;
         }}, 1500);
       }}
     }});
@@ -456,23 +459,33 @@ def list_connected_accounts(
         .all()
     )
 
+    now_utc = datetime.now(timezone.utc)
+    res_accounts = []
+    for acc in accounts:
+        status_val = str(acc.status)
+        if acc.expires_at:
+            exp_dt = acc.expires_at
+            if exp_dt.tzinfo is None:
+                exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+            if exp_dt < now_utc and status_val == "ACTIVE":
+                status_val = "EXPIRED"
+
+        res_accounts.append({
+            "id": str(acc.id),
+            "provider": str(acc.provider),
+            "account_id": str(acc.account_id),
+            "account_name": str(acc.account_name),
+            "status": status_val,
+            "scopes": acc.scopes or [],
+            "expires_at": acc.expires_at.isoformat() if acc.expires_at else None,
+            "created_at": acc.created_at.isoformat() if acc.created_at else None,
+            "updated_at": acc.updated_at.isoformat() if acc.updated_at else None,
+        })
+
     return {
         "workspace_id": user.workspace_id,
-        "count": len(accounts),
-        "accounts": [
-            {
-                "id": str(acc.id),
-                "provider": str(acc.provider),
-                "account_id": str(acc.account_id),
-                "account_name": str(acc.account_name),
-                "status": str(acc.status),
-                "scopes": acc.scopes or [],
-                "expires_at": acc.expires_at.isoformat() if acc.expires_at else None,
-                "created_at": acc.created_at.isoformat() if acc.created_at else None,
-                "updated_at": acc.updated_at.isoformat() if acc.updated_at else None,
-            }
-            for acc in accounts
-        ]
+        "count": len(res_accounts),
+        "accounts": res_accounts
     }
 
 

@@ -1,11 +1,8 @@
-import os
 from unittest.mock import patch, MagicMock
-import pytest
 from packages.security.email_service import (
     get_email_service,
     set_email_service,
     SMTPEmailService,
-    MemoryLogEmailService,
 )
 from apps.api.routers.auth import is_email_verification_required
 

@@ -2,12 +2,10 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import infra.db.models
 from infra.db.models import Base, WorkspaceModel
-from infra.db.repository import ContentOpsRepository, NotFoundError, WorkspaceNotFoundError
+from infra.db.repository import ContentOpsRepository, NotFoundError
 
 
 @pytest.fixture
@@ -43,6 +41,7 @@ def test_ensure_workspace_raises_not_found_on_missing_id(test_repo):
 def test_ensure_workspace_returns_existing_workspace(test_repo):
     repo, session = test_repo
     created_ws = repo.create_workspace(name="Legitimate Workspace", workspace_id="ws_legit_1")
+    assert created_ws.id == "ws_legit_1"
 
     retrieved = repo.ensure_workspace("ws_legit_1")
     assert retrieved is not None
@@ -89,7 +88,7 @@ def test_fastapi_handles_not_found_error_with_404():
     Base.metadata.create_all(bind=engine)
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-    from apps.api.dependencies import get_db, get_repository, UserContext, require_roles
+    from apps.api.dependencies import get_db, get_repository, UserContext
 
     def override_get_db():
         db = TestingSessionLocal()

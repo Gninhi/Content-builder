@@ -1,16 +1,15 @@
 import asyncio
 import pytest
 import time
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from datetime import datetime, timezone, timedelta
 from fastapi.testclient import TestClient
 from apps.api.main import app, supervise_daemon
 from infra.db.database import get_db_session
 from infra.db.repository import ContentOpsRepository
-from infra.db.models import PublicationJobModel, UserModel, WorkspaceMemberModel
+from infra.db.models import UserModel
 from packages.domain.state_machine import ContentStatus
 from services.scheduler.dispatcher import SchedulerDispatcher
-from services.scheduler.veille_worker import VeilleSchedulerWorker
 
 
 @pytest.mark.asyncio
@@ -61,7 +60,7 @@ def test_lifespan_starts_and_stops_background_daemons_gracefully():
     with patch.dict("os.environ", {"ENABLE_BACKGROUND_DAEMONS": "true"}):
         with patch("services.scheduler.dispatcher.SchedulerDispatcher.run_daemon_loop", side_effect=mock_loop), \
              patch("services.scheduler.veille_worker.VeilleSchedulerWorker.run_daemon_loop", side_effect=mock_loop):
-            with TestClient(app) as client:
+            with TestClient(app):
                 # Verify background tasks exist on app.state
                 assert hasattr(app.state, "background_tasks")
                 assert hasattr(app.state, "background_stop_event")
@@ -107,11 +106,11 @@ def test_scheduler_dispatcher_processes_due_jobs_in_daemon():
             variant_id=str(var.id),
             scheduled_at=due_time
         )
-        job_id = job.id
         db.commit()
 
         dispatcher = SchedulerDispatcher(db)
         results = dispatcher.process_due_jobs()
+        assert isinstance(results, list)
 
         # Check job was processed
         db.refresh(job)

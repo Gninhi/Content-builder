@@ -78,7 +78,7 @@ def test_idea_deduplication_in_repository():
             effort_score=35.0,
             priority="high",
             risks=[],
-            signal_id="sig_test_1"
+            signal_id=None
         )
         assert idea1.id.startswith("idea_")
 
@@ -95,7 +95,7 @@ def test_idea_deduplication_in_repository():
             effort_score=40.0,
             priority="high",
             risks=[],
-            signal_id="sig_test_2"
+            signal_id=None
         )
         assert idea2.id == idea1.id
 

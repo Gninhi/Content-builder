@@ -20,6 +20,21 @@ from apps.api.dependencies import get_repository, UserContext, require_roles
 router = APIRouter(tags=["Strategy & Insights"])
 
 
+@router.get("/v1/strategy/insights", response_model=StrategyInsightsResponse)
+def get_strategy_insights(
+    user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer"))
+):
+    """
+    Read-only endpoint returning current strategic insights without triggering LLM generation.
+    Returns empty list when no on-demand generation has been requested yet.
+    """
+    return StrategyInsightsResponse(
+        workspace_id=user.workspace_id,
+        generated_at=datetime.now(timezone.utc),
+        insights=[]
+    )
+
+
 @router.post("/v1/strategy/insights", response_model=StrategyInsightsResponse)
 def generate_strategy_insights(
     workspace_id: Optional[str] = Body(None, embed=True),
@@ -78,7 +93,6 @@ def generate_strategy_insights(
             detail={"error_code": "LLM_PROVIDERS_DOWN", "message": "LLM providers unavailable for strategy insights."}
         )
 
-
     insights = [
         StrategyInsight(
             pillar=h.get("pillar", "Général"),
@@ -91,7 +105,7 @@ def generate_strategy_insights(
     ]
 
     return StrategyInsightsResponse(
-        workspace_id=workspace_id,
+        workspace_id=ws_id,
         generated_at=datetime.now(timezone.utc),
         insights=insights
     )

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -34,6 +35,7 @@ interface VeilleScreenProps {
 }
 
 export const VeilleScreen: React.FC<VeilleScreenProps> = ({ onNavigate }) => {
+  const navigate = useNavigate();
   const { language } = useLanguage();
   const { session, canEdit, isOwner } = useAuth();
   const { showToast } = useToast();
@@ -167,7 +169,7 @@ export const VeilleScreen: React.FC<VeilleScreenProps> = ({ onNavigate }) => {
       if (onNavigate) {
         onNavigate('ideation');
       } else {
-        window.location.hash = '#ideation';
+        navigate('/ideation');
       }
     } catch (err: any) {
       showToast('error', `Erreur de conversion : ${err.message}`);

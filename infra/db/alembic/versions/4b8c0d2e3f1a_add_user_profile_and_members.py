@@ -17,80 +17,109 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def _has_table(inspector: sa.Inspector, table_name: str) -> bool:
+    return table_name in inspector.get_table_names()
+
+
+def _has_index(inspector: sa.Inspector, table_name: str, index_name: str) -> bool:
+    if not _has_table(inspector, table_name):
+        return False
+    return any(idx["name"] == index_name for idx in inspector.get_indexes(table_name))
+
+
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+
     # 1. users table
-    op.create_table(
-        'users',
-        sa.Column('id', sa.String(length=64), nullable=False),
-        sa.Column('email', sa.String(length=255), nullable=False),
-        sa.Column('password_hash', sa.String(length=255), nullable=True),
-        sa.Column('full_name', sa.String(length=255), nullable=False, server_default=''),
-        sa.Column('display_name', sa.String(length=255), nullable=True),
-        sa.Column('job_title', sa.String(length=255), nullable=True),
-        sa.Column('avatar_url', sa.Text(), nullable=True),
-        sa.Column('timezone', sa.String(length=64), nullable=False, server_default='UTC'),
-        sa.Column('language', sa.String(length=8), nullable=False, server_default='fr'),
-        sa.Column('theme', sa.String(length=16), nullable=False, server_default='dark'),
-        sa.Column('notification_preferences', sa.JSON(), nullable=False),
-        sa.Column('ui_preferences', sa.JSON(), nullable=False),
-        sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.true()),
-        sa.Column('created_at', sa.DateTime(), nullable=False),
-        sa.Column('updated_at', sa.DateTime(), nullable=False),
-        sa.PrimaryKeyConstraint('id'),
-    )
-    op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
+    if not _has_table(inspector, 'users'):
+        op.create_table(
+            'users',
+            sa.Column('id', sa.String(length=64), nullable=False),
+            sa.Column('email', sa.String(length=255), nullable=False),
+            sa.Column('password_hash', sa.String(length=255), nullable=True),
+            sa.Column('full_name', sa.String(length=255), nullable=False, server_default=''),
+            sa.Column('display_name', sa.String(length=255), nullable=True),
+            sa.Column('job_title', sa.String(length=255), nullable=True),
+            sa.Column('avatar_url', sa.Text(), nullable=True),
+            sa.Column('timezone', sa.String(length=64), nullable=False, server_default='UTC'),
+            sa.Column('language', sa.String(length=8), nullable=False, server_default='fr'),
+            sa.Column('theme', sa.String(length=16), nullable=False, server_default='dark'),
+            sa.Column('notification_preferences', sa.JSON(), nullable=False),
+            sa.Column('ui_preferences', sa.JSON(), nullable=False),
+            sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.true()),
+            sa.Column('created_at', sa.DateTime(), nullable=False),
+            sa.Column('updated_at', sa.DateTime(), nullable=False),
+            sa.PrimaryKeyConstraint('id'),
+        )
+    inspector = sa.inspect(bind)
+    if not _has_index(inspector, 'users', 'ix_users_email'):
+        op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
 
     # 2. workspace_members table
-    op.create_table(
-        'workspace_members',
-        sa.Column('id', sa.String(length=64), nullable=False),
-        sa.Column('workspace_id', sa.String(length=64), nullable=False),
-        sa.Column('user_id', sa.String(length=64), nullable=False),
-        sa.Column('role', sa.String(length=32), nullable=False, server_default='Viewer'),
-        sa.Column('created_at', sa.DateTime(), nullable=False),
-        sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ondelete='CASCADE'),
-        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
-        sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('workspace_id', 'user_id', name='uq_workspace_member'),
-    )
-    op.create_index(op.f('ix_workspace_members_workspace_id'), 'workspace_members', ['workspace_id'], unique=False)
-    op.create_index(op.f('ix_workspace_members_user_id'), 'workspace_members', ['user_id'], unique=False)
+    if not _has_table(inspector, 'workspace_members'):
+        op.create_table(
+            'workspace_members',
+            sa.Column('id', sa.String(length=64), nullable=False),
+            sa.Column('workspace_id', sa.String(length=64), nullable=False),
+            sa.Column('user_id', sa.String(length=64), nullable=False),
+            sa.Column('role', sa.String(length=32), nullable=False, server_default='Viewer'),
+            sa.Column('created_at', sa.DateTime(), nullable=False),
+            sa.ForeignKeyConstraint(['workspace_id'], ['workspaces.id'], ondelete='CASCADE'),
+            sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+            sa.PrimaryKeyConstraint('id'),
+            sa.UniqueConstraint('workspace_id', 'user_id', name='uq_workspace_member'),
+        )
+    inspector = sa.inspect(bind)
+    if not _has_index(inspector, 'workspace_members', 'ix_workspace_members_workspace_id'):
+        op.create_index(op.f('ix_workspace_members_workspace_id'), 'workspace_members', ['workspace_id'], unique=False)
+    if not _has_index(inspector, 'workspace_members', 'ix_workspace_members_user_id'):
+        op.create_index(op.f('ix_workspace_members_user_id'), 'workspace_members', ['user_id'], unique=False)
 
     # 3. user_sessions table
-    op.create_table(
-        'user_sessions',
-        sa.Column('id', sa.String(length=64), nullable=False),
-        sa.Column('user_id', sa.String(length=64), nullable=False),
-        sa.Column('token_jti', sa.String(length=64), nullable=False),
-        sa.Column('user_agent', sa.Text(), nullable=True),
-        sa.Column('ip_address', sa.String(length=64), nullable=True),
-        sa.Column('last_active_at', sa.DateTime(), nullable=False),
-        sa.Column('expires_at', sa.DateTime(), nullable=False),
-        sa.Column('is_revoked', sa.Boolean(), nullable=False, server_default=sa.false()),
-        sa.Column('created_at', sa.DateTime(), nullable=False),
-        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
-        sa.PrimaryKeyConstraint('id'),
-    )
-    op.create_index(op.f('ix_user_sessions_user_id'), 'user_sessions', ['user_id'], unique=False)
-    op.create_index(op.f('ix_user_sessions_token_jti'), 'user_sessions', ['token_jti'], unique=True)
+    if not _has_table(inspector, 'user_sessions'):
+        op.create_table(
+            'user_sessions',
+            sa.Column('id', sa.String(length=64), nullable=False),
+            sa.Column('user_id', sa.String(length=64), nullable=False),
+            sa.Column('token_jti', sa.String(length=64), nullable=False),
+            sa.Column('user_agent', sa.Text(), nullable=True),
+            sa.Column('ip_address', sa.String(length=64), nullable=True),
+            sa.Column('last_active_at', sa.DateTime(), nullable=False),
+            sa.Column('expires_at', sa.DateTime(), nullable=False),
+            sa.Column('is_revoked', sa.Boolean(), nullable=False, server_default=sa.false()),
+            sa.Column('created_at', sa.DateTime(), nullable=False),
+            sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+            sa.PrimaryKeyConstraint('id'),
+        )
+    inspector = sa.inspect(bind)
+    if not _has_index(inspector, 'user_sessions', 'ix_user_sessions_user_id'):
+        op.create_index(op.f('ix_user_sessions_user_id'), 'user_sessions', ['user_id'], unique=False)
+    if not _has_index(inspector, 'user_sessions', 'ix_user_sessions_token_jti'):
+        op.create_index(op.f('ix_user_sessions_token_jti'), 'user_sessions', ['token_jti'], unique=True)
 
     # 4. audit_logs table
-    op.create_table(
-        'audit_logs',
-        sa.Column('id', sa.String(length=64), nullable=False),
-        sa.Column('workspace_id', sa.String(length=64), nullable=True),
-        sa.Column('user_id', sa.String(length=64), nullable=False),
-        sa.Column('event_type', sa.String(length=64), nullable=False),
-        sa.Column('severity', sa.String(length=16), nullable=False, server_default='INFO'),
-        sa.Column('details', sa.JSON(), nullable=False),
-        sa.Column('ip_address', sa.String(length=64), nullable=True),
-        sa.Column('user_agent', sa.Text(), nullable=True),
-        sa.Column('created_at', sa.DateTime(), nullable=False),
-        sa.PrimaryKeyConstraint('id'),
-    )
-    op.create_index(op.f('ix_audit_logs_workspace_id'), 'audit_logs', ['workspace_id'], unique=False)
-    op.create_index(op.f('ix_audit_logs_user_id'), 'audit_logs', ['user_id'], unique=False)
-    op.create_index(op.f('ix_audit_logs_event_type'), 'audit_logs', ['event_type'], unique=False)
+    if not _has_table(inspector, 'audit_logs'):
+        op.create_table(
+            'audit_logs',
+            sa.Column('id', sa.String(length=64), nullable=False),
+            sa.Column('workspace_id', sa.String(length=64), nullable=True),
+            sa.Column('user_id', sa.String(length=64), nullable=False),
+            sa.Column('event_type', sa.String(length=64), nullable=False),
+            sa.Column('severity', sa.String(length=16), nullable=False, server_default='INFO'),
+            sa.Column('details', sa.JSON(), nullable=False),
+            sa.Column('ip_address', sa.String(length=64), nullable=True),
+            sa.Column('user_agent', sa.Text(), nullable=True),
+            sa.Column('created_at', sa.DateTime(), nullable=False),
+            sa.PrimaryKeyConstraint('id'),
+        )
+    inspector = sa.inspect(bind)
+    if not _has_index(inspector, 'audit_logs', 'ix_audit_logs_workspace_id'):
+        op.create_index(op.f('ix_audit_logs_workspace_id'), 'audit_logs', ['workspace_id'], unique=False)
+    if not _has_index(inspector, 'audit_logs', 'ix_audit_logs_user_id'):
+        op.create_index(op.f('ix_audit_logs_user_id'), 'audit_logs', ['user_id'], unique=False)
+    if not _has_index(inspector, 'audit_logs', 'ix_audit_logs_event_type'):
+        op.create_index(op.f('ix_audit_logs_event_type'), 'audit_logs', ['event_type'], unique=False)
 
 
 def downgrade() -> None:

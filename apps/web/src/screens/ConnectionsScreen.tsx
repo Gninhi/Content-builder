@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -32,6 +33,7 @@ interface AccountInfo {
 }
 
 export const ConnectionsScreen: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useLanguage();
   const { session, isOwner } = useAuth();
   const { showToast } = useToast();
@@ -60,6 +62,18 @@ export const ConnectionsScreen: React.FC = () => {
     message: string;
   } | null>(null);
 
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Clear polling interval on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, []);
+
   const fetchAccounts = async (silent = false) => {
     if (!silent) setLoading(true);
     setError(null);
@@ -79,6 +93,21 @@ export const ConnectionsScreen: React.FC = () => {
     fetchAccounts();
   }, [session?.workspace_id]);
 
+  // Handle direct OAuth redirect query parameters (e.g. ?oauth=success&provider=x)
+  useEffect(() => {
+    const oauthStatus = searchParams.get('oauth');
+    if (oauthStatus === 'success') {
+      const prov = (searchParams.get('provider') || '').toUpperCase();
+      showToast('success', `Compte ${prov || 'social'} connecté et vérifié avec succès !`);
+      fetchAccounts(true);
+      setSearchParams({}, { replace: true });
+    } else if (oauthStatus === 'error') {
+      const errorMsg = searchParams.get('message') || searchParams.get('error') || 'Erreur OAuth';
+      showToast('error', `Échec d'autorisation OAuth : ${errorMsg}`);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams, showToast]);
+
   // Listen for OAuth completion message from the opened external tab
   useEffect(() => {
     const handleOAuthMessage = (event: MessageEvent) => {
@@ -94,10 +123,18 @@ export const ConnectionsScreen: React.FC = () => {
         return;
       }
       if (event.data?.type === 'CONTENTOPS_OAUTH_SUCCESS') {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
         const prov = String(event.data.provider || '').toUpperCase();
         showToast('success', `Compte ${prov} connecté et vérifié avec succès !`);
         fetchAccounts(true);
       } else if (event.data?.type === 'CONTENTOPS_OAUTH_ERROR') {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
         showToast('error', `Échec d'autorisation OAuth : ${event.data.error || 'Erreur inconnue'}`);
       }
     };
@@ -119,16 +156,32 @@ export const ConnectionsScreen: React.FC = () => {
         `/v1/oauth/start/${provider}`
       );
       if (res.authorization_url) {
-        // Must open in an external tab to preserve application session and JWT
-        window.open(res.authorization_url, '_blank', 'noopener,noreferrer');
+        // Open OAuth authorization flow in a popup window allowing postMessage back to window.opener
+        const width = 600;
+        const height = 700;
+        const left = Math.max(0, window.screenX + (window.outerWidth - width) / 2);
+        const top = Math.max(0, window.screenY + (window.outerHeight - height) / 2);
+        const popup = window.open(
+          res.authorization_url,
+          `oauth_${provider}`,
+          `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,status=yes`
+        );
+        if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+          // Fallback if popup blocker intercepted
+          window.open(res.authorization_url, '_blank');
+        }
         showToast(
           'info',
-          `Ouverture de la fenêtre d'autorisation ${provider.toUpperCase()} dans un nouvel onglet...`
+          `Ouverture de la fenêtre d'autorisation ${provider.toUpperCase()}...`
         );
 
-        // Start background polling to detect callback completion
+        // Start background polling to detect callback completion safely
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
         let pollCount = 0;
-        const interval = setInterval(async () => {
+        pollIntervalRef.current = setInterval(async () => {
           pollCount++;
           try {
             const accRes = await apiClient<{ accounts: AccountInfo[] }>('/v1/oauth/accounts');
@@ -136,15 +189,21 @@ export const ConnectionsScreen: React.FC = () => {
               (a) => a.provider.toLowerCase() === provider.toLowerCase()
             );
             if (found) {
-              clearInterval(interval);
+              if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+                pollIntervalRef.current = null;
+              }
               setAccounts(accRes.accounts);
               showToast('success', `Compte ${provider.toUpperCase()} synchronisé avec succès !`);
             }
           } catch (e) {
             // Ignore polling errors
           }
-          if (pollCount >= 30) {
-            clearInterval(interval);
+          if (pollCount >= 20) {
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
           }
         }, 3000);
       }
@@ -215,6 +274,8 @@ export const ConnectionsScreen: React.FC = () => {
 
   const linkedIn = getAccount('linkedin');
   const xAccount = getAccount('x');
+  const isLinkedInExpired = linkedIn?.status === 'EXPIRED';
+  const isXExpired = xAccount?.status === 'EXPIRED';
 
   if (loading) {
     return (
@@ -294,16 +355,26 @@ export const ConnectionsScreen: React.FC = () => {
               </div>
 
               <Badge
-                variant={linkedIn ? 'success' : 'neutral'}
+                variant={!linkedIn ? 'neutral' : isLinkedInExpired ? 'warning' : 'success'}
                 withDot
                 className="text-xs"
               >
-                {linkedIn ? t.connections.status_connected : t.connections.status_disconnected}
+                {!linkedIn
+                  ? t.connections.status_disconnected
+                  : isLinkedInExpired
+                  ? 'Jeton expiré'
+                  : t.connections.status_connected}
               </Badge>
             </div>
 
             {linkedIn ? (
               <div className="space-y-2.5 rounded-lg bg-surface-subtle p-4 border border-border-subtle text-xs">
+                {isLinkedInExpired && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-md bg-status-warning-bg text-status-warning-text border border-status-warning-border">
+                    <ShieldAlert className="h-4 w-4 shrink-0" />
+                    <span>Jeton OAuth expiré. Renouvelez l'autorisation pour débloquer la publication.</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-txt-muted">Compte membre :</span>
                   <span className="font-medium text-txt">{linkedIn.account_name}</span>
@@ -327,6 +398,19 @@ export const ConnectionsScreen: React.FC = () => {
           <div className="pt-2 space-y-2.5">
             {linkedIn ? (
               <div className="space-y-2">
+                {isLinkedInExpired && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={!isOwner}
+                    onClick={() => handleStartOAuth('linkedin')}
+                    className="w-full text-xs min-h-[44px] font-semibold"
+                    title="Renouveler immédiatement le jeton d'accès expiré"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                    Renouveler le jeton expiré (Onglet externe)
+                  </Button>
+                )}
                 <div className="flex gap-2">
                   <Button
                     variant="primary"
@@ -408,16 +492,26 @@ export const ConnectionsScreen: React.FC = () => {
               </div>
 
               <Badge
-                variant={xAccount ? 'success' : 'neutral'}
+                variant={!xAccount ? 'neutral' : isXExpired ? 'warning' : 'success'}
                 withDot
                 className="text-xs"
               >
-                {xAccount ? t.connections.status_connected : t.connections.status_disconnected}
+                {!xAccount
+                  ? t.connections.status_disconnected
+                  : isXExpired
+                  ? 'Jeton expiré'
+                  : t.connections.status_connected}
               </Badge>
             </div>
 
             {xAccount ? (
               <div className="space-y-2.5 rounded-lg bg-surface-subtle p-4 border border-border-subtle text-xs">
+                {isXExpired && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-md bg-status-warning-bg text-status-warning-text border border-status-warning-border">
+                    <ShieldAlert className="h-4 w-4 shrink-0" />
+                    <span>Jeton OAuth expiré. Renouvelez l'autorisation pour débloquer la publication.</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-txt-muted">Compte membre :</span>
                   <span className="font-medium text-txt">{xAccount.account_name}</span>
@@ -441,6 +535,19 @@ export const ConnectionsScreen: React.FC = () => {
           <div className="pt-2 space-y-2.5">
             {xAccount ? (
               <div className="space-y-2">
+                {isXExpired && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={!isOwner}
+                    onClick={() => handleStartOAuth('x')}
+                    className="w-full text-xs min-h-[44px] font-semibold"
+                    title="Renouveler immédiatement le jeton d'accès expiré"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                    Renouveler le jeton expiré (Onglet externe)
+                  </Button>
+                )}
                 <div className="flex gap-2">
                   <Button
                     variant="primary"

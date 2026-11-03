@@ -40,6 +40,8 @@ def _get_client_ip(request: Request) -> Optional[str]:
 
 
 def _to_profile_response(user_model: UserModel, workspaces: List[UserWorkspaceInfo]) -> UserProfileResponse:
+    raw_ui_prefs = dict(user_model.ui_preferences or {})
+    public_ui_prefs = {k: v for k, v in raw_ui_prefs.items() if not str(k).startswith("_")}
     return UserProfileResponse(
         id=str(user_model.id),
         email=str(user_model.email),
@@ -51,11 +53,12 @@ def _to_profile_response(user_model: UserModel, workspaces: List[UserWorkspaceIn
         language=str(user_model.language or "fr"),
         theme=str(user_model.theme or "dark"),
         notification_preferences=dict(user_model.notification_preferences or {}),
-        ui_preferences=dict(user_model.ui_preferences or {}),
+        ui_preferences=public_ui_prefs,
         created_at=getattr(user_model, "created_at"),
         updated_at=getattr(user_model, "updated_at"),
         workspaces=workspaces,
     )
+
 
 
 @router.get("/me", response_model=UserProfileResponse)

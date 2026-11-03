@@ -1,6 +1,6 @@
 import pytest
-from datetime import datetime, timezone, timedelta
-from unittest.mock import MagicMock, patch
+from datetime import datetime, timezone
+from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
 from apps.api.main import app

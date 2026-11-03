@@ -2,6 +2,7 @@ from typing import Dict, Any, List
 import re
 from packages.domain.state_machine import ContentStatus
 from packages.resilience.circuit_breaker import resolve_cycle_budget
+from packages.security.env import is_production
 from services.orchestration.state.base import ContentProductionState
 
 
@@ -18,6 +19,7 @@ def _build_remediation_hint(rule_id: str, platform: str, details: str) -> str:
         "FACTUAL_CLAIMS_VERIFIED": "Ancrer chaque affirmation factuelle sur les faits présents dans les sources fournies.",
         "SECURITY_INJECTION_DEFENSE": "Retirer tout motif d'instruction système ou balise suspecte.",
         "AI_ACT_TRANSPARENCY": "Inclure une mention explicite de transparence IA (ex: 'Généré avec assistance IA').",
+        "AUTHENTIC_LLM_OUTPUT": "Fournir une génération LLM authentique issue d'un fournisseur vérifié et configuré.",
     }
     return hints.get(rule_id, f"Corriger la non-conformité détectée : {details}")
 
@@ -139,6 +141,24 @@ def quality_gate_node(state: ContentProductionState) -> Dict[str, Any]:
                 "passed": ai_ok,
                 "details": ai_msg
             })
+
+        # 7. Authentic non-synthetic content rule (AGT-01)
+        # If strict_llm is requested, synthetic fallback items cannot pass quality gate
+        strict_llm = bool(state.get("strict_llm", False))
+        is_synthetic = bool(variant.get("degraded") or variant.get("is_synthetic") or variant.get("is_demo"))
+        if strict_llm and is_synthetic:
+            auth_passed = False
+            auth_msg = "Strict LLM policy active: Synthetic fallback or demo content rejected"
+        else:
+            auth_passed = True
+            auth_msg = "Content accepted for human review (marked degraded)" if is_synthetic else "Verified authentic content"
+
+        checks.append({
+            "rule_id": "AUTHENTIC_LLM_OUTPUT",
+            "name": "Authentic Non-Fabricated Content",
+            "passed": auth_passed,
+            "details": auth_msg
+        })
 
         passed_count = sum(1 for c in checks if c["passed"])
         variant_score = round((passed_count / len(checks)) * 100, 1)

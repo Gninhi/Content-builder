@@ -1,5 +1,4 @@
 import json
-import re
 import yaml
 from pathlib import Path
 

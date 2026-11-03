@@ -1,5 +1,4 @@
 import io
-import os
 import pytest
 from PIL import Image
 from fastapi.testclient import TestClient
@@ -10,7 +9,6 @@ from infra.db.repository import ContentOpsRepository
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-import infra.db.models
 from infra.db.models import Base, UserModel
 
 

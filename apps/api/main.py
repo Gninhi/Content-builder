@@ -3,17 +3,23 @@ import time
 import asyncio
 import random
 import logging
-from typing import Callable, Coroutine, Any, Optional
+from typing import Callable, Coroutine, Any, Dict
 from pathlib import Path
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv, find_dotenv
 
-# Prioritize values from .env file unconditionally over inherited shell values
-load_dotenv(find_dotenv(usecwd=True), override=True)
+# Prioritize values from .env file in normal execution, without overwriting explicit test environment variables
+_is_test_mode = (
+    os.environ.get("CONTENTOPS_TEST_MODE") == "1"
+    or "PYTEST_CURRENT_TEST" in os.environ
+    or os.environ.get("APP_ENV") in ("test", "testing")
+)
+load_dotenv(find_dotenv(usecwd=True), override=not _is_test_mode)
+
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from slowapi.errors import RateLimitExceeded
@@ -22,7 +28,8 @@ from infra.db.database import init_db, SessionLocal
 from infra.db.repository import ContentOpsRepository, NotFoundError
 from packages.security.limiter import limiter, safe_rate_limit_exceeded_handler, get_storage_status
 from packages.resilience.circuit_breaker import BudgetExceededException
-from packages.observability.correlation import set_correlation_id
+from packages.observability.correlation import set_correlation_id, get_correlation_id
+
 from packages.observability.prometheus import (
     get_prometheus_metrics_response,
     HTTP_REQUESTS_TOTAL,
@@ -91,12 +98,18 @@ async def supervise_daemon(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Enforce fail-closed security configuration in production
+    app.state.app_initialized = False
+
+    # Enforce fail-closed security and email configuration
     from packages.security.auth import validate_jwt_configuration
+    from packages.security.email_service import validate_email_configuration
+    from packages.security.env import get_app_env
     validate_jwt_configuration()
+    validate_email_configuration()
 
     # Initialize DB schemas
     init_db()
+
 
     # Seed default workspace & initial brand profile for zero-friction start
     # and reconcile any orphan PUBLISHING jobs left over from unexpected process stops
@@ -142,9 +155,9 @@ async def lifespan(app: FastAPI):
         if stale_orphan_jobs:
             db.commit()
 
-        app_env = os.getenv("APP_ENV", "production").lower()
+        app_env = get_app_env()
         enable_fixtures = os.getenv("ENABLE_DEV_FIXTURES", "false").lower() in ("true", "1", "yes")
-        if app_env in ("development", "test", "local") or enable_fixtures:
+        if app_env in ("development", "dev", "test", "testing", "local") or enable_fixtures:
             repo = ContentOpsRepository(db)
             default_ws = repo.get_workspace("ws_default")
             if not default_ws:
@@ -224,7 +237,9 @@ async def lifespan(app: FastAPI):
         app.state.background_tasks = [dispatcher_task, veille_task]
         logger.info("Background daemons started under supervision: SchedulerDispatcher, VeilleSchedulerWorker")
 
+    app.state.app_initialized = True
     yield
+
 
     # Graceful shutdown of background daemons
     if hasattr(app.state, "background_stop_event") and app.state.background_stop_event:
@@ -323,7 +338,15 @@ async def security_and_size_middleware(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     if "Content-Security-Policy" not in response.headers:
-        response.headers["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none';"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https:; "
+            "style-src 'self' 'unsafe-inline' https:; "
+            "img-src 'self' data: blob: https:; "
+            "font-src 'self' data: https:; "
+            "connect-src 'self' http://localhost:* http://127.0.0.1:* https:; "
+            "frame-ancestors 'none';"
+        )
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response
 
@@ -332,7 +355,11 @@ async def security_and_size_middleware(request: Request, call_next):
 async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
     return JSONResponse(
         status_code=exc.status_code,
-        content={"error": "http_error", "detail": exc.detail},
+        content={
+            "error": "http_error",
+            "detail": exc.detail,
+            "correlation_id": get_correlation_id(),
+        },
         headers=getattr(exc, "headers", None)
     )
 
@@ -341,7 +368,11 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
 async def budget_exceeded_handler(request: Request, exc: BudgetExceededException):
     return JSONResponse(
         status_code=429,
-        content={"error": "budget_exceeded", "detail": f"LLM cycle budget exceeded: {str(exc)}"}
+        content={
+            "error": "budget_exceeded",
+            "detail": f"LLM cycle budget exceeded: {str(exc)}",
+            "correlation_id": get_correlation_id(),
+        }
     )
 
 
@@ -349,7 +380,11 @@ async def budget_exceeded_handler(request: Request, exc: BudgetExceededException
 async def not_found_handler(request: Request, exc: NotFoundError):
     return JSONResponse(
         status_code=404,
-        content={"error": "not_found", "detail": str(exc)}
+        content={
+            "error": "not_found",
+            "detail": str(exc),
+            "correlation_id": get_correlation_id(),
+        }
     )
 
 
@@ -360,7 +395,8 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={
             "error": "internal_server_error",
-            "detail": "Une erreur interne est survenue. Veuillez contacter le support."
+            "detail": "Une erreur interne est survenue. Veuillez contacter le support.",
+            "correlation_id": get_correlation_id(),
         }
     )
 
@@ -385,17 +421,52 @@ web_dir = Path(__file__).resolve().parent.parent / "web"
 dist_dir = web_dir / "dist"
 target_static_dir = dist_dir if dist_dir.exists() else web_dir
 if target_static_dir.exists():
-    app.mount("/ui", StaticFiles(directory=str(target_static_dir), html=True), name="ui")
+    class SPAStaticFiles(StaticFiles):
+        async def get_response(self, path: str, scope):
+            try:
+                response = await super().get_response(path, scope)
+                if response.status_code == 404:
+                    index_path = target_static_dir / "index.html"
+                    if index_path.exists() and not path.startswith("assets/"):
+                        return FileResponse(str(index_path))
+                return response
+            except StarletteHTTPException as exc:
+                if exc.status_code == 404:
+                    index_path = target_static_dir / "index.html"
+                    if index_path.exists() and not path.startswith("assets/"):
+                        return FileResponse(str(index_path))
+                raise exc
+
+    app.mount("/ui", SPAStaticFiles(directory=str(target_static_dir), html=True), name="ui")
 
 
 @app.get("/health", tags=["System"])
-def health_check():
-    return {
-        "status": "healthy",
-        "service": "ContentOps Harness API",
-        "version": "1.0.0",
-        "engine": "LangGraph + FastAPI"
-    }
+def health_check(request: Request):
+    db_ok = False
+    try:
+        from sqlalchemy import text
+        db = SessionLocal()
+        try:
+            db.execute(text("SELECT 1"))
+            db_ok = True
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error("Health check database probe failed: %s", exc)
+
+    app_initialized = bool(getattr(request.app.state, "app_initialized", True))
+    is_healthy = db_ok
+    return JSONResponse(
+        status_code=200 if is_healthy else 503,
+        content={
+            "status": "healthy" if is_healthy else "unhealthy",
+            "service": "ContentOps Harness API",
+            "version": "2.0.0",
+            "engine": "LangGraph + FastAPI",
+            "app_initialized": app_initialized,
+            "database": "ok" if db_ok else "unavailable",
+        },
+    )
 
 
 @app.get("/ready", tags=["System"])
@@ -403,8 +474,9 @@ def readiness_check():
     """
     Readiness probe checking database, LangGraph checkpointer, and LLM configuration.
     Returns HTTP 200 if dependencies are ready, HTTP 503 if critical dependencies are down.
+    Never exposes raw SQL or internal exception strings publicly.
     """
-    checks = {}
+    checks: Dict[str, Any] = {}
     is_ready = True
 
     # 1. Database Connectivity
@@ -418,7 +490,8 @@ def readiness_check():
         finally:
             db.close()
     except Exception as e:
-        checks["database"] = f"error: {str(e)}"
+        logger.error("Readiness database check failed: %s", e)
+        checks["database"] = "unavailable"
         is_ready = False
 
     # 2. LangGraph Checkpointer
@@ -429,8 +502,10 @@ def readiness_check():
         if cp is None:
             is_ready = False
     except Exception as e:
-        checks["checkpointer"] = f"error: {str(e)}"
+        logger.error("Readiness checkpointer check failed: %s", e)
+        checks["checkpointer"] = "unavailable"
         is_ready = False
+
 
     # 3. LLM Providers Status
     from services.orchestration.providers.registry import LLMProviderRegistry

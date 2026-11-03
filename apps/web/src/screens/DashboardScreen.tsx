@@ -42,8 +42,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
   const [llmBudgetSpent, setLlmBudgetSpent] = useState(0.42);
   const [llmLimit] = useState(10.0);
 
-  const [linkedInStatus, setLinkedInStatus] = useState<'connected' | 'disconnected'>('disconnected');
-  const [xStatus, setXStatus] = useState<'connected' | 'disconnected'>('disconnected');
+  const [linkedInStatus, setLinkedInStatus] = useState<'connected' | 'expired' | 'disconnected'>('disconnected');
+  const [xStatus, setXStatus] = useState<'connected' | 'expired' | 'disconnected'>('disconnected');
   const [nextScheduled, setNextScheduled] = useState<any[]>([]);
 
   const currentWorkspaceName =
@@ -88,14 +88,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
       // 4. Fetch social accounts
       const accountsRes = await apiClient<{ accounts: any[] }>('/v1/oauth/accounts');
       const accounts = accountsRes.accounts || [];
-      const hasLinkedIn = accounts.some(
-        (a) => a.provider?.toLowerCase() === 'linkedin' && (a.status === 'ACTIVE' || a.status === 'connected')
-      );
-      const hasX = accounts.some(
-        (a) => a.provider?.toLowerCase() === 'x' && (a.status === 'ACTIVE' || a.status === 'connected')
-      );
-      setLinkedInStatus(hasLinkedIn ? 'connected' : 'disconnected');
-      setXStatus(hasX ? 'connected' : 'disconnected');
+      const liAcc = accounts.find((a) => a.provider?.toLowerCase() === 'linkedin');
+      const liStatus = !liAcc ? 'disconnected' : liAcc.status === 'EXPIRED' ? 'expired' : 'connected';
+
+      const xAcc = accounts.find((a) => a.provider?.toLowerCase() === 'x');
+      const xStat = !xAcc ? 'disconnected' : xAcc.status === 'EXPIRED' ? 'expired' : 'connected';
+
+      setLinkedInStatus(liStatus);
+      setXStatus(xStat);
     } catch (err: any) {
       setError(err.message || 'Erreur lors du chargement des indicateurs.');
     } finally {
@@ -305,8 +305,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
                   <p className="text-[11px] text-txt-muted font-mono">OAuth 2.0 PKCE</p>
                 </div>
               </div>
-              <Badge variant={linkedInStatus === 'connected' ? 'success' : 'neutral'} className="text-[11px]">
-                {linkedInStatus === 'connected' ? (isEn ? 'Connected' : 'Connecté') : (isEn ? 'Disconnected' : 'Non connecté')}
+              <Badge
+                variant={linkedInStatus === 'connected' ? 'success' : linkedInStatus === 'expired' ? 'warning' : 'neutral'}
+                className="text-[11px]"
+              >
+                {linkedInStatus === 'connected'
+                  ? (isEn ? 'Connected' : 'Connecté')
+                  : linkedInStatus === 'expired'
+                  ? (isEn ? 'Token Expired' : 'Jeton expiré')
+                  : (isEn ? 'Disconnected' : 'Non connecté')}
               </Badge>
             </div>
 
@@ -321,8 +328,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
                   <p className="text-[11px] text-txt-muted font-mono">OAuth 2.0 PKCE</p>
                 </div>
               </div>
-              <Badge variant={xStatus === 'connected' ? 'success' : 'neutral'} className="text-[11px]">
-                {xStatus === 'connected' ? (isEn ? 'Connected' : 'Connecté') : (isEn ? 'Disconnected' : 'Non connecté')}
+              <Badge
+                variant={xStatus === 'connected' ? 'success' : xStatus === 'expired' ? 'warning' : 'neutral'}
+                className="text-[11px]"
+              >
+                {xStatus === 'connected'
+                  ? (isEn ? 'Connected' : 'Connecté')
+                  : xStatus === 'expired'
+                  ? (isEn ? 'Token Expired' : 'Jeton expiré')
+                  : (isEn ? 'Disconnected' : 'Non connecté')}
               </Badge>
             </div>
           </div>

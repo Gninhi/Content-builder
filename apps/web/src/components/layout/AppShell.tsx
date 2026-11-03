@@ -48,12 +48,17 @@ export const AppShell: React.FC<AppShellProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Poll review inbox count and workspace status safely
+  // Poll review inbox count and workspace status safely without overloading inactive tabs
   useEffect(() => {
     if (!isAuthenticated) return;
 
     let isMounted = true;
     const fetchOverviewData = async () => {
+      // Don't poll or consume resources if the browser tab is hidden/inactive
+      if (typeof document !== 'undefined' && document.hidden) {
+        return;
+      }
+
       try {
         const inbox = await apiClient<InboxVariant[]>('/v1/inbox');
         if (isMounted) {
@@ -76,10 +81,20 @@ export const AppShell: React.FC<AppShellProps> = ({
     };
 
     fetchOverviewData();
-    const interval = setInterval(fetchOverviewData, 15000);
+    const interval = setInterval(fetchOverviewData, 30000);
+
+    // Immediately refresh badges when user switches back to this tab
+    const handleVisibilityChange = () => {
+      if (!document.hidden && isMounted) {
+        fetchOverviewData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       isMounted = false;
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [isAuthenticated, session?.workspace_id]);
 

@@ -1,6 +1,5 @@
 import uuid
 import os
-import pytest
 from fastapi.testclient import TestClient
 from apps.api.main import app
 from infra.db.database import get_db_session

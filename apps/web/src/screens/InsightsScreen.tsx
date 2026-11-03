@@ -41,8 +41,14 @@ export const InsightsScreen: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiClient<any>('/v1/analytics/overview');
+      const [data, insightsRes] = await Promise.all([
+        apiClient<any>('/v1/analytics/overview'),
+        apiClient<{ insights: Insight[] }>('/v1/strategy/insights').catch(() => ({ insights: [] })),
+      ]);
       setAnalytics(data);
+      if (insightsRes?.insights && insightsRes.insights.length > 0) {
+        setInsights(insightsRes.insights);
+      }
     } catch (err: any) {
       setError(err.message || (isEn ? 'Failed to fetch analytics.' : 'Impossible de récupérer les statistiques.'));
     } finally {
@@ -70,7 +76,6 @@ export const InsightsScreen: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-    handleGenerateInsights();
   }, [session?.workspace_id]);
 
   if (loading && !analytics) {

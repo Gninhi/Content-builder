@@ -72,9 +72,7 @@ Thumbs.db
 contentops.db*
 artifacts/
 scratch/
-storage/sources/
-storage/checkpoints/
-storage/avatars/*.webp
+storage/
 dumps/
 backups/
 *.zip

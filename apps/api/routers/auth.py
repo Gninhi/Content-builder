@@ -4,18 +4,29 @@ import logging
 from typing import Optional, List, Any, cast
 from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
-
-logger = logging.getLogger(__name__)
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from packages.security.auth import create_access_token, decode_access_token, Role
 from packages.security.env import is_production
-from packages.security.passwords import hash_password, verify_password, validate_password_strength
+from packages.security.passwords import (
+    hash_password,
+    verify_password,
+    validate_password_strength,
+    check_needs_rehash,
+    MAX_PASSWORD_LENGTH,
+)
 from packages.security.tokens import generate_crypto_token, hash_crypto_token, generate_refresh_token
-from packages.security.email_service import get_email_service
+from packages.security.email_service import (
+    get_email_service,
+    is_dev_mailbox_allowed,
+    MemoryLogEmailService,
+)
 from packages.security.limiter import limiter, get_client_ip
 from apps.api.dependencies import get_repository, get_current_user, UserContext
-from infra.db.repository import ContentOpsRepository
+from infra.db.repository import ContentOpsRepository, DuplicateUserError
 from infra.db.models import utc_now, ensure_utc
+
+logger = logging.getLogger(__name__)
+
 
 router = APIRouter(prefix="/v1/auth", tags=["Authentication"])
 
@@ -33,11 +44,15 @@ def _is_cookie_secure(request: Request) -> bool:
 
 
 def is_email_verification_required() -> bool:
-    """Enforces email verification requirement (fail-closed in production)."""
+    """
+    Enforces email verification requirement by default across production, staging, and local development (D-02).
+    Only disabled when REQUIRE_EMAIL_VERIFICATION is explicitly set to 'false'/'0'/'no' (e.g. in legacy unit tests).
+    """
     env_val = os.getenv("REQUIRE_EMAIL_VERIFICATION")
-    if env_val is not None:
-        return env_val.strip().lower() in ("true", "1", "yes")
-    return is_production()
+    if env_val is not None and env_val.strip():
+        return env_val.strip().lower() not in ("false", "0", "no")
+    return True
+
 
 
 def _set_refresh_cookie(response: Response, raw_token: str, request: Request) -> None:
@@ -67,10 +82,10 @@ class RegisterRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     email: EmailStr = Field(..., description="Adresse email professionnelle")
-    password: str = Field(..., description="Mot de passe robuste (min 10 caractères)")
+    password: str = Field(..., max_length=MAX_PASSWORD_LENGTH, description="Mot de passe robuste (10 à 128 caractères)")
     full_name: str = Field(..., min_length=2, max_length=120, description="Nom complet")
     workspace_name: Optional[str] = Field(None, max_length=120, description="Nom de l'organisation ou workspace")
-    invitation_code: Optional[str] = Field(None, description="Code d'invitation optionnel")
+    invitation_code: Optional[str] = Field(None, max_length=128, description="Code d'invitation optionnel")
     cgu_accepted: bool = Field(False, description="Acceptation des CGU")
     privacy_accepted: bool = Field(False, description="Acceptation de la Politique de Confidentialité")
     language: str = Field("fr", max_length=8)
@@ -79,7 +94,7 @@ class RegisterRequest(BaseModel):
 
 class VerifyEmailRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    token: str = Field(..., description="Jeton de vérification reçu par email")
+    token: str = Field(..., min_length=1, max_length=256, description="Jeton de vérification reçu par email")
 
 
 class ResendVerificationRequest(BaseModel):
@@ -94,15 +109,16 @@ class ForgotPasswordRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    token: str = Field(..., description="Jeton de réinitialisation reçu par email")
-    new_password: str = Field(..., description="Nouveau mot de passe")
+    token: str = Field(..., min_length=1, max_length=256, description="Jeton de réinitialisation reçu par email")
+    new_password: str = Field(..., max_length=MAX_PASSWORD_LENGTH, description="Nouveau mot de passe")
 
 
 class LoginRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     email: EmailStr = Field(..., description="Adresse email de l'utilisateur")
-    password: str = Field(..., description="Mot de passe du compte")
-    workspace_id: Optional[str] = Field(None, description="Workspace cible optionnel")
+    password: str = Field(..., min_length=1, max_length=MAX_PASSWORD_LENGTH, description="Mot de passe du compte")
+    workspace_id: Optional[str] = Field(None, max_length=64, description="Workspace cible optionnel")
+
 
 
 class RefreshRequest(BaseModel):
@@ -194,19 +210,26 @@ def register(
 
     if existing_user:
         # OWASP anti-enumeration: return timing-safe identical success response and status
+        delivery_status = "already_verified"
         if not existing_user.email_verified:
             raw_token = generate_crypto_token(32)
             token_hash = hash_crypto_token(raw_token)
             repo.set_email_verification_token(str(existing_user.id), token_hash, utc_now() + timedelta(hours=24))
-            email_svc.send_verification_email(
-                to_email=str(existing_user.email),
-                token=raw_token,
-                user_name=str(existing_user.full_name or "Utilisateur"),
-            )
+            try:
+                res_mail = email_svc.send_verification_email(
+                    to_email=str(existing_user.email),
+                    token=raw_token,
+                    user_name=str(existing_user.full_name or "Utilisateur"),
+                )
+                delivery_status = "sent" if res_mail.success else "pending_retry"
+            except Exception as exc:
+                logger.error("Failed to dispatch verification email for existing unverified user: %s", exc)
+                delivery_status = "pending_retry"
         return {
             "message": "Si l'adresse est valide, un email de confirmation a été envoyé pour activer votre accès.",
             "email": email_clean,
             "requires_verification": True,
+            "email_delivery_status": delivery_status,
         }
 
     pwd_hash = hash_password(req.password)
@@ -214,6 +237,10 @@ def register(
 
     require_verification = is_email_verification_required()
     email_verified = not require_verification
+
+    raw_token = generate_crypto_token(32)
+    token_hash = hash_crypto_token(raw_token)
+    verif_expires_at = utc_now() + timedelta(hours=24)
 
     try:
         user, ws, role = repo.register_user_atomic(
@@ -227,29 +254,70 @@ def register(
             language=req.language,
             theme=req.theme,
             email_verified=email_verified,
+            email_verification_token_hash=token_hash,
+            email_verification_expires_at=verif_expires_at,
+            ip_address=get_client_ip(request),
+            user_agent=request.headers.get("user-agent"),
         )
+    except DuplicateUserError:
+        return {
+            "message": "Si l'adresse est valide, un email de confirmation a été envoyé pour activer votre accès.",
+            "email": email_clean,
+            "requires_verification": True,
+            "email_delivery_status": "sent",
+        }
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
 
-    raw_token = generate_crypto_token(32)
-    token_hash = hash_crypto_token(raw_token)
-    repo.set_email_verification_token(str(user.id), token_hash, utc_now() + timedelta(hours=24))
-    email_svc.send_verification_email(
-        to_email=str(user.email),
-        token=raw_token,
-        user_name=str(user.full_name or req.full_name),
-    )
+    email_delivery_status = "sent"
+    try:
+        delivery_res = email_svc.send_verification_email(
+            to_email=str(user.email),
+            token=raw_token,
+            user_name=str(user.full_name or req.full_name),
+        )
+        if not delivery_res.success:
+            email_delivery_status = "pending_retry"
+    except Exception as exc:
+        logger.error("Verification email delivery failed after atomic registration for %s: %s", user.id, exc)
+        email_delivery_status = "pending_retry"
+
+    if email_delivery_status != "sent":
+        try:
+            repo.record_audit_log(
+                user_id=str(user.id),
+                workspace_id=str(ws.id),
+                event_type="verification_email_delivery_failed",
+                severity="WARNING",
+                details={"email_delivery_status": "pending_retry"},
+                ip_address=get_client_ip(request),
+                user_agent=request.headers.get("user-agent"),
+            )
+        except Exception as exc:
+            logger.warning("Failed to record verification email delivery audit log for user %s: %s", user.id, exc)
+        return {
+            "message": (
+                "Compte créé. L'envoi de l'email de confirmation est en attente ou a rencontré une erreur temporaire ; "
+                "vous pouvez demander un nouvel envoi depuis l'écran de confirmation."
+            ),
+            "email": str(user.email),
+            "requires_verification": require_verification,
+            "email_delivery_status": "pending_retry",
+        }
 
     return {
         "message": "Si l'adresse est valide, un email de confirmation a été envoyé pour activer votre accès.",
         "email": str(user.email),
         "requires_verification": require_verification,
+        "email_delivery_status": "sent",
     }
 
 
 @router.post("/verify-email")
+@limiter.limit("10/minute")
 def verify_email(
     req: VerifyEmailRequest,
+    request: Request,
     repo: ContentOpsRepository = Depends(get_repository),
 ):
     """Verifies a user's email address using the one-time cryptographic token."""
@@ -265,8 +333,11 @@ def verify_email(
         user_id=str(user.id),
         event_type="email_verified",
         severity="INFO",
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("user-agent"),
     )
     return {"message": "Adresse email vérifiée avec succès. Vous pouvez maintenant vous connecter."}
+
 
 
 @router.post("/resend-verification")
@@ -392,6 +463,14 @@ def login_with_password(
         )
 
     repo.reset_failed_logins(user_id)
+
+    # Transparently upgrade Argon2id hash if cost parameters changed
+    if check_needs_rehash(str(user.password_hash or "")):
+        try:
+            repo.update_user_password(user_id, hash_password(req.password))
+        except Exception as exc:
+            logger.warning("Failed to transparently rehash password for user %s: %s", user_id, exc)
+
 
     require_verification = is_email_verification_required()
     if require_verification and not user.email_verified:
@@ -770,7 +849,19 @@ def switch_workspace(
         jti=session_jti,
     )
 
+    try:
+        repo.create_session(
+            user_id=str(user.id),
+            token_jti=session_jti,
+            expires_at=utc_now() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+            user_agent=request.headers.get("user-agent") or "ContentOps Client",
+            ip_address=get_client_ip(request),
+        )
+    except Exception as exc:
+        logger.warning("Failed to record session during workspace switch: %s", exc)
+
     ws_list = [
+
         WorkspaceMembershipSummary(
             workspace_id=w["workspace_id"],
             name=w["name"],
@@ -876,5 +967,43 @@ def start_demo_session(
         is_demo=True,
         expires_at=ws.expires_at.isoformat() if ws.expires_at else None,
     )
+
+
+@router.get("/dev/mailbox")
+def get_dev_mailbox(
+    request: Request,
+    email: Optional[str] = None,
+):
+    """
+    Strictly local development mailbox endpoint (D-02).
+    Allows inspecting verification & password reset emails in APP_ENV=development/test without external SMTP.
+    Hard-blocked in staging and production (returns 404) and restricted to loopback clients (returns 403).
+    """
+    if not is_dev_mailbox_allowed():
+        raise HTTPException(
+            status_code=404,
+            detail="La boîte de réception de développement est désactivée hors environnement de développement.",
+        )
+
+    client_host = (request.client.host if request.client else "") or ""
+    forwarded_for = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    allowed_loopback = {"127.0.0.1", "::1", "localhost", "testclient", ""}
+    if client_host not in allowed_loopback or (forwarded_for and forwarded_for not in allowed_loopback):
+        raise HTTPException(
+            status_code=403,
+            detail="Accès à la boîte de réception de développement strictement réservé à l'interface locale (loopback).",
+        )
+
+    email_svc = get_email_service()
+    if not isinstance(email_svc, MemoryLogEmailService):
+        return {"enabled": False, "adapter": type(email_svc).__name__, "messages": []}
+
+    messages = email_svc.list_messages_for(email=email)
+    return {
+        "enabled": True,
+        "adapter": "dev_mailbox",
+        "messages": messages,
+    }
+
 
 

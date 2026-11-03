@@ -1,11 +1,8 @@
 import uuid
-import time
-from datetime import datetime, timedelta
-import pytest
+from datetime import timedelta
 from fastapi.testclient import TestClient
 from apps.api.main import app
 from infra.db.database import get_db_session
-from infra.db.repository import ContentOpsRepository
 from infra.db.models import utc_now, UserRefreshTokenModel
 
 client = TestClient(app, raise_server_exceptions=False)
@@ -18,7 +15,6 @@ def test_concurrent_refresh_within_grace_window_does_not_revoke_family():
     the server must NOT treat it as a malicious replay attack and must NOT revoke the token family.
     It should accommodate multi-tab concurrent refreshes smoothly.
     """
-    uid = f"usr_{uuid.uuid4().hex[:8]}"
     email = f"user_{uuid.uuid4().hex[:8]}@company.com"
     pwd = "StrongPassword2026!#"
 

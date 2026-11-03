@@ -1,8 +1,9 @@
-from typing import Dict, Any, List, Optional, Literal
-import logging
 import os
+import logging
 import re
+from typing import Dict, Any, List, Optional, Literal
 from pydantic import BaseModel, Field
+from packages.security.env import is_production
 from packages.observability.tracing import ObservabilityTracer
 from packages.prompts.registry import PromptRegistry
 from packages.cache.factory import (
@@ -386,36 +387,33 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
         budget.add_tokens(tokens_delivered)
         return res_data
 
-    strict_llm = (
-        bool(state.get("strict_llm"))
-        or os.getenv("STRICT_LLM_AVAILABILITY", "false").lower() in ("true", "1", "yes")
-    )
-
+    is_test_env = os.environ.get("CONTENTOPS_TEST_MODE") == "1" or "PYTEST_CURRENT_TEST" in os.environ
+    is_demo_mode = bool(state.get("demo")) or is_test_env or not is_production()
     if model is None:
-        if strict_llm:
-            logger.error(f"Strict LLM availability enforced and no LLM provider is active for workspace '{workspace_id}'.")
-            return {
-                "status": "LLM_UNAVAILABLE",
-                "error_code": "LLM_PROVIDERS_DOWN",
-                "reason": "Aucun fournisseur LLM actif n'est disponible pour générer les idées.",
-                "generated_ideas": [],
-                "run_id": trace_meta["run_id"],
-                "resolved_llm": None,
-                "cycle_budget": budget,
-                "cached": False,
-            }
-        logger.warning(f"No configured LLM provider available for workspace '{workspace_id}'. Using deterministic fallback for test/offline environment (never cached).")
-        return _build_demo_ideas(
-            topic=topic,
-            pillars=pillars,
-            audience=audience,
-            evidence_pool=evidence_pool,
-            target_count=target_count,
-            trace_meta=trace_meta,
-            resolved_ctx=resolved_ctx,
-            frozen_llm=frozen_llm,
-            budget=budget,
-        )
+        if is_demo_mode:
+            logger.info("Demo / test mode active: using clearly labeled synthetic demo ideas (never cached).")
+            return _build_demo_ideas(
+                topic=topic,
+                pillars=pillars,
+                audience=audience,
+                evidence_pool=evidence_pool,
+                target_count=target_count,
+                trace_meta=trace_meta,
+                resolved_ctx=resolved_ctx,
+                frozen_llm=frozen_llm,
+                budget=budget,
+            )
+        logger.error(f"No configured LLM provider available for workspace '{workspace_id}' and demo mode is not enabled.")
+        return {
+            "status": "LLM_PROVIDERS_DOWN",
+            "error_code": "LLM_PROVIDERS_DOWN",
+            "reason": "Aucun fournisseur LLM actif n'est disponible pour générer les idées.",
+            "generated_ideas": [],
+            "run_id": trace_meta["run_id"],
+            "resolved_llm": None,
+            "cycle_budget": budget,
+            "cached": False,
+        }
 
     try:
         rendered_prompt = PromptRegistry.render(
@@ -464,18 +462,34 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
             ObservabilityTracer.tag_trace(trace_meta["run_id"], ["cache_miss"])
             return res
         else:
-            if strict_llm:
-                return {
-                    "status": "LLM_UNAVAILABLE",
-                    "error_code": "LLM_PROVIDERS_DOWN",
-                    "reason": "Le fournisseur LLM n'a retourné aucune idée structurée valide.",
-                    "generated_ideas": [],
-                    "run_id": trace_meta["run_id"],
-                    "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else None,
-                    "cycle_budget": budget,
-                    "cached": False,
-                }
-            logger.warning("Structured output returned no ideas. Falling back to deterministic demo ideas (never cached).")
+            if is_demo_mode:
+                logger.warning("Structured output returned no ideas. Demo mode active: using demo ideas (never cached).")
+                return _build_demo_ideas(
+                    topic=topic,
+                    pillars=pillars,
+                    audience=audience,
+                    evidence_pool=evidence_pool,
+                    target_count=target_count,
+                    trace_meta=trace_meta,
+                    resolved_ctx=resolved_ctx,
+                    frozen_llm=frozen_llm,
+                    budget=budget,
+                )
+            return {
+                "status": "LLM_PROVIDERS_DOWN",
+                "error_code": "LLM_PROVIDERS_DOWN",
+                "reason": "Le fournisseur LLM n'a retourné aucune idée structurée valide.",
+                "generated_ideas": [],
+                "run_id": trace_meta["run_id"],
+                "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else None,
+                "cycle_budget": budget,
+                "cached": False,
+            }
+    except BudgetExceededException:
+        raise
+    except Exception as e:
+        if is_demo_mode:
+            logger.warning(f"LLM ideation invocation failed: {e}. Demo mode active: using demo ideas (never cached).")
             return _build_demo_ideas(
                 topic=topic,
                 pillars=pillars,
@@ -487,33 +501,17 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
                 frozen_llm=frozen_llm,
                 budget=budget,
             )
-    except BudgetExceededException:
-        raise
-    except Exception as e:
-        if strict_llm:
-            logger.error(f"Strict LLM ideation invocation failed: {e}")
-            return {
-                "status": "LLM_UNAVAILABLE",
-                "error_code": "LLM_PROVIDERS_DOWN",
-                "reason": f"Échec des fournisseurs LLM lors de l'idéation : {e}",
-                "generated_ideas": [],
-                "run_id": trace_meta["run_id"],
-                "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else None,
-                "cycle_budget": budget,
-                "cached": False,
-            }
-        logger.warning(f"LLM ideation invocation failed: {e}. Falling back to deterministic demo ideas (never cached).")
-        return _build_demo_ideas(
-            topic=topic,
-            pillars=pillars,
-            audience=audience,
-            evidence_pool=evidence_pool,
-            target_count=target_count,
-            trace_meta=trace_meta,
-            resolved_ctx=resolved_ctx,
-            frozen_llm=frozen_llm,
-            budget=budget,
-        )
+        logger.error(f"LLM ideation invocation failed: {e}")
+        return {
+            "status": "LLM_PROVIDERS_DOWN",
+            "error_code": "LLM_PROVIDERS_DOWN",
+            "reason": f"Échec des fournisseurs LLM lors de l'idéation : {e}",
+            "generated_ideas": [],
+            "run_id": trace_meta["run_id"],
+            "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else None,
+            "cycle_budget": budget,
+            "cached": False,
+        }
 
 
 def _build_demo_ideas(

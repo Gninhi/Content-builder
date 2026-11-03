@@ -1,10 +1,9 @@
 import uuid
-import pytest
 from fastapi.testclient import TestClient
 from apps.api.main import app
 from packages.security.auth import create_access_token
 from infra.db.database import get_db_session
-from infra.db.models import WorkspaceModel, WorkspaceMemberModel, UserModel
+from infra.db.models import WorkspaceModel, WorkspaceMemberModel
 from infra.db.repository import ContentOpsRepository
 
 client = TestClient(app, raise_server_exceptions=False)

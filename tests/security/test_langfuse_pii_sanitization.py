@@ -1,6 +1,5 @@
 import os
-from unittest.mock import MagicMock, patch
-import pytest
+from unittest.mock import patch
 
 from packages.security.pii import mask_pii
 from services.orchestration.callbacks.langfuse import SanitizedLangfuseCallbackHandler
@@ -59,10 +58,10 @@ def test_callback_handler_masks_chain_inputs_and_outputs():
     inputs = {"brief": "Send draft to ceo@bigcorp.com", "api_key": "sk-lf-secretkey12345678"}
     outputs = {"result": "Approved by supervisor@bigcorp.com"}
 
-    with patch.object(handler, "_handle_chain_start", create=True) as mock_chain_start:
+    with patch.object(handler, "_handle_chain_start", create=True):
         handler.on_chain_start(serialized={"name": "ideation"}, inputs=inputs)
 
-    with patch.object(handler, "_handle_chain_end", create=True) as mock_chain_end:
+    with patch.object(handler, "_handle_chain_end", create=True):
         handler.on_chain_end(outputs=outputs)
 
 

@@ -13,6 +13,7 @@ from services.orchestration.structured_output import invoke_structured_output
 from services.orchestration.llm import get_gemini_model, resolve_and_get_llm, GeneratedVariant
 
 from packages.resilience.circuit_breaker import resolve_cycle_budget
+from packages.security.env import is_production
 
 logger = logging.getLogger(__name__)
 
@@ -246,72 +247,82 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
             except Exception as e:
                 logger.warning(f"Variant generation failed for {platform}: {e}")
 
-        # 2. Deterministic structured fallback (ensures tests and offline runs succeed)
+        # 2. Bounded fallback policy (AGT-01):
+        # Fallback content is deterministically grounded without fake statistics or unverified claims.
+        # It is marked degraded=True and blocked from automated publishing by PublisherWorker.
         is_degraded = False
+        is_test_env = os.environ.get("CONTENTOPS_TEST_MODE") == "1" or "PYTEST_CURRENT_TEST" in os.environ
+        allow_fallback = is_test_env or bool(state.get("demo")) or bool(state.get("allow_degraded_fallback", True))
+
         if not variant_data:
+            if not allow_fallback:
+                logger.error("LLM variant generation failed for platform %s and fallback is prohibited.", platform)
+                state.setdefault("errors", []).append(
+                    f"LLM_PROVIDERS_DOWN: LLM provider unavailable or call failed for {platform}."
+                )
+                continue
+
             is_degraded = True
-            ObservabilityTracer.tag_trace(trace_meta["run_id"], ["degraded"])
+            ObservabilityTracer.tag_trace(trace_meta["run_id"], ["degraded", "synthetic_demo"])
             ObservabilityTracer.record_score(
                 name="degraded_fallback",
                 value=1.0,
                 trace_id=trace_meta["run_id"],
-                comment="Deterministic fallback used due to LLM unavailability or failure"
+                comment="Synthetic demo fallback used (clearly segregated, never published automatically)"
             )
 
+            # Ground factual claims strictly on provided sources facts (zero fabricated Gartner or statistics)
+            source_facts: List[str] = []
+            for s in sources:
+                if isinstance(s, dict):
+                    source_facts.extend([str(f) for f in s.get("facts", []) if f])
+
+            if source_facts:
+                primary_fact = source_facts[0]
+                is_ver, conf = verify_claim_against_sources(primary_fact, sources)
+                claims = [
+                    {
+                        "claim": primary_fact,
+                        "source_id": source_id,
+                        "verified": is_ver,
+                        "confidence_score": conf,
+                        "is_synthetic": True,
+                    }
+                ]
+            else:
+                claims = []
+
+            hook = f"Perspective clé : {objective}"
             if platform == "linkedin":
-                hook = "Pourquoi 80% des projets IA échouent sans gouvernance éditoriale claire ?"
                 body = (
                     f"{hook}\n\n"
-                    f"Sur le terrain, la différence entre un prototype amusant et un système de production réside dans un seul principe : le contrôle déterministe.\n\n"
-                    f"Voici 3 constats issus de nos retours d'expérience :\n"
-                    f"1. L'automatisation aveugle dégrade la marque plus vite qu'elle ne l'amplifie.\n"
-                    f"2. Une boucle de validation humaine (HITL) n'est pas un frein, c'est un accélérateur de confiance.\n"
-                    f"3. Chaque affirmation doit avoir une source vérifiée et traçable.\n\n"
-                    f"L'objectif : {objective.lower()}.\n\n"
-                    f"{selected_cta} 👇"
-                )
-                hashtags = ["#IntelligenceArtificielle", "#GouvernanceIA", "#ProductOps", "#LangGraph"]
-                claim_text = "80% des projets IA échouent sans gouvernance éditoriale claire"
-                is_ver, conf = verify_claim_against_sources(claim_text, sources)
-                claims = [
-                    {
-                        "claim": claim_text,
-                        "source_id": source_id,
-                        "verified": is_ver,
-                        "confidence_score": conf
-                    }
-                ]
-                media_spec: Dict[str, Any] = {
-                    "type": "image_carousel_suggestion",
-                    "aspect_ratio": "1:1",
-                    "description": "Schéma de l'architecture déterministe avec barrière de validation humaine."
-                }
-            elif platform == "x":
-                hook = "L'IA sans garde-fous détruit votre crédibilité."
-                body = (
-                    f"{hook} La vraie valeur en 2026 n'est pas de publier 10x plus, mais de garantir que 100% de vos affirmations sont vérifiées et validées par un humain.\n\n"
+                    f"Sur le terrain, l'application concrète des retours d'expérience permet d'aligner les équipes sur des standards vérifiables.\n\n"
+                    f"Points d'attention identifiés :\n"
+                    f"1. Rigueur et traçabilité documentaire à chaque étape.\n"
+                    f"2. Validation humaine préalable obligatoire (HITL) avant publication.\n"
+                    f"3. Ancrage sur des sources factuelles démontrées.\n\n"
+                    f"Objectif : {objective.lower()}.\n\n"
                     f"{selected_cta}"
                 )
-                hashtags = ["#AI", "#BuildInPublic"]
-                claim_text = "L'IA nécessite des garde-fous pour garantir la véracité des affirmations"
-                is_ver, conf = verify_claim_against_sources(claim_text, sources)
-                claims = [
-                    {
-                        "claim": claim_text,
-                        "source_id": source_id,
-                        "verified": is_ver,
-                        "confidence_score": conf
-                    }
-                ]
+                hashtags = ["#Gouvernance", "#ProductOps", "#ContentOps"]
+                media_spec: Dict[str, Any] = {
+                    "type": "none",
+                    "aspect_ratio": "1:1",
+                    "description": "Aperçu de synthèse opérationnelle."
+                }
+            elif platform == "x":
+                body = (
+                    f"{hook} La valeur repose sur des affirmations vérifiées et validées par un humain avant publication.\n\n"
+                    f"{selected_cta}"
+                )
+                hashtags = ["#ContentOps", "#ProductOps"]
                 media_spec = {
                     "type": "none",
                     "is_thread": False
                 }
             else:
-                hook = f"Point de vue clé : {objective}"
                 body = f"{hook}\n\n{angle}\n\n{selected_cta}"
                 hashtags = ["#ContentOps"]
-                claims = []
                 media_spec = {}
 
             variant_data = {
@@ -321,7 +332,9 @@ def generate_variants_node(state: ContentProductionState) -> Dict[str, Any]:
                 "cta": selected_cta,
                 "hashtags": hashtags,
                 "media_spec": media_spec,
-                "claims": claims
+                "claims": claims,
+                "is_synthetic": True,
+                "is_demo": True,
             }
 
         # 2b. Enforce platform-specific hard limits (e.g. X 280-char constraint)

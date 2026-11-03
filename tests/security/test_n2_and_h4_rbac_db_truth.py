@@ -1,12 +1,10 @@
 import uuid
-import pytest
 from fastapi import APIRouter, Depends
 from fastapi.testclient import TestClient
 from apps.api.main import app
 from apps.api.dependencies import require_roles, UserContext
 from packages.security.auth import create_access_token
 from infra.db.database import get_db_session
-from infra.db.models import UserModel, WorkspaceMemberModel
 from infra.db.repository import ContentOpsRepository
 
 test_router = APIRouter(prefix="/v1/test-rbac")

@@ -70,6 +70,21 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"}
         )
 
+    # Check global token invalidation timestamp (e.g. after password reset)
+    if user_record and isinstance(user_record.ui_preferences, dict):
+        tokens_valid_after = user_record.ui_preferences.get("_tokens_valid_after")
+        iat = claims.get("iat")
+        if tokens_valid_after is not None and iat is not None:
+            try:
+                if float(iat) < float(tokens_valid_after):
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Session révoquée. Veuillez vous reconnecter.",
+                        headers={"WWW-Authenticate": "Bearer"}
+                    )
+            except (TypeError, ValueError):
+                pass
+
     # If token contains a session jti, check if the session has been revoked
     if jti:
         from infra.db.models import UserSessionModel
@@ -80,6 +95,7 @@ def get_current_user(
                 detail="Session révoquée. Veuillez vous reconnecter.",
                 headers={"WWW-Authenticate": "Bearer"}
             )
+
 
     # Bind workspace context for multi-tenant isolation & PostgreSQL RLS
     set_db_workspace_context(db, workspace_id)

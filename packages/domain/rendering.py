@@ -1,5 +1,4 @@
-from typing import Any, Dict, List, Optional
-import re
+from typing import Any, List
 
 
 def _get_val(obj: Any, key: str, default: Any = None) -> Any:

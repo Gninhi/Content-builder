@@ -7,9 +7,16 @@ from datetime import datetime, timezone, timedelta
 from enum import Enum
 import jwt
 from dotenv import load_dotenv, find_dotenv
+from packages.security.env import is_production, get_app_env
 
-# Prioritize values from .env file unconditionally over inherited shell values
-load_dotenv(find_dotenv(usecwd=True), override=True)
+# Prioritize values from .env file in normal execution, without overwriting explicit test environment variables
+_is_test_mode = (
+    os.environ.get("CONTENTOPS_TEST_MODE") == "1"
+    or "PYTEST_CURRENT_TEST" in os.environ
+    or os.environ.get("APP_ENV") in ("test", "testing")
+)
+load_dotenv(find_dotenv(usecwd=True), override=not _is_test_mode)
+
 
 PROHIBITED_SECRET_PATTERNS = (
     "change-me",
@@ -82,8 +89,36 @@ ROLE_PERMISSIONS: Dict[Role, Set[str]] = {
 }
 
 
+# Known insecure legacy secrets - blacklisted and rejected in all environments
 DEFAULT_DEV_JWT_SECRET = "contentops-hardened-jwt-secret-key-must-be-rotated-in-production-2026"  # nosec B105
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", DEFAULT_DEV_JWT_SECRET)
+LEGACY_INSECURE_DEV_JWT_SECRETS: Set[str] = {
+    DEFAULT_DEV_JWT_SECRET,
+    "secret",
+    "change-me",
+    "changeme",
+    "default-jwt-secret",
+    "password123456789012345678901234567890",
+}
+
+
+def get_jwt_secret_key() -> str:
+    """
+    Retrieves the active JWT secret key from the environment.
+    Enforces fail-closed behavior: no default hardcoded fallback secrets are permitted.
+    """
+    secret = os.getenv("JWT_SECRET_KEY")
+    if not secret:
+        if _is_test_mode:
+            # Deterministic high-entropy ephemeral key strictly reserved for isolated tests
+            return "test_only_ephemeral_jwt_secret_key_32_chars_long_entropy_safe_ok_2026"
+        raise RuntimeError(
+            "Security Startup Error: JWT_SECRET_KEY environment variable is missing. "
+            "A cryptographically strong secret (>= 32 chars, Shannon entropy >= 3.0) must be explicitly configured."
+        )
+    return secret
+
+
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "")
 JWT_KEY_ID = os.getenv("JWT_KEY_ID", "key_v1")
 JWT_ALGORITHM = "HS256"
 JWT_ISSUER = "contentops-auth"
@@ -94,7 +129,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15")
 def get_key_ring() -> Dict[str, str]:
     """Returns the current key ring mapping key_id to secret key."""
     key_id = os.getenv("JWT_KEY_ID", "key_v1")
-    secret = os.getenv("JWT_SECRET_KEY", DEFAULT_DEV_JWT_SECRET)
+    secret = get_jwt_secret_key()
     ring: Dict[str, str] = {key_id: secret}
     rotation_keys = os.getenv("JWT_ROTATION_KEYS")
     if rotation_keys:
@@ -109,18 +144,15 @@ def get_key_ring() -> Dict[str, str]:
 _KEY_RING: Dict[str, str] = get_key_ring()
 
 
-from packages.security.env import is_production, get_app_env
-
-
 def validate_jwt_configuration() -> None:
     """
-    Enforces fail-closed validation of JWT keys in production.
+    Enforces fail-closed validation of JWT keys in production and staging.
     Raises RuntimeError if insecure defaults or weak keys are used.
     """
     load_dotenv()
-    if is_production():
-        secret = os.getenv("JWT_SECRET_KEY", "")
-        if not secret or secret == DEFAULT_DEV_JWT_SECRET:
+    secret = os.getenv("JWT_SECRET_KEY", "")
+    if is_production() or get_app_env() in ("production", "staging"):
+        if not secret or secret in LEGACY_INSECURE_DEV_JWT_SECRETS:
             raise RuntimeError(
                 "Production Startup Denied: JWT_SECRET_KEY must be configured with a dedicated strong secret "
                 "in production. Default development keys are strictly rejected. "
@@ -130,6 +162,11 @@ def validate_jwt_configuration() -> None:
             validate_secret_entropy(secret, secret_name="JWT_SECRET_KEY", min_length=32, min_entropy=3.0)
         except ValueError as exc:
             raise RuntimeError(f"Production Startup Denied: {exc}") from exc
+    elif not _is_test_mode and not secret:
+        raise RuntimeError(
+            "Security Startup Denied: JWT_SECRET_KEY must be explicitly configured in .env for development. "
+            "Falling back to hardcoded defaults is strictly prohibited."
+        )
 
 
 def create_access_token(

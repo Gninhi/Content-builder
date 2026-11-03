@@ -1,4 +1,3 @@
-import pytest
 from packages.domain.rendering import render_publishable_text, extract_publishable_media
 
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { apiClient } from '../lib/api';
@@ -20,7 +21,12 @@ import {
   Zap,
 } from 'lucide-react';
 
-export const AgentsScreen: React.FC = () => {
+interface AgentsScreenProps {
+  onNavigate?: (screen: string) => void;
+}
+
+export const AgentsScreen: React.FC<AgentsScreenProps> = ({ onNavigate }) => {
+  const navigate = useNavigate();
   const { session } = useAuth();
   const { showToast } = useToast();
 
@@ -603,7 +609,11 @@ export const AgentsScreen: React.FC = () => {
                     variant="primary"
                     size="sm"
                     onClick={() => {
-                      window.location.hash = '#inbox';
+                      if (onNavigate) {
+                        onNavigate('inbox');
+                      } else {
+                        navigate('/inbox');
+                      }
                     }}
                     className="min-h-[40px] font-medium"
                   >

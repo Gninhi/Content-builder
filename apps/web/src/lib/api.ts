@@ -122,7 +122,7 @@ export async function performSilentRefresh(): Promise<string | null> {
 }
 
 export async function parseResponseBody(res: Response): Promise<any> {
-  if (res.status === 204 || res.headers.get('content-length') === '0') {
+  if (!res || res.status === 204 || res.headers?.get?.('content-length') === '0') {
     return null;
   }
   if (typeof res.text === 'function') {

@@ -123,12 +123,15 @@ class PublisherWorker:
 
         raise ValueError(f"Unsupported platform: {platform}")
 
-    def execute_job(self, job_id: str) -> Dict[str, Any]:
-        job = self.db.query(PublicationJobModel).filter(PublicationJobModel.id == job_id).first()
-        if not job:
-            raise ValueError(f"Publication job '{job_id}' not found.")
+    def _fail_precondition(self, job: PublicationJobModel, error_msg: str) -> None:
+        """Helper to mark job as PUBLISH_FAILED, commit, and raise ValueError."""
+        setattr(job, "status", ContentStatus.PUBLISH_FAILED.value)
+        setattr(job, "error_message", error_msg)
+        self.db.commit()
+        raise ValueError(error_msg)
 
-        # Idempotency check: if already published, return existing receipt
+    def _check_idempotency_and_concurrency(self, job: PublicationJobModel) -> Optional[Dict[str, Any]]:
+        """Check for completed publication or active concurrent publication."""
         if job.status == ContentStatus.PUBLISHED.value:
             existing_post = job.published_post
             return {
@@ -138,22 +141,16 @@ class PublisherWorker:
                 "permalink": existing_post.permalink if existing_post else None
             }
 
-        # Concurrency locking guard: avoid double processing of in-flight jobs
         if job.status == ContentStatus.PUBLISHING.value:
-            raise RuntimeError(f"Concurrent execution detected: Job '{job_id}' is already in PUBLISHING status.")
+            raise RuntimeError(f"Concurrent execution detected: Job '{job.id}' is already in PUBLISHING status.")
 
-        variant: ContentVariantModel = job.variant
-        if not variant:
-            raise ValueError(f"Associated variant not found for job {job_id}")
+        return None
 
-        # 1. Verify exact status
+    def _verify_preconditions(self, job: PublicationJobModel, variant: ContentVariantModel) -> Dict[str, Any]:
+        """Verify status, payload hash integrity, and degraded mode safety guard."""
         if variant.status not in (ContentStatus.APPROVED.value, ContentStatus.SCHEDULED.value):
-            setattr(job, "status", ContentStatus.PUBLISH_FAILED.value)
-            setattr(job, "error_message", f"Precondition failed: Variant status is {variant.status}, expected APPROVED/SCHEDULED.")
-            self.db.commit()
-            raise ValueError(job.error_message)
+            self._fail_precondition(job, f"Precondition failed: Variant status is {variant.status}, expected APPROVED/SCHEDULED.")
 
-        # 2. Verify payload hash against approval
         current_payload = {
             "platform": variant.platform,
             "hook": variant.hook,
@@ -163,7 +160,7 @@ class PublisherWorker:
             "media_spec": variant.media_spec
         }
         calculated_hash = compute_payload_hash(current_payload)
-        
+
         valid_approval = (
             self.db.query(ApprovalModel)
             .filter(
@@ -174,45 +171,35 @@ class PublisherWorker:
             .first()
         )
         if not valid_approval:
-            setattr(job, "status", ContentStatus.PUBLISH_FAILED.value)
-            setattr(job, "error_message", "Security verification failed: Current payload hash does not match an approved record.")
-            self.db.commit()
-            raise ValueError(job.error_message)
+            self._fail_precondition(job, "Security verification failed: Current payload hash does not match an approved record.")
 
-        # Degraded mode safety lock: content generated via fallback requires explicit human reviewer approval
-        is_degraded = getattr(variant, "degraded", False) or (variant.media_spec and variant.media_spec.get("degraded", False))
+        # Degraded mode safety lock: fallback generated content requires explicit human reviewer approval
+        is_degraded = getattr(variant, "degraded", False) or bool(variant.media_spec and variant.media_spec.get("degraded", False))
         if is_degraded:
             reviewer = (valid_approval.reviewer_id or "").strip().lower()
             if reviewer in ("system", "auto", "automated", ""):
-                setattr(job, "status", ContentStatus.PUBLISH_FAILED.value)
-                setattr(job, "error_message", "Degraded mode safety lock: Content generated via fallback requires explicit human reviewer approval before publication.")
-                self.db.commit()
-                raise ValueError(job.error_message)
+                self._fail_precondition(job, "Degraded mode safety lock: Content generated via fallback requires explicit human reviewer approval before publication.")
 
-        # Check global & workspace kill switch
+        return current_payload
+
+    def _verify_guards_and_limits(self, job: PublicationJobModel, variant: ContentVariantModel) -> str:
+        """Verify kill switch and rate limits."""
+        if not (variant.package and variant.package.brief and variant.package.brief.workspace_id):
+            self._fail_precondition(job, f"Integrity error: Variant '{variant.id}' has no associated brief/workspace hierarchy.")
+
+        ws_id = str(variant.package.brief.workspace_id)
+        workspace = self.db.query(WorkspaceModel).filter(WorkspaceModel.id == ws_id).first()
+
         kill_switch = (
             os.getenv("KILL_SWITCH_ENABLED", "false").lower() in ("true", "1", "yes")
             or os.getenv("GLOBAL_KILL_SWITCH", "false").lower() in ("true", "1", "yes")
             or os.getenv("KILL_SWITCH_GLOBAL", "false").lower() in ("true", "1", "yes")
+            or bool(workspace and getattr(workspace, "kill_switch_enabled", False))
         )
-        if not (variant.package and variant.package.brief and variant.package.brief.workspace_id):
-            setattr(job, "status", ContentStatus.PUBLISH_FAILED.value)
-            setattr(job, "error_message", f"Integrity error: Variant '{variant.id}' has no associated brief/workspace hierarchy.")
-            self.db.commit()
-            raise ValueError(job.error_message)
-        ws_id = str(variant.package.brief.workspace_id)
-        workspace = self.db.query(WorkspaceModel).filter(WorkspaceModel.id == ws_id).first()
-
-        if workspace and getattr(workspace, "kill_switch_enabled", False):
-            kill_switch = True
 
         if kill_switch:
-            setattr(job, "status", ContentStatus.PUBLISH_FAILED.value)
-            setattr(job, "error_message", "Emergency Kill Switch is ACTIVE: All automated publications are halted.")
-            self.db.commit()
-            raise ValueError(job.error_message)
+            self._fail_precondition(job, "Emergency Kill Switch is ACTIVE: All automated publications are halted.")
 
-        # Enforce workspace publication rate ceiling
         if workspace:
             max_hourly = int(os.getenv("MAX_HOURLY_PUBLICATIONS", "10"))
             one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
@@ -229,17 +216,16 @@ class PublisherWorker:
                 .count()
             )
             if recent_count >= max_hourly:
-                setattr(job, "status", ContentStatus.PUBLISH_FAILED.value)
-                setattr(job, "error_message", f"Publication rate limit reached for workspace '{workspace.id}': {recent_count}/{max_hourly} posts published in the last hour.")
-                self.db.commit()
-                raise ValueError(job.error_message)
+                self._fail_precondition(job, f"Publication rate limit reached for workspace '{workspace.id}': {recent_count}/{max_hourly} posts published in the last hour.")
 
-        # 3. Atomic database-level lock transition to PUBLISHING (Committed BEFORE external network call)
-        # Guarantees At-Most-Once mutual exclusion across concurrent workers
+        return ws_id
+
+    def _acquire_publishing_lock(self, job: PublicationJobModel, variant: ContentVariantModel) -> Optional[Dict[str, Any]]:
+        """Atomic database-level lock transition to PUBLISHING before network call."""
         updated = (
             self.db.query(PublicationJobModel)
             .filter(
-                PublicationJobModel.id == job_id,
+                PublicationJobModel.id == job.id,
                 PublicationJobModel.status.in_([ContentStatus.APPROVED.value, ContentStatus.SCHEDULED.value])
             )
             .update(
@@ -261,125 +247,179 @@ class PublisherWorker:
                     "external_post_id": existing_post.external_post_id if existing_post else None,
                     "permalink": existing_post.permalink if existing_post else None
                 }
-            raise RuntimeError(f"Concurrent execution detected: Job '{job_id}' is already in {job.status} status.")
+            raise RuntimeError(f"Concurrent execution detected: Job '{job.id}' is already in {job.status} status.")
 
         ContentStateMachine.transition(ContentStatus(variant.status), ContentStatus.PUBLISHING)
         setattr(variant, "status", ContentStatus.PUBLISHING.value)
         self.db.commit()
+        return None
 
-        trace_id = str(variant.package_id if variant.package else job.idempotency_key)
+    def _dispatch_publish(self, job: PublicationJobModel, variant: ContentVariantModel, ws_id: str) -> Any:
+        """Instantiate connector and dispatch publication over network."""
+        publisher = self.resolve_publisher(str(variant.platform), ws_id)
+        content_text = render_publishable_text(variant)
+        media_urls = extract_publishable_media(variant)
+        return publisher.publish(
+            content=content_text,
+            media_urls=media_urls or None,
+            options={"job_id": job.id, "idempotency_key": str(job.idempotency_key)}
+        )
 
-        # 4. Delegate to platform publisher
-        pub_result = None
-        try:
-            publisher = self.resolve_publisher(str(variant.platform), ws_id)
-            content_text = render_publishable_text(variant)
-            media_urls = extract_publishable_media(variant)
-            pub_result = publisher.publish(
-                content=content_text,
-                media_urls=media_urls or None,
-                options={"job_id": job_id, "idempotency_key": str(job.idempotency_key)}
+    def _record_success(
+        self,
+        job: PublicationJobModel,
+        variant: ContentVariantModel,
+        pub_result: Any,
+        current_payload: Dict[str, Any],
+        trace_id: str
+    ) -> Dict[str, Any]:
+        """Persist published post record, update state machine to PUBLISHED, and emit metrics."""
+        post = self.repo.record_published_post(
+            job_id=str(job.id),
+            external_post_id=str(pub_result.platform_post_id),
+            final_payload=current_payload,
+            platform=str(variant.platform),
+            permalink=str(pub_result.permalink_url or "")
+        )
+
+        ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISHED)
+        setattr(job, "status", ContentStatus.PUBLISHED.value)
+        setattr(variant, "status", ContentStatus.PUBLISHED.value)
+        self.db.commit()
+
+        ObservabilityTracer.record_score(
+            name="publication_success",
+            value=1.0,
+            trace_id=trace_id,
+            comment=f"Successfully published on {variant.platform} as {pub_result.platform_post_id}"
+        )
+
+        receipt = {
+            "platform": str(variant.platform),
+            "external_id": str(pub_result.platform_post_id),
+            "permalink": str(pub_result.permalink_url or ""),
+            "published_at": datetime.now(timezone.utc).isoformat(),
+            "idempotency_key": str(job.idempotency_key),
+            "status": "SUCCESS"
+        }
+
+        return {
+            "status": "SUCCESS",
+            "post_id": str(post.id),
+            "external_id": str(post.external_post_id),
+            "permalink": str(post.permalink),
+            "receipt": receipt,
+            "result": pub_result.model_dump()
+        }
+
+    def _handle_publish_unknown(
+        self,
+        job: PublicationJobModel,
+        variant: ContentVariantModel,
+        unk_exc: SocialPublishUnknownError,
+        trace_id: str
+    ) -> None:
+        """Handle indeterminate publish status with At-Most-Once safety protocol."""
+        ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISH_UNKNOWN)
+        setattr(job, "status", ContentStatus.PUBLISH_UNKNOWN.value)
+        setattr(variant, "status", ContentStatus.PUBLISH_UNKNOWN.value)
+        setattr(job, "error_message", f"PUBLISH_UNKNOWN: {str(unk_exc)}")
+        self.db.commit()
+
+        ObservabilityTracer.record_score(
+            name="publication_unknown",
+            value=0.5,
+            trace_id=trace_id,
+            comment=f"PUBLISH_UNKNOWN encountered: {str(unk_exc)}. Manual reconciliation required."
+        )
+
+    def _handle_publish_error(
+        self,
+        job: PublicationJobModel,
+        variant: Optional[ContentVariantModel],
+        exc: Exception,
+        pub_result: Any,
+        trace_id: str
+    ) -> None:
+        """Handle publishing exceptions, treating post-network DB failures as PUBLISH_UNKNOWN."""
+        if pub_result is not None:
+            platform_str = str(variant.platform) if variant else "unknown"
+            logger.error(
+                f"CRITICAL: Post succeeded on external network ({platform_str} id={pub_result.platform_post_id}), "
+                f"but database post-processing/commit failed: {exc}. Transitioning to PUBLISH_UNKNOWN."
             )
-
-            # 5. Record published post and mark SUCCESS
-            post = self.repo.record_published_post(
-                job_id=str(job.id),
-                external_post_id=str(pub_result.platform_post_id),
-                final_payload=current_payload,
-                platform=str(variant.platform),
-                permalink=str(pub_result.permalink_url or "")
-            )
-
-            ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISHED)
-            setattr(job, "status", ContentStatus.PUBLISHED.value)
-            setattr(variant, "status", ContentStatus.PUBLISHED.value)
-            self.db.commit()
-
-            # Record Langfuse score for successful publication
-            ObservabilityTracer.record_score(
-                name="publication_success",
-                value=1.0,
-                trace_id=trace_id,
-                comment=f"Successfully published on {variant.platform} as {pub_result.platform_post_id}"
-            )
-
-            receipt = {
-                "platform": str(variant.platform),
-                "external_id": str(pub_result.platform_post_id),
-                "permalink": str(pub_result.permalink_url or ""),
-                "published_at": datetime.now(timezone.utc).isoformat(),
-                "idempotency_key": str(job.idempotency_key),
-                "status": "SUCCESS"
-            }
-
-            return {
-                "status": "SUCCESS",
-                "post_id": str(post.id),
-                "external_id": str(post.external_post_id),
-                "permalink": str(post.permalink),
-                "receipt": receipt,
-                "result": pub_result.model_dump()
-            }
-
-        except SocialPublishUnknownError as unk_exc:
-            # At-Most-Once safety protocol: network timeout or unconfirmed status
-            # NEVER retry automatically. Transition strictly to PUBLISH_UNKNOWN.
-            ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISH_UNKNOWN)
-            setattr(job, "status", ContentStatus.PUBLISH_UNKNOWN.value)
-            setattr(variant, "status", ContentStatus.PUBLISH_UNKNOWN.value)
-            setattr(job, "error_message", f"PUBLISH_UNKNOWN: {str(unk_exc)}")
-            self.db.commit()
+            try:
+                self.db.rollback()
+                ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISH_UNKNOWN)
+                job.status = ContentStatus.PUBLISH_UNKNOWN.value
+                job.error_message = (
+                    f"PUBLISH_UNKNOWN: Post succeeded externally (id={pub_result.platform_post_id}), "
+                    f"but local DB transaction failed: {str(exc)}"
+                )
+                if variant:
+                    variant.status = ContentStatus.PUBLISH_UNKNOWN.value
+                self.db.commit()
+            except Exception as rollback_err:
+                logger.critical(f"FATAL: Database error during emergency rollback to PUBLISH_UNKNOWN: {rollback_err}")
 
             ObservabilityTracer.record_score(
                 name="publication_unknown",
                 value=0.5,
                 trace_id=trace_id,
-                comment=f"PUBLISH_UNKNOWN encountered: {str(unk_exc)}. Manual reconciliation required."
+                comment=f"PUBLISH_UNKNOWN: Network succeeded (id={pub_result.platform_post_id}) but DB failed: {str(exc)}"
             )
-            raise unk_exc
+            raise SocialPublishUnknownError(
+                f"Post succeeded on {platform_str} (id={pub_result.platform_post_id}) but local database transaction failed: {str(exc)}"
+            )
 
-        except Exception as exc:
-            if pub_result is not None:
-                logger.error(
-                    f"CRITICAL: Post succeeded on external network ({variant.platform} id={pub_result.platform_post_id}), "
-                    f"but database post-processing/commit failed: {exc}. Transitioning to PUBLISH_UNKNOWN."
-                )
-                try:
-                    self.db.rollback()
-                    ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISH_UNKNOWN)
-                    job.status = ContentStatus.PUBLISH_UNKNOWN.value
-                    job.error_message = (
-                        f"PUBLISH_UNKNOWN: Post succeeded externally (id={pub_result.platform_post_id}), "
-                        f"but local DB transaction failed: {str(exc)}"
-                    )
-                    if variant:
-                        variant.status = ContentStatus.PUBLISH_UNKNOWN.value
-                    self.db.commit()
-                except Exception as rollback_err:
-                    logger.critical(f"FATAL: Database error during emergency rollback to PUBLISH_UNKNOWN: {rollback_err}")
-
-                ObservabilityTracer.record_score(
-                    name="publication_unknown",
-                    value=0.5,
-                    trace_id=trace_id,
-                    comment=f"PUBLISH_UNKNOWN: Network succeeded (id={pub_result.platform_post_id}) but DB failed: {str(exc)}"
-                )
-                raise SocialPublishUnknownError(
-                    f"Post succeeded on {variant.platform} (id={pub_result.platform_post_id}) but local database transaction failed: {str(exc)}"
-                )
-
-            ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISH_FAILED)
-            setattr(job, "status", ContentStatus.PUBLISH_FAILED.value)
-            setattr(job, "error_message", str(exc))
+        ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISH_FAILED)
+        setattr(job, "status", ContentStatus.PUBLISH_FAILED.value)
+        setattr(job, "error_message", str(exc))
+        if variant:
             setattr(variant, "status", ContentStatus.PUBLISH_FAILED.value)
-            self.db.commit()
+        self.db.commit()
 
-            ObservabilityTracer.record_score(
-                name="publication_failed",
-                value=0.0,
-                trace_id=trace_id,
-                comment=f"Publication failed: {str(exc)}"
-            )
+        ObservabilityTracer.record_score(
+            name="publication_failed",
+            value=0.0,
+            trace_id=trace_id,
+            comment=f"Publication failed: {str(exc)}"
+        )
+
+    def execute_job(self, job_id: str) -> Dict[str, Any]:
+        """
+        Execute publishing job adhering strictly to At-Most-Once and zero-trust preconditions.
+        """
+        job = self.db.query(PublicationJobModel).filter(PublicationJobModel.id == job_id).first()
+        if not job:
+            raise ValueError(f"Publication job '{job_id}' not found.")
+
+        early_result = self._check_idempotency_and_concurrency(job)
+        if early_result:
+            return early_result
+
+        variant: ContentVariantModel = job.variant
+        if not variant:
+            raise ValueError(f"Associated variant not found for job {job_id}")
+
+        current_payload = self._verify_preconditions(job, variant)
+        ws_id = self._verify_guards_and_limits(job, variant)
+
+        lock_early_result = self._acquire_publishing_lock(job, variant)
+        if lock_early_result:
+            return lock_early_result
+
+        trace_id = str(variant.package_id if variant.package else job.idempotency_key)
+        pub_result = None
+
+        try:
+            pub_result = self._dispatch_publish(job, variant, ws_id)
+            return self._record_success(job, variant, pub_result, current_payload, trace_id)
+        except SocialPublishUnknownError as unk_exc:
+            self._handle_publish_unknown(job, variant, unk_exc, trace_id)
+            raise unk_exc
+        except Exception as exc:
+            self._handle_publish_error(job, variant, exc, pub_result, trace_id)
             raise exc
 
     def reconcile_job(

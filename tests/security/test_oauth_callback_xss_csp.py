@@ -1,11 +1,8 @@
-import pytest
 import re
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from apps.api.main import app
-from infra.db.database import init_db, SessionLocal
-from infra.db.repository import ContentOpsRepository
-from packages.security.oauth_state import oauth_state_manager, OAuthState
+from packages.security.oauth_state import OAuthState
 
 client = TestClient(app)
 
@@ -47,7 +44,7 @@ def test_oauth_callback_success_page_xss_and_csp():
     state_token = "valid_state_xss_test"
 
     with patch("apps.api.routers.oauth.oauth_state_manager.consume_state") as mock_consume, \
-         patch("apps.api.routers.oauth.EncryptedOAuthTokenVault") as mock_vault, \
+         patch("apps.api.routers.oauth.EncryptedOAuthTokenVault"), \
          patch("apps.api.routers.oauth.httpx.Client") as mock_http_client_cls:
 
         mock_consume.return_value = OAuthState(

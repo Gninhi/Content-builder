@@ -1,22 +1,8 @@
-import pytest
 from sqlalchemy import create_engine, inspect
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import infra.db.models
 from infra.db.models import (
     Base,
-    ContentSourceModel,
-    IdeaModel,
-    ContentBriefModel,
-    ContentPackageModel,
-    ContentVariantModel,
-    ApprovalModel,
-    PublicationJobModel,
-    PublishedPostModel,
-    MetricSnapshotModel,
-    VeilleSourceModel,
-    SignalModel,
 )
 
 

@@ -1,0 +1,287 @@
+F401 [*] `typing.Optional` imported but unused
+ --> apps/api/main.py:6:46
+  |
+4 | import random
+5 | import logging
+6 | from typing import Callable, Coroutine, Any, Optional
+  |                                              ^^^^^^^^
+7 | from pathlib import Path
+8 | from contextlib import asynccontextmanager
+  |
+help: Remove unused import: `typing.Optional`
+  |
+5 | import logging
+  - from typing import Callable, Coroutine, Any, Optional
+6 + from typing import Callable, Coroutine, Any
+7 | from pathlib import Path
+  |
+
+E402 Module level import not at top of file
+  --> apps/api/routers/auth.py:9:1
+   |
+ 8 | logger = logging.getLogger(__name__)
+ 9 | from pydantic import BaseModel, Field, EmailStr, ConfigDict
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+10 | from packages.security.auth import create_access_token, decode_access_token, Role
+11 | from packages.security.env import is_production
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> apps/api/routers/auth.py:10:1
+   |
+ 8 | logger = logging.getLogger(__name__)
+ 9 | from pydantic import BaseModel, Field, EmailStr, ConfigDict
+10 | from packages.security.auth import create_access_token, decode_access_token, Role
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+11 | from packages.security.env import is_production
+12 | from packages.security.passwords import (
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> apps/api/routers/auth.py:11:1
+   |
+ 9 | from pydantic import BaseModel, Field, EmailStr, ConfigDict
+10 | from packages.security.auth import create_access_token, decode_access_token, Role
+11 | from packages.security.env import is_production
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+12 | from packages.security.passwords import (
+13 |     hash_password,
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> apps/api/routers/auth.py:12:1
+   |
+10 |   from packages.security.auth import create_access_token, decode_access_token, Role
+11 |   from packages.security.env import is_production
+12 | / from packages.security.passwords import (
+13 | |     hash_password,
+14 | |     verify_password,
+15 | |     validate_password_strength,
+16 | |     check_needs_rehash,
+17 | |     MAX_PASSWORD_LENGTH,
+18 | | )
+   | |_^
+19 |   from packages.security.tokens import generate_crypto_token, hash_crypto_token, generate_refresh_token
+20 |   from packages.security.email_service import (
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> apps/api/routers/auth.py:19:1
+   |
+17 |     MAX_PASSWORD_LENGTH,
+18 | )
+19 | from packages.security.tokens import generate_crypto_token, hash_crypto_token, generate_refresh_token
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+20 | from packages.security.email_service import (
+21 |     get_email_service,
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> apps/api/routers/auth.py:20:1
+   |
+18 |   )
+19 |   from packages.security.tokens import generate_crypto_token, hash_crypto_token, generate_refresh_token
+20 | / from packages.security.email_service import (
+21 | |     get_email_service,
+22 | |     is_dev_mailbox_allowed,
+23 | |     MemoryLogEmailService,
+24 | | )
+   | |_^
+25 |   from packages.security.limiter import limiter, get_client_ip
+26 |   from apps.api.dependencies import get_repository, get_current_user, UserContext
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> apps/api/routers/auth.py:25:1
+   |
+23 |     MemoryLogEmailService,
+24 | )
+25 | from packages.security.limiter import limiter, get_client_ip
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+26 | from apps.api.dependencies import get_repository, get_current_user, UserContext
+27 | from infra.db.repository import ContentOpsRepository, DuplicateUserError
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> apps/api/routers/auth.py:26:1
+   |
+24 | )
+25 | from packages.security.limiter import limiter, get_client_ip
+26 | from apps.api.dependencies import get_repository, get_current_user, UserContext
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+27 | from infra.db.repository import ContentOpsRepository, DuplicateUserError
+28 | from infra.db.models import utc_now, ensure_utc
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> apps/api/routers/auth.py:27:1
+   |
+25 | from packages.security.limiter import limiter, get_client_ip
+26 | from apps.api.dependencies import get_repository, get_current_user, UserContext
+27 | from infra.db.repository import ContentOpsRepository, DuplicateUserError
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+28 | from infra.db.models import utc_now, ensure_utc
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> apps/api/routers/auth.py:28:1
+   |
+26 | from apps.api.dependencies import get_repository, get_current_user, UserContext
+27 | from infra.db.repository import ContentOpsRepository, DuplicateUserError
+28 | from infra.db.models import utc_now, ensure_utc
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> infra/db/repository.py:56:1
+   |
+56 | / from infra.db.repos import (
+57 | |     WorkspaceRepository,
+58 | |     VeilleRepository,
+59 | |     EditorialRepository,
+60 | |     PublishingRepository,
+61 | |     AuthRepository,
+62 | |     LLMSettingsRepository,
+63 | | )
+   | |_^
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> packages/connectors/social/linkedin.py:11:1
+   |
+ 9 |   logger = logging.getLogger(__name__)
+10 |
+11 | / from packages.connectors.social.base import (
+12 | |     BaseSocialConnector,
+13 | |     BaseSocialPublisher,
+14 | |     SocialPublisherRegistry,
+15 | | )
+   | |_^
+16 |   from packages.connectors.social.models import (
+17 |       PublicationResult,
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> packages/connectors/social/linkedin.py:16:1
+   |
+14 |       SocialPublisherRegistry,
+15 |   )
+16 | / from packages.connectors.social.models import (
+17 | |     PublicationResult,
+18 | |     PublicationStatus,
+19 | |     SocialProvider,
+20 | | )
+   | |_^
+21 |   from packages.connectors.social.exceptions import (
+22 |       SocialAuthenticationError,
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> packages/connectors/social/linkedin.py:21:1
+   |
+19 |       SocialProvider,
+20 |   )
+21 | / from packages.connectors.social.exceptions import (
+22 | |     SocialAuthenticationError,
+23 | |     SocialPermissionError,
+24 | |     SocialRateLimitError,
+25 | |     SocialDuplicateError,
+26 | |     SocialNetworkError,
+27 | |     SocialPublishUnknownError,
+28 | |     TokenExpiringSoonError,
+29 | | )
+   | |_^
+help: Move module level imports to top of file
+
+F401 [*] `typing.Dict` imported but unused
+ --> packages/domain/rendering.py:1:25
+  |
+1 | from typing import Any, Dict, List, Optional
+  |                         ^^^^
+2 | import re
+  |
+help: Remove unused import
+  |
+  - from typing import Any, Dict, List, Optional
+1 + from typing import Any, List
+2 | import re
+  |
+
+F401 [*] `typing.Optional` imported but unused
+ --> packages/domain/rendering.py:1:37
+  |
+1 | from typing import Any, Dict, List, Optional
+  |                                     ^^^^^^^^
+2 | import re
+  |
+help: Remove unused import
+  |
+  - from typing import Any, Dict, List, Optional
+1 + from typing import Any, List
+2 | import re
+  |
+
+F401 [*] `re` imported but unused
+ --> packages/domain/rendering.py:2:8
+  |
+1 | from typing import Any, Dict, List, Optional
+2 | import re
+  |        ^^
+help: Remove unused import: `re`
+  |
+1 | from typing import Any, Dict, List, Optional
+  - import re
+2 |
+  |
+
+E402 Module level import not at top of file
+   --> packages/security/auth.py:118:1
+    |
+118 | from packages.security.env import is_production, get_app_env
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Move module level imports to top of file
+
+F401 [*] `packages.security.env.get_app_env` imported but unused
+   --> packages/security/auth.py:118:50
+    |
+118 | from packages.security.env import is_production, get_app_env
+    |                                                  ^^^^^^^^^^^
+help: Remove unused import: `packages.security.env.get_app_env`
+    |
+117 |
+    - from packages.security.env import is_production, get_app_env
+118 + from packages.security.env import is_production
+119 |
+    |
+
+F401 [*] `packages.security.env.is_production` imported but unused
+  --> packages/security/email_service.py:14:48
+   |
+12 | from typing import Optional, List, Dict, Any
+13 |
+14 | from packages.security.env import get_app_env, is_production
+   |                                                ^^^^^^^^^^^^^
+15 |
+16 | logger = logging.getLogger("packages.security.email_service")
+   |
+help: Remove unused import: `packages.security.env.is_production`
+   |
+13 |
+   - from packages.security.env import get_app_env, is_production
+14 + from packages.security.env import get_app_env
+15 |
+   |
+
+Found 21 errors.
+[*] 6 fixable with `--fix`.

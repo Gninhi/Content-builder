@@ -59,8 +59,8 @@ class XSocialPublisher(BaseSocialPublisher):
         self.access_token = access_token or os.getenv("X_ACCESS_TOKEN")
         self.refresh_token = refresh_token
         self.token_expires_at = token_expires_at
-        self.client_id = client_id or os.getenv("X_CLIENT_ID") or os.getenv("X_API_KEY")
-        self.client_secret = client_secret or os.getenv("X_CLIENT_SECRET") or os.getenv("X_API_SECRET")
+        self.client_id = client_id or os.getenv("X_CLIENT_ID")
+        self.client_secret = client_secret or os.getenv("X_CLIENT_SECRET")
         self.max_text_length = max_text_length
         self.monthly_limit = monthly_limit
         self.current_month_publications = current_month_publications

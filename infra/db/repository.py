@@ -1,9 +1,11 @@
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.exc import IntegrityError
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, timezone, timedelta
 import uuid
 import hashlib
 import re
+
 
 from infra.db.models import (
     WorkspaceModel,
@@ -33,6 +35,14 @@ from infra.db.models import (
 )
 from packages.domain.state_machine import ContentStatus, ContentStateMachine
 from packages.domain.idempotency import compute_payload_hash, compute_idempotency_key
+from infra.db.repos import (
+    WorkspaceRepository,
+    VeilleRepository,
+    EditorialRepository,
+    PublishingRepository,
+    AuthRepository,
+    LLMSettingsRepository,
+)
 
 
 class NotFoundError(Exception):
@@ -45,14 +55,9 @@ class WorkspaceNotFoundError(NotFoundError):
     pass
 
 
-from infra.db.repos import (
-    WorkspaceRepository,
-    VeilleRepository,
-    EditorialRepository,
-    PublishingRepository,
-    AuthRepository,
-    LLMSettingsRepository,
-)
+class DuplicateUserError(ValueError):
+    """Raised when attempting to register an email that already exists."""
+    pass
 
 
 class ContentOpsRepository:
@@ -1342,11 +1347,12 @@ class ContentOpsRepository:
         setattr(user, "avatar_url", None)
         setattr(user, "password_hash", None)
         setattr(user, "notification_preferences", {})
-        setattr(user, "ui_preferences", {})
+        setattr(user, "ui_preferences", {"_tokens_valid_after": utc_now().timestamp()})
         setattr(user, "is_active", False)
         setattr(user, "updated_at", utc_now())
-        # Revoke all sessions
-        self.revoke_other_sessions(user_id=user_id, current_jti=None)
+        # Revoke all sessions and refresh tokens
+        self.revoke_other_sessions(user_id=user_id, current_jti=None, commit=False)
+        self.revoke_all_user_refresh_tokens(user_id=user_id, commit=False)
         self.db.commit()
         return True
 
@@ -1358,14 +1364,24 @@ class ContentOpsRepository:
             .first()
         )
 
-    def add_workspace_member(self, workspace_id: str, user_id: str, role: str = "Viewer") -> WorkspaceMemberModel:
-        self.ensure_workspace(workspace_id)
-        self.get_or_create_user(user_id=user_id, default_role=role)
+    def add_workspace_member(
+        self,
+        workspace_id: str,
+        user_id: str,
+        role: str = "Viewer",
+        commit: bool = True,
+    ) -> WorkspaceMemberModel:
+        if commit:
+            self.ensure_workspace(workspace_id)
+            self.get_or_create_user(user_id=user_id, default_role=role)
         existing = self.get_workspace_member(workspace_id, user_id)
         if existing:
             setattr(existing, "role", role)
-            self.db.commit()
-            self.db.refresh(existing)
+            if commit:
+                self.db.commit()
+                self.db.refresh(existing)
+            else:
+                self.db.flush()
             return existing
         member = WorkspaceMemberModel(
             id=f"mem_{uuid.uuid4().hex[:12]}",
@@ -1374,9 +1390,13 @@ class ContentOpsRepository:
             role=role,
         )
         self.db.add(member)
-        self.db.commit()
-        self.db.refresh(member)
+        if commit:
+            self.db.commit()
+            self.db.refresh(member)
+        else:
+            self.db.flush()
         return member
+
 
     def get_user_memberships(self, user_id: str) -> List[WorkspaceMemberModel]:
         return self.db.query(WorkspaceMemberModel).filter(WorkspaceMemberModel.user_id == user_id).all()
@@ -1503,7 +1523,12 @@ class ContentOpsRepository:
         self.db.commit()
         return True
 
-    def revoke_other_sessions(self, user_id: str, current_jti: Optional[str] = None) -> int:
+    def revoke_other_sessions(
+        self,
+        user_id: str,
+        current_jti: Optional[str] = None,
+        commit: bool = True,
+    ) -> int:
         q = self.db.query(UserSessionModel).filter(
             UserSessionModel.user_id == user_id,
             UserSessionModel.is_revoked.is_(False),
@@ -1513,7 +1538,10 @@ class ContentOpsRepository:
         sessions = q.all()
         for s in sessions:
             setattr(s, "is_revoked", True)
-        self.db.commit()
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
         return len(sessions)
 
     # ----------------- Audit Logs -----------------
@@ -1526,6 +1554,7 @@ class ContentOpsRepository:
         details: Optional[Dict[str, Any]] = None,
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
+        commit: bool = True,
     ) -> AuditLogModel:
         log = AuditLogModel(
             id=f"audit_{uuid.uuid4().hex[:12]}",
@@ -1538,9 +1567,13 @@ class ContentOpsRepository:
             user_agent=user_agent,
         )
         self.db.add(log)
-        self.db.commit()
-        self.db.refresh(log)
+        if commit:
+            self.db.commit()
+            self.db.refresh(log)
+        else:
+            self.db.flush()
         return log
+
 
     def get_user_audit_logs(self, user_id: str, limit: int = 50) -> List[AuditLogModel]:
         return (
@@ -1646,7 +1679,7 @@ class ContentOpsRepository:
         self.db.commit()
         return len(tokens)
 
-    def revoke_all_user_refresh_tokens(self, user_id: str) -> int:
+    def revoke_all_user_refresh_tokens(self, user_id: str, commit: bool = True) -> int:
         tokens = (
             self.db.query(UserRefreshTokenModel)
             .filter(
@@ -1655,10 +1688,16 @@ class ContentOpsRepository:
             )
             .all()
         )
+        now = utc_now()
         for t in tokens:
             setattr(t, "is_revoked", True)
-        self.db.commit()
+            setattr(t, "revoked_at", now)
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
         return len(tokens)
+
 
     def cleanup_expired_refresh_tokens(self) -> int:
         now = utc_now()
@@ -1732,17 +1771,22 @@ class ContentOpsRepository:
         user = self.get_user(user_id)
         if not user:
             return False
+        now = utc_now()
         setattr(user, "password_hash", password_hash)
         setattr(user, "password_reset_token_hash", None)
         setattr(user, "password_reset_expires_at", None)
         setattr(user, "failed_login_attempts", 0)
         setattr(user, "locked_until", None)
-        setattr(user, "updated_at", utc_now())
-        # Invalidate existing sessions and refresh tokens on password change
-        self.revoke_other_sessions(user_id=user_id, current_jti=None)
-        self.revoke_all_user_refresh_tokens(user_id=user_id)
+        ui_prefs = dict(user.ui_preferences or {})
+        ui_prefs["_tokens_valid_after"] = now.timestamp()
+        setattr(user, "ui_preferences", ui_prefs)
+        setattr(user, "updated_at", now)
+        # Invalidate existing sessions and refresh tokens on password change in a single transaction
+        self.revoke_other_sessions(user_id=user_id, current_jti=None, commit=False)
+        self.revoke_all_user_refresh_tokens(user_id=user_id, commit=False)
         self.db.commit()
         return True
+
 
     def record_failed_login(
         self, user_id: str, max_attempts: int = 5, lock_duration_minutes: int = 15
@@ -1825,108 +1869,143 @@ class ContentOpsRepository:
         language: str = "fr",
         theme: str = "dark",
         email_verified: bool = False,
+        email_verification_token_hash: Optional[str] = None,
+        email_verification_expires_at: Optional[datetime] = None,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
     ) -> Tuple[UserModel, WorkspaceModel, str]:
         """
         Atomically registers a user, provisions either a joined workspace (via invite)
-        or a new workspace (Owner), initial brand profile, and audits the registration.
+        or a new workspace (Owner), initial brand profile, LLM settings, verification token,
+        and audits the registration in a single SQL transaction.
+        Rolls back 100% of writes if any step fails.
         """
         email_clean = email.strip().lower()
         if self.get_user_by_email(email_clean):
-            raise ValueError(f"Un compte avec l'adresse {email_clean} existe déjà.")
+            raise DuplicateUserError(f"Un compte avec l'adresse {email_clean} existe déjà.")
 
         now = utc_now()
         user_id = f"usr_{uuid.uuid4().hex[:12]}"
 
-        user = UserModel(
-            id=user_id,
-            email=email_clean,
-            password_hash=password_hash,
-            full_name=full_name.strip(),
-            display_name=full_name.strip().split()[0] if full_name.strip() else None,
-            job_title="Membre de l'équipe",
-            timezone="Europe/Paris",
-            language=language,
-            theme=theme,
-            is_active=True,
-            email_verified=email_verified,
-            cgu_accepted_at=now if cgu_version else None,
-            cgu_version=cgu_version,
-            privacy_accepted_at=now if privacy_version else None,
-            privacy_version=privacy_version,
-            failed_login_attempts=0,
-        )
-        self.db.add(user)
-
-        # Handle workspace assignment
-        assigned_role = "Owner"
-        if invitation_code_hash:
-            inv = self.get_invitation_by_code_hash(invitation_code_hash)
-            if not inv:
-                raise ValueError("Code d'invitation invalide ou expiré.")
-            target_ws = self.get_workspace(str(inv.workspace_id))
-            if not target_ws:
-                raise ValueError("Le workspace associé à l'invitation n'existe plus.")
-            assigned_role = str(inv.role)
-            self.add_workspace_member(workspace_id=str(target_ws.id), user_id=user_id, role=assigned_role)
-            setattr(inv, "accepted_at", now)
-            final_workspace = target_ws
-        else:
-            ws_id = f"ws_{uuid.uuid4().hex[:12]}"
-            final_ws_name = workspace_name.strip() if workspace_name and workspace_name.strip() else f"Workspace {full_name.strip()}"
-            final_workspace = WorkspaceModel(
-                id=ws_id,
-                name=final_ws_name,
+        try:
+            user = UserModel(
+                id=user_id,
+                email=email_clean,
+                password_hash=password_hash,
+                full_name=full_name.strip(),
+                display_name=full_name.strip().split()[0] if full_name.strip() else None,
+                job_title="Membre de l'équipe",
                 timezone="Europe/Paris",
-                owner_id=user_id,
-                is_demo=False,
+                language=language,
+                theme=theme,
+                is_active=True,
+                email_verified=email_verified,
+                email_verification_token_hash=email_verification_token_hash,
+                email_verification_expires_at=email_verification_expires_at,
+                cgu_accepted_at=now if cgu_version else None,
+                cgu_version=cgu_version,
+                privacy_accepted_at=now if privacy_version else None,
+                privacy_version=privacy_version,
+                failed_login_attempts=0,
             )
-            self.db.add(final_workspace)
-            self.add_workspace_member(workspace_id=ws_id, user_id=user_id, role="Owner")
+            self.db.add(user)
+            self.db.flush()
 
-            # Seed default brand profile
-            bp = BrandProfileModel(
-                id=f"bp_{uuid.uuid4().hex[:12]}",
-                workspace_id=ws_id,
-                version=1,
-                audience=["Professionnels", "B2B Leaders", "Décideurs Tech"],
-                voice="Expert, engageant, clair et orienté valeur.",
-                pillars=["Innovation & Tendances", "Méthodologie & Best Practices", "Cas d'usage concrets"],
-                prohibited_topics=["Allégations sans source", "Langage familier déplacé"],
-                cta_policy={
-                    "allowed_ctas": ["Donnez votre avis en commentaire", "Contactez notre équipe"],
-                    "max_per_post": 1,
+            # Handle workspace assignment
+            assigned_role = "Owner"
+            if invitation_code_hash:
+                inv = self.get_invitation_by_code_hash(invitation_code_hash)
+                if not inv:
+                    raise ValueError("Code d'invitation invalide ou expiré.")
+                target_ws = self.get_workspace(str(inv.workspace_id))
+                if not target_ws:
+                    raise ValueError("Le workspace associé à l'invitation n'existe plus.")
+                assigned_role = str(inv.role)
+                self.add_workspace_member(
+                    workspace_id=str(target_ws.id),
+                    user_id=user_id,
+                    role=assigned_role,
+                    commit=False,
+                )
+                setattr(inv, "accepted_at", now)
+                final_workspace = target_ws
+            else:
+                ws_id = f"ws_{uuid.uuid4().hex[:12]}"
+                final_ws_name = (
+                    workspace_name.strip()
+                    if workspace_name and workspace_name.strip()
+                    else f"Workspace {full_name.strip()}"
+                )
+                final_workspace = WorkspaceModel(
+                    id=ws_id,
+                    name=final_ws_name,
+                    timezone="Europe/Paris",
+                    owner_id=user_id,
+                    is_demo=False,
+                )
+                self.db.add(final_workspace)
+                self.db.flush()
+                self.add_workspace_member(
+                    workspace_id=ws_id,
+                    user_id=user_id,
+                    role="Owner",
+                    commit=False,
+                )
+
+                # Seed default brand profile
+                bp = BrandProfileModel(
+                    id=f"bp_{uuid.uuid4().hex[:12]}",
+                    workspace_id=ws_id,
+                    version=1,
+                    audience=["Professionnels", "B2B Leaders", "Décideurs Tech"],
+                    voice="Expert, engageant, clair et orienté valeur.",
+                    pillars=["Innovation & Tendances", "Méthodologie & Best Practices", "Cas d'usage concrets"],
+                    prohibited_topics=["Allégations sans source", "Langage familier déplacé"],
+                    cta_policy={
+                        "allowed_ctas": ["Donnez votre avis en commentaire", "Contactez notre équipe"],
+                        "max_per_post": 1,
+                    },
+                )
+                self.db.add(bp)
+
+                # Seed default LLM settings
+                llm_settings = WorkspaceLLMSettingsModel(
+                    id=f"llm_cfg_{uuid.uuid4().hex[:12]}",
+                    workspace_id=ws_id,
+                    default_provider_id="nvidia",
+                    default_model_id="z-ai/glm-5.3-flash",
+                    default_temperature=0.2,
+                    task_overrides={},
+                    provider_settings={},
+                )
+                self.db.add(llm_settings)
+
+            self.record_audit_log(
+                user_id=user_id,
+                workspace_id=str(final_workspace.id),
+                event_type="user_registered",
+                severity="INFO",
+                details={
+                    "email": email_clean,
+                    "role": assigned_role,
+                    "via_invitation": bool(invitation_code_hash),
+                    "email_verification_required": not email_verified,
                 },
+                ip_address=ip_address,
+                user_agent=user_agent,
+                commit=False,
             )
-            self.db.add(bp)
 
-            # Seed default LLM settings
-            llm_settings = WorkspaceLLMSettingsModel(
-                id=f"llm_cfg_{uuid.uuid4().hex[:12]}",
-                workspace_id=ws_id,
-                default_provider_id="nvidia",
-                default_model_id="z-ai/glm-5.3-flash",
-                default_temperature=0.2,
-                task_overrides={},
-                provider_settings={},
-            )
-            self.db.add(llm_settings)
-
-        self.record_audit_log(
-            user_id=user_id,
-            workspace_id=str(final_workspace.id),
-            event_type="user_registered",
-            severity="INFO",
-            details={
-                "email": email_clean,
-                "role": assigned_role,
-                "via_invitation": bool(invitation_code_hash),
-            },
-        )
-
-        self.db.commit()
-        self.db.refresh(user)
-        self.db.refresh(final_workspace)
-        return (user, final_workspace, assigned_role)
+            self.db.commit()
+            self.db.refresh(user)
+            self.db.refresh(final_workspace)
+            return (user, final_workspace, assigned_role)
+        except IntegrityError as ie:
+            self.db.rollback()
+            raise DuplicateUserError(f"Un compte avec l'adresse {email_clean} existe déjà.") from ie
+        except Exception:
+            self.db.rollback()
+            raise
 
     # ----------------- Demo Workspaces (Ephemeral) -----------------
     def create_demo_workspace_session(
@@ -1943,108 +2022,115 @@ class ContentOpsRepository:
         user_id = f"demo_usr_{suffix}"
         ws_id = f"ws_demo_{suffix}"
 
-        user = UserModel(
-            id=user_id,
-            email=f"demo_{suffix}@demo.contentops.internal",
-            password_hash=None,
-            full_name="Visiteur Démo",
-            display_name="Démo Invité",
-            job_title="Evaluateur ContentOps",
-            timezone="Europe/Paris",
-            language="fr",
-            theme="dark",
-            is_active=True,
-            email_verified=True,
-            failed_login_attempts=0,
-        )
-        self.db.add(user)
+        try:
+            user = UserModel(
+                id=user_id,
+                email=f"demo_{suffix}@demo.contentops.internal",
+                password_hash=None,
+                full_name="Visiteur Démo",
+                display_name="Démo Invité",
+                job_title="Evaluateur ContentOps",
+                timezone="Europe/Paris",
+                language="fr",
+                theme="dark",
+                is_active=True,
+                email_verified=True,
+                failed_login_attempts=0,
+            )
+            self.db.add(user)
+            self.db.flush()
 
-        ws = WorkspaceModel(
-            id=ws_id,
-            name=f"Espace Démo ({suffix.upper()})",
-            timezone="Europe/Paris",
-            owner_id=user_id,
-            is_demo=True,
-            expires_at=expires_at,
-        )
-        self.db.add(ws)
-        self.add_workspace_member(workspace_id=ws_id, user_id=user_id, role="Owner")
+            ws = WorkspaceModel(
+                id=ws_id,
+                name=f"Espace Démo ({suffix.upper()})",
+                timezone="Europe/Paris",
+                owner_id=user_id,
+                is_demo=True,
+                expires_at=expires_at,
+            )
+            self.db.add(ws)
+            self.db.flush()
+            self.add_workspace_member(workspace_id=ws_id, user_id=user_id, role="Owner", commit=False)
 
-        # Pre-seed realistic brand profile
-        bp = BrandProfileModel(
-            id=f"bp_{uuid.uuid4().hex[:12]}",
-            workspace_id=ws_id,
-            version=1,
-            audience=["Tech Leads", "Directeurs Marketing", "AI Practitioners"],
-            voice="Analytique, visionnaire, mesuré et orienté retour sur investissement.",
-            pillars=["Architecture des agents IA", "Content Engineering B2B", "Gouvernance & HITL"],
-            prohibited_topics=["Conseils financiers", "Promesses irréalistes"],
-            cta_policy={
-                "allowed_ctas": ["Partagez votre retour d'expérience", "Découvrez notre livre blanc"],
-                "max_per_post": 1,
-            },
-        )
-        self.db.add(bp)
+            # Pre-seed realistic brand profile
+            bp = BrandProfileModel(
+                id=f"bp_{uuid.uuid4().hex[:12]}",
+                workspace_id=ws_id,
+                version=1,
+                audience=["Tech Leads", "Directeurs Marketing", "AI Practitioners"],
+                voice="Analytique, visionnaire, mesuré et orienté retour sur investissement.",
+                pillars=["Architecture des agents IA", "Content Engineering B2B", "Gouvernance & HITL"],
+                prohibited_topics=["Conseils financiers", "Promesses irréalistes"],
+                cta_policy={
+                    "allowed_ctas": ["Partagez votre retour d'expérience", "Découvrez notre livre blanc"],
+                    "max_per_post": 1,
+                },
+            )
+            self.db.add(bp)
 
-        # Pre-seed a realistic source
-        source = ContentSourceModel(
-            id=f"src_{uuid.uuid4().hex[:12]}",
-            workspace_id=ws_id,
-            type="url",
-            canonical_url="https://contentops.internal/blog/ai-orchestration-2026",
-            raw_content_ref="Synthèse prospective : orchestration multi-modèles et agents autonomes en 2026.",
-            extracted_facts=[
-                "La supervision humaine (HITL) réduit les hallucinations critiques de 94%",
-                "Le routage dynamique multi-fournisseurs divise les coûts d'inférence par 3"
-            ],
-            provenance={"author": "ContentOps Research", "date": "2026-03"},
-            status="ingested",
-        )
-        self.db.add(source)
+            # Pre-seed a realistic source
+            source = ContentSourceModel(
+                id=f"src_{uuid.uuid4().hex[:12]}",
+                workspace_id=ws_id,
+                type="url",
+                canonical_url="https://contentops.internal/blog/ai-orchestration-2026",
+                raw_content_ref="Synthèse prospective : orchestration multi-modèles et agents autonomes en 2026.",
+                extracted_facts=[
+                    "La supervision humaine (HITL) réduit les hallucinations critiques de 94%",
+                    "Le routage dynamique multi-fournisseurs divise les coûts d'inférence par 3"
+                ],
+                provenance={"author": "ContentOps Research", "date": "2026-03"},
+                status="ingested",
+            )
+            self.db.add(source)
 
-        # Pre-seed a sample idea
-        idea = IdeaModel(
-            id=f"idea_{uuid.uuid4().hex[:12]}",
-            workspace_id=ws_id,
-            title="Pourquoi 2026 marque la fin des modèles monolithiques au profit d'agents spécialisés",
-            angle="Comparer les architectures monolithiques coûteuses aux graphes d'agents avec garde-fous stricts.",
-            pillar="Architecture des agents IA",
-            audience="Tech Leads",
-            evidence_refs=["https://contentops.internal/blog/ai-orchestration-2026"],
-            novelty_score=0.88,
-            relevance_score=0.92,
-            effort_score=0.40,
-            total_score=0.85,
-            priority="high",
-            risks=["Éviter d'attaquer directement un modèle particulier"],
-            status="IDEA",
-        )
-        self.db.add(idea)
+            # Pre-seed a sample idea
+            idea = IdeaModel(
+                id=f"idea_{uuid.uuid4().hex[:12]}",
+                workspace_id=ws_id,
+                title="Pourquoi 2026 marque la fin des modèles monolithiques au profit d'agents spécialisés",
+                angle="Comparer les architectures monolithiques coûteuses aux graphes d'agents avec garde-fous stricts.",
+                pillar="Architecture des agents IA",
+                audience="Tech Leads",
+                evidence_refs=["https://contentops.internal/blog/ai-orchestration-2026"],
+                novelty_score=0.88,
+                relevance_score=0.92,
+                effort_score=0.40,
+                total_score=0.85,
+                priority="high",
+                risks=["Éviter d'attaquer directement un modèle particulier"],
+                status="IDEA",
+            )
+            self.db.add(idea)
 
-        # Pre-seed LLM Settings
-        llm_settings = WorkspaceLLMSettingsModel(
-            id=f"llm_cfg_{uuid.uuid4().hex[:12]}",
-            workspace_id=ws_id,
-            default_provider_id="nvidia",
-            default_model_id="z-ai/glm-5.3-flash",
-            default_temperature=0.2,
-            task_overrides={},
-            provider_settings={},
-        )
-        self.db.add(llm_settings)
+            # Pre-seed LLM Settings
+            llm_settings = WorkspaceLLMSettingsModel(
+                id=f"llm_cfg_{uuid.uuid4().hex[:12]}",
+                workspace_id=ws_id,
+                default_provider_id="nvidia",
+                default_model_id="z-ai/glm-5.3-flash",
+                default_temperature=0.2,
+                task_overrides={},
+                provider_settings={},
+            )
+            self.db.add(llm_settings)
 
-        self.record_audit_log(
-            user_id=user_id,
-            workspace_id=ws_id,
-            event_type="demo_workspace_created",
-            severity="INFO",
-            details={"expires_at": expires_at.isoformat(), "is_demo": True},
-        )
+            self.record_audit_log(
+                user_id=user_id,
+                workspace_id=ws_id,
+                event_type="demo_workspace_created",
+                severity="INFO",
+                details={"expires_at": expires_at.isoformat(), "is_demo": True},
+                commit=False,
+            )
 
-        self.db.commit()
-        self.db.refresh(user)
-        self.db.refresh(ws)
-        return (user, ws, "Owner")
+            self.db.commit()
+            self.db.refresh(user)
+            self.db.refresh(ws)
+            return (user, ws, "Owner")
+        except Exception:
+            self.db.rollback()
+            raise
 
     def cleanup_expired_demo_workspaces(self) -> int:
         now = utc_now()
@@ -2058,6 +2144,13 @@ class ContentOpsRepository:
         )
         count = len(expired)
         for ws in expired:
+            ws_id = str(ws.id)
+            # Clean up child rows explicitly before deleting demo workspace
+            self.db.query(BrandProfileModel).filter(BrandProfileModel.workspace_id == ws_id).delete()
+            self.db.query(ContentSourceModel).filter(ContentSourceModel.workspace_id == ws_id).delete()
+            self.db.query(IdeaModel).filter(IdeaModel.workspace_id == ws_id).delete()
+            self.db.query(WorkspaceLLMSettingsModel).filter(WorkspaceLLMSettingsModel.workspace_id == ws_id).delete()
+            self.db.query(WorkspaceMemberModel).filter(WorkspaceMemberModel.workspace_id == ws_id).delete()
             self.db.delete(ws)
         if count > 0:
             self.db.commit()
@@ -2065,12 +2158,19 @@ class ContentOpsRepository:
 
     # ----------------- Bootstrapping Defaults -----------------
     def ensure_default_users(self) -> None:
-        """Ensures default seed users exist for seamless development & tests."""
-        from packages.security.passwords import hash_password
-        default_pwd_hash = hash_password("DevPassword2026!")
-
+        """Ensures default seed users exist for seamless development & tests without unnecessary writes."""
+        ws_default = self.get_workspace("ws_default")
+        if not ws_default:
+            self.create_workspace(
+                name="Default Editorial Workspace",
+                timezone="Europe/Paris",
+                owner_id="owner_martial",
+                workspace_id="ws_default",
+            )
         user_martial = self.get_user("owner_martial")
         if not user_martial:
+            from packages.security.passwords import hash_password
+            default_pwd_hash = hash_password("DevPassword2026!")
             self.create_user(
                 user_id="owner_martial",
                 email="martial@contentops.internal",
@@ -2094,11 +2194,13 @@ class ContentOpsRepository:
                 },
             )
             self.add_workspace_member("ws_default", "owner_martial", "Owner")
-        else:
+        elif not user_martial.email_verified or not user_martial.password_hash:
             setattr(user_martial, "email_verified", True)
             if not user_martial.password_hash:
-                setattr(user_martial, "password_hash", default_pwd_hash)
+                from packages.security.passwords import hash_password
+                setattr(user_martial, "password_hash", hash_password("DevPassword2026!"))
             self.db.commit()
+
 
 
 

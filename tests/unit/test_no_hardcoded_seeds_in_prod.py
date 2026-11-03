@@ -1,12 +1,10 @@
 import os
 from unittest.mock import patch
-import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 
-import infra.db.models
 from infra.db.models import Base, UserModel, WorkspaceModel
 
 

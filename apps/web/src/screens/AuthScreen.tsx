@@ -27,12 +27,14 @@ export const AuthScreen: React.FC = () => {
   const {
     login,
     register,
+    verifyEmail,
     forgotPassword,
     resetPassword,
     resendVerification,
     startDemo,
     loginWithDevToken,
   } = useAuth();
+
   const { t, language, setLanguage } = useLanguage();
   const { theme, toggleTheme } = useTheme();
 
@@ -71,20 +73,65 @@ export const AuthScreen: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string>('');
+  const [devVerificationToken, setDevVerificationToken] = useState<string | null>(null);
 
-  // Check URL parameters for reset_token or verification
+  // Fetch local dev mailbox verification token when in verify_notice view (D-02)
+  const fetchDevMailboxToken = async (targetEmail: string) => {
+    if (!targetEmail) return;
+    try {
+      const res = await fetch(`/v1/auth/dev/mailbox?email=${encodeURIComponent(targetEmail.trim().toLowerCase())}`);
+      if (!res.ok) {
+        setDevVerificationToken(null);
+        return;
+      }
+      const data = await res.json();
+      if (data?.enabled && Array.isArray(data.messages)) {
+        const verifMsg = data.messages.find((m: any) => m.type === 'verification' && m.token);
+        if (verifMsg) {
+          setDevVerificationToken(verifMsg.token);
+          return;
+        }
+      }
+      setDevVerificationToken(null);
+    } catch {
+      setDevVerificationToken(null);
+    }
+  };
+
+  // Check URL parameters for reset_token or verify_token
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const tokenFromUrl = params.get('reset_token');
+      const verifyFromUrl = params.get('verify_token') || (window.location.pathname.includes('verify-email') ? params.get('token') : null);
       if (tokenFromUrl) {
         setResetToken(tokenFromUrl);
         setCurrentView('reset_password');
+      } else if (verifyFromUrl) {
+        setIsLoading(true);
+        verifyEmail(verifyFromUrl)
+          .then((msg) => {
+            setSuccessMessage(msg);
+            setCurrentView('login');
+          })
+          .catch((err: any) => {
+            setErrorMessage(err.message || 'Jeton de vérification invalide ou expiré.');
+            setCurrentView('login');
+          })
+          .finally(() => {
+            setIsLoading(false);
+            try {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            } catch {
+              // Ignore history errors
+            }
+          });
       }
     } catch {
       // Ignore URL parsing errors
     }
-  }, []);
+  }, [verifyEmail]);
+
 
   // Password strength calculation (OWASP / NIST SP 800-63B)
   const computePasswordStrength = (pwd: string) => {
@@ -122,12 +169,38 @@ export const AuthScreen: React.FC = () => {
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
+
+    const cleanName = regFullName.trim();
+    if (cleanName.length < 2) {
+      setErrorMessage('Le nom complet doit contenir au moins 2 caractères.');
+      return;
+    }
+    if (cleanName.length > 120) {
+      setErrorMessage('Le nom complet ne doit pas dépasser 120 caractères.');
+      return;
+    }
+
+    const cleanEmail = regEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(cleanEmail)) {
+      setErrorMessage('Veuillez saisir une adresse email valide (ex : nom@entreprise.com).');
+      return;
+    }
+
     if (!regCguAccepted || !regPrivacyAccepted) {
       setErrorMessage(t.auth.accept_cgu + ' & ' + t.auth.accept_privacy);
       return;
     }
     if (regPassword.length < 10) {
       setErrorMessage('Le mot de passe doit contenir au moins 10 caractères.');
+      return;
+    }
+    if (regPassword.length > 128) {
+      setErrorMessage('Le mot de passe ne doit pas dépasser 128 caractères.');
+      return;
+    }
+    if (regWorkspaceName.trim().length > 120) {
+      setErrorMessage("Le nom de l'espace de travail ne doit pas dépasser 120 caractères.");
       return;
     }
 
@@ -137,9 +210,9 @@ export const AuthScreen: React.FC = () => {
 
     try {
       const result = await register({
-        email: regEmail,
+        email: cleanEmail,
         password: regPassword,
-        fullName: regFullName,
+        fullName: cleanName,
         workspaceName: regWorkspaceName.trim() || undefined,
         invitationCode: regInvitationCode.trim() || undefined,
         cguAccepted: regCguAccepted,
@@ -147,12 +220,13 @@ export const AuthScreen: React.FC = () => {
       });
 
       if (result.requiresVerification) {
-        setPendingVerificationEmail(regEmail);
+        setPendingVerificationEmail(cleanEmail);
         setCurrentView('verify_notice');
         setSuccessMessage(result.message);
+        await fetchDevMailboxToken(cleanEmail);
       } else {
         setSuccessMessage('Compte créé avec succès ! Connexion en cours...');
-        await login(regEmail, regPassword);
+        await login(cleanEmail, regPassword);
       }
     } catch (err: any) {
       setErrorMessage(err.message || "Échec de l'inscription.");
@@ -160,6 +234,7 @@ export const AuthScreen: React.FC = () => {
       setIsLoading(false);
     }
   };
+
 
   const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,12 +284,31 @@ export const AuthScreen: React.FC = () => {
     try {
       const msg = await resendVerification(pendingVerificationEmail);
       setSuccessMessage(msg);
+      await fetchDevMailboxToken(pendingVerificationEmail);
     } catch (err: any) {
       setErrorMessage(err.message || "Impossible de renvoyer l'email.");
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleDevVerifyEmail = async () => {
+    if (!devVerificationToken) return;
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const msg = await verifyEmail(devVerificationToken);
+      setDevVerificationToken(null);
+      setSuccessMessage(msg);
+      setEmail(pendingVerificationEmail);
+      setCurrentView('login');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Jeton de vérification invalide ou expiré.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
 
   const handleDemoClick = async () => {
     setIsDemoLoading(true);
@@ -771,7 +865,32 @@ export const AuthScreen: React.FC = () => {
               )}
             </div>
 
+            {devVerificationToken && (
+              <div
+                data-testid="dev-mailbox-panel"
+                className="rounded-xl border border-accent-border bg-accent-subtle/40 p-3.5 text-left space-y-2"
+              >
+                <p className="text-[11px] font-semibold text-accent uppercase tracking-wider">
+                  Boîte de réception locale (Mode Développement)
+                </p>
+                <p className="text-xs text-txt-secondary leading-relaxed">
+                  Un lien de confirmation à usage unique a été généré dans la boîte de réception locale de développement.
+                </p>
+                <Button
+                  type="button"
+                  variant="primary"
+                  data-testid="dev-verify-email-btn"
+                  onClick={handleDevVerifyEmail}
+                  isLoading={isLoading}
+                  className="w-full justify-center py-2 text-xs min-h-[40px]"
+                >
+                  Confirmer mon adresse email (Lien de vérification local)
+                </Button>
+              </div>
+            )}
+
             <div className="space-y-2 pt-2">
+
               <Button
                 type="button"
                 variant="secondary"
