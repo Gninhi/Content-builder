@@ -5,9 +5,6 @@ from unittest.mock import patch, MagicMock
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
-from services.orchestration.nodes.analytics import normalize_metrics_node
-from services.orchestration.nodes.scheduling import schedule_job_node
-from services.orchestration.nodes.publishing import verify_approval_and_publish_node
 from services.orchestration.nodes.insights import generate_strategy_insights_node
 from packages.domain.state_machine import ContentStatus
 from packages.domain.idempotency import compute_payload_hash
@@ -45,123 +42,7 @@ from packages.tools.data_connectors import OfficialDataConnectors
 
 
 # =====================================================================
-# 1. Analytics Node Coverage
-# =====================================================================
-def test_normalize_metrics_node_nominal():
-    state = {
-        "raw_metrics": {
-            "impressions": 1000,
-            "engagements": 50,
-            "clicks": 20,
-            "comments": 5,
-            "shares": 10,
-        }
-    }
-    result = normalize_metrics_node(state)
-    assert result["status"] == "MEASURED"
-    metrics = result["normalized_metrics"]
-    assert metrics["impressions"] == 1000
-    assert metrics["engagement_rate_pct"] == 5.0
-    assert metrics["click_through_rate_pct"] == 2.0
-    assert metrics["amplification_rate_pct"] == 1.0
-    assert metrics["performance_index"] == 3.8
-
-
-def test_normalize_metrics_node_zero_impressions():
-    state = {"raw_metrics": {}}
-    result = normalize_metrics_node(state)
-    assert result["status"] == "MEASURED"
-    metrics = result["normalized_metrics"]
-    assert metrics["impressions"] == 1
-    assert metrics["engagement_rate_pct"] == 0.0
-
-
-# =====================================================================
-# 2. Scheduling Node Coverage
-# =====================================================================
-def test_schedule_job_node_unapproved():
-    state = {"status": ContentStatus.DRAFT}
-    result = schedule_job_node(state)
-    assert "error" in result
-    assert result["status"] == ContentStatus.DRAFT
-
-
-def test_schedule_job_node_success():
-    state = {
-        "status": ContentStatus.APPROVED,
-        "workspace_id": "ws_123",
-        "variant_id": "var_456",
-        "platform": "linkedin",
-        "scheduled_at": "2026-10-20T10:00:00Z",
-    }
-    result = schedule_job_node(state)
-    assert result["status"] == ContentStatus.SCHEDULED
-    assert result["error"] is None
-    assert result["job_id"].startswith("job_")
-    assert result["idempotency_key"] is not None
-
-
-# =====================================================================
-# 3. Publishing Graph & Node Coverage
-# =====================================================================
-def test_verify_approval_and_publish_tampered():
-    payload = {"text": "Original text"}
-    state = {
-        "payload": payload,
-        "approval_hash": "different_hash_value",
-        "idempotency_key": "key_1",
-        "platform": "linkedin",
-    }
-    result = verify_approval_and_publish_node(state)
-    assert result["status"] == ContentStatus.PUBLISH_FAILED
-    assert "Security failure" in result["error"]
-
-
-def test_verify_approval_and_publish_unsupported_platform():
-    payload = {"text": "Valid post"}
-    h = compute_payload_hash(payload)
-    state = {
-        "payload": payload,
-        "approval_hash": h,
-        "idempotency_key": "key_2",
-        "platform": "unsupported_social",
-    }
-    result = verify_approval_and_publish_node(state)
-    assert result["status"] == ContentStatus.PUBLISH_FAILED
-    assert "Unsupported publishing platform" in result["error"]
-
-
-def test_verify_approval_and_publish_linkedin_sandbox():
-    payload = {"body": "Publish to LinkedIn"}
-    h = compute_payload_hash(payload)
-    state = {
-        "payload": payload,
-        "approval_hash": h,
-        "idempotency_key": "key_3",
-        "platform": "linkedin",
-    }
-    result = verify_approval_and_publish_node(state)
-    assert result["status"] == ContentStatus.PUBLISHED
-    assert result["receipt"] is not None
-    assert result["error"] is None
-
-
-def test_verify_approval_and_publish_x_sandbox():
-    payload = {"body": "Publish to X"}
-    h = compute_payload_hash(payload)
-    state = {
-        "payload": payload,
-        "approval_hash": h,
-        "idempotency_key": "key_4",
-        "platform": "x",
-    }
-    result = verify_approval_and_publish_node(state)
-    assert result["status"] == ContentStatus.PUBLISHED
-    assert result["receipt"] is not None
-
-
-# =====================================================================
-# 4. Strategy Insights Node Coverage
+# Strategy Insights Node Coverage
 # =====================================================================
 def test_generate_strategy_insights_no_data():
     state = {

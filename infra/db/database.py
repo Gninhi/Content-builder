@@ -154,6 +154,22 @@ def init_db():
             if "revoked_at" not in columns:
                 with engine.begin() as conn:
                     conn.execute(text("ALTER TABLE user_refresh_tokens ADD COLUMN revoked_at DATETIME"))
+        # DB-01 / Lot 0: Denormalized workspace_id across content and publication tables
+        denorm_tables = [
+            "content_packages",
+            "content_variants",
+            "approvals",
+            "publication_jobs",
+            "published_posts",
+            "metric_snapshots",
+        ]
+        for tbl in denorm_tables:
+            if tbl in inspector.get_table_names():
+                cols = [c["name"] for c in inspector.get_columns(tbl)]
+                if "workspace_id" not in cols:
+                    with engine.begin() as conn:
+                        conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN workspace_id VARCHAR(64) DEFAULT 'ws_default'"))
+                        conn.execute(text(f"CREATE INDEX IF NOT EXISTS ix_{tbl}_workspace_id ON {tbl}(workspace_id)"))
     except Exception:
         pass
 

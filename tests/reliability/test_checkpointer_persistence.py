@@ -1,6 +1,6 @@
 import tempfile
 from pathlib import Path
-from services.orchestration.nodes.approval import create_approval_graph
+from tests.fixtures.approval_graph import create_approval_graph
 from services.orchestration.checkpointer import get_checkpointer
 
 

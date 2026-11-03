@@ -207,14 +207,14 @@ def rewrite_content_variant(
     Triggers an intelligent agent rewrite of the specified content variant based on human reviewer feedback.
     Applies real LLM / Gemini refinement, updates variant body & hook, and re-calculates cryptographic hash.
     """
-    variant = repo.db.query(ContentVariantModel).filter(ContentVariantModel.id == variant_id).first()
+    variant = repo.db.query(ContentVariantModel).filter(
+        ContentVariantModel.id == variant_id,
+        ContentVariantModel.workspace_id == user.workspace_id
+    ).first()
     if not variant:
         raise HTTPException(status_code=404, detail="Variant not found.")
 
     package = variant.package
-    brief = package.brief if package else None
-    if brief and brief.workspace_id != user.workspace_id:
-        raise HTTPException(status_code=404, detail="Variant not found.")
 
     # Record the feedback approval
     repo.record_approval(

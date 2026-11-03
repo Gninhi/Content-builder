@@ -21,7 +21,7 @@ from packages.security.email_service import (
     MemoryLogEmailService,
 )
 from packages.security.limiter import limiter, get_client_ip
-from apps.api.dependencies import get_repository, get_current_user, UserContext
+from apps.api.dependencies import get_repository, get_current_user, UserContext, AuthSessionCache
 from infra.db.repository import ContentOpsRepository, DuplicateUserError
 from infra.db.models import utc_now, ensure_utc
 
@@ -408,6 +408,7 @@ def reset_password(
 
     new_hash = hash_password(req.new_password)
     repo.reset_password_with_token(str(user.id), new_hash)
+    AuthSessionCache.invalidate_user(str(user.id))
     repo.record_audit_log(
         user_id=str(user.id),
         event_type="password_reset_success",
@@ -775,6 +776,10 @@ def logout(
                 if sess:
                     setattr(sess, "is_revoked", True)
                     repo.db.commit()
+                AuthSessionCache.invalidate_session(jti)
+            user_id = claims.get("sub")
+            if user_id:
+                AuthSessionCache.invalidate_user(user_id)
         except Exception as exc:
             logger.warning("Failed to revoke session on logout: %s", exc)
 

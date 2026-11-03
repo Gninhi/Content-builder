@@ -134,8 +134,12 @@ class ContentBriefModel(Base):
 
 class ContentPackageModel(Base):
     __tablename__ = "content_packages"
+    __table_args__ = (
+        Index("ix_content_packages_workspace_created", "workspace_id", "created_at"),
+    )
 
     id = Column(String(64), primary_key=True)
+    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, default="ws_default", index=True)
     brief_id = Column(String(64), ForeignKey("content_briefs.id", ondelete="CASCADE"), nullable=False, index=True)
     version = Column(Integer, default=1, nullable=False)
     model_metadata = Column(JSON, default=dict, nullable=False)
@@ -143,6 +147,7 @@ class ContentPackageModel(Base):
     status = Column(String(32), default="DRAFT")
     created_at = Column(DateTime, default=utc_now)
 
+    workspace = relationship("WorkspaceModel")
     brief = relationship("ContentBriefModel", back_populates="packages")
     variants = relationship("ContentVariantModel", back_populates="package", cascade="all, delete-orphan")
 
@@ -151,9 +156,11 @@ class ContentVariantModel(Base):
     __tablename__ = "content_variants"
     __table_args__ = (
         Index("ix_content_variants_package_status", "package_id", "status"),
+        Index("ix_content_variants_ws_status", "workspace_id", "status"),
     )
 
     id = Column(String(64), primary_key=True)
+    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, default="ws_default", index=True)
     package_id = Column(String(64), ForeignKey("content_packages.id", ondelete="CASCADE"), nullable=False, index=True)
     platform = Column(String(32), nullable=False)
     hook = Column(Text, nullable=False)
@@ -167,6 +174,7 @@ class ContentVariantModel(Base):
     status = Column(String(32), default="DRAFT")
     created_at = Column(DateTime, default=utc_now)
 
+    workspace = relationship("WorkspaceModel")
     package = relationship("ContentPackageModel", back_populates="variants")
     approvals = relationship("ApprovalModel", back_populates="variant", cascade="all, delete-orphan")
     jobs = relationship("PublicationJobModel", back_populates="variant", cascade="all, delete-orphan")
@@ -174,8 +182,12 @@ class ContentVariantModel(Base):
 
 class ApprovalModel(Base):
     __tablename__ = "approvals"
+    __table_args__ = (
+        Index("ix_approvals_workspace_reviewed", "workspace_id", "reviewed_at"),
+    )
 
     id = Column(String(64), primary_key=True)
+    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, default="ws_default", index=True)
     variant_id = Column(String(64), ForeignKey("content_variants.id", ondelete="CASCADE"), nullable=False, index=True)
     decision = Column(String(32), nullable=False)
     reviewer_id = Column(String(64), nullable=False)
@@ -183,6 +195,7 @@ class ApprovalModel(Base):
     payload_hash = Column(String(64), nullable=False)
     reviewed_at = Column(DateTime, default=utc_now)
 
+    workspace = relationship("WorkspaceModel")
     variant = relationship("ContentVariantModel", back_populates="approvals")
 
 
@@ -190,9 +203,11 @@ class PublicationJobModel(Base):
     __tablename__ = "publication_jobs"
     __table_args__ = (
         Index("ix_publication_jobs_status_scheduled_at", "status", "scheduled_at"),
+        Index("ix_publication_jobs_ws_status_sched", "workspace_id", "status", "scheduled_at"),
     )
 
     id = Column(String(64), primary_key=True)
+    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, default="ws_default", index=True)
     variant_id = Column(String(64), ForeignKey("content_variants.id", ondelete="CASCADE"), nullable=False, index=True)
     platform = Column(String(32), nullable=False)
     scheduled_at = Column(DateTime, nullable=False)
@@ -203,14 +218,19 @@ class PublicationJobModel(Base):
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utc_now)
 
+    workspace = relationship("WorkspaceModel")
     variant = relationship("ContentVariantModel", back_populates="jobs")
     published_post = relationship("PublishedPostModel", uselist=False, back_populates="job", cascade="all, delete-orphan")
 
 
 class PublishedPostModel(Base):
     __tablename__ = "published_posts"
+    __table_args__ = (
+        Index("ix_published_posts_workspace_published", "workspace_id", "published_at"),
+    )
 
     id = Column(String(64), primary_key=True)
+    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, default="ws_default", index=True)
     job_id = Column(String(64), ForeignKey("publication_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
     external_post_id = Column(String(128), nullable=False)
     final_payload = Column(JSON, nullable=False)
@@ -219,14 +239,19 @@ class PublishedPostModel(Base):
     permalink = Column(Text, nullable=False)
     created_at = Column(DateTime, default=utc_now)
 
+    workspace = relationship("WorkspaceModel")
     job = relationship("PublicationJobModel", back_populates="published_post")
     metrics = relationship("MetricSnapshotModel", back_populates="post", cascade="all, delete-orphan")
 
 
 class MetricSnapshotModel(Base):
     __tablename__ = "metric_snapshots"
+    __table_args__ = (
+        Index("ix_metric_snapshots_workspace_observed", "workspace_id", "observed_at"),
+    )
 
     id = Column(String(64), primary_key=True)
+    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, default="ws_default", index=True)
     post_id = Column(String(64), ForeignKey("published_posts.id", ondelete="CASCADE"), nullable=False, index=True)
     observed_at = Column(DateTime, default=utc_now, nullable=False)
     impressions = Column(Integer, default=0)
@@ -236,6 +261,7 @@ class MetricSnapshotModel(Base):
     shares = Column(Integer, default=0)
     raw_payload = Column(JSON, default=dict, nullable=False)
 
+    workspace = relationship("WorkspaceModel")
     post = relationship("PublishedPostModel", back_populates="metrics")
 
 

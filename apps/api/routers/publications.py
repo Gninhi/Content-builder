@@ -47,11 +47,11 @@ def publish_now(
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner"))
 ):
-    job = repo.db.query(PublicationJobModel).filter(PublicationJobModel.id == job_id).first()
+    job = repo.db.query(PublicationJobModel).filter(
+        PublicationJobModel.id == job_id,
+        PublicationJobModel.workspace_id == user.workspace_id
+    ).first()
     if not job:
-        raise HTTPException(status_code=404, detail="Publication job not found.")
-    job_ws = job.variant.package.brief.workspace_id if (job.variant and job.variant.package and job.variant.package.brief) else None
-    if job_ws != user.workspace_id:
         raise HTTPException(status_code=404, detail="Publication job not found.")
 
     worker = PublisherWorker(repo.db)
@@ -68,11 +68,11 @@ def cancel_publication_job(
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor"))
 ):
-    job = repo.db.query(PublicationJobModel).filter(PublicationJobModel.id == job_id).first()
+    job = repo.db.query(PublicationJobModel).filter(
+        PublicationJobModel.id == job_id,
+        PublicationJobModel.workspace_id == user.workspace_id
+    ).first()
     if not job:
-        raise HTTPException(status_code=404, detail="Publication job not found.")
-    job_ws = job.variant.package.brief.workspace_id if (job.variant and job.variant.package and job.variant.package.brief) else None
-    if job_ws != user.workspace_id:
         raise HTTPException(status_code=404, detail="Publication job not found.")
 
     current_status = ContentStatus.parse(str(job.status))
@@ -105,11 +105,11 @@ def reconcile_publication_job(
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor"))
 ):
-    job = repo.db.query(PublicationJobModel).filter(PublicationJobModel.id == job_id).first()
+    job = repo.db.query(PublicationJobModel).filter(
+        PublicationJobModel.id == job_id,
+        PublicationJobModel.workspace_id == user.workspace_id
+    ).first()
     if not job:
-        raise HTTPException(status_code=404, detail="Publication job not found.")
-    job_ws = job.variant.package.brief.workspace_id if (job.variant and job.variant.package and job.variant.package.brief) else None
-    if job_ws != user.workspace_id:
         raise HTTPException(status_code=404, detail="Publication job not found.")
 
     worker = PublisherWorker(repo.db)
@@ -132,13 +132,7 @@ def list_publications(
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer", "ServiceAgent"))
 ):
-    query = (
-        repo.db.query(PublicationJobModel)
-        .join(ContentVariantModel)
-        .join(ContentPackageModel)
-        .join(ContentBriefModel)
-        .filter(ContentBriefModel.workspace_id == user.workspace_id)
-    )
+    query = repo.db.query(PublicationJobModel).filter(PublicationJobModel.workspace_id == user.workspace_id)
     if status:
         query = query.filter(PublicationJobModel.status == status)
     jobs = query.order_by(PublicationJobModel.scheduled_at.desc()).limit(limit).all()

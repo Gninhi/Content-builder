@@ -762,10 +762,16 @@ class ContentOpsRepository:
         brief_id: str,
         version: int = 1,
         model_metadata: Optional[Dict[str, Any]] = None,
-        qa_score: float = 0.0
+        qa_score: float = 0.0,
+        workspace_id: Optional[str] = None
     ) -> ContentPackageModel:
+        if not workspace_id:
+            brief = self.db.query(ContentBriefModel).filter(ContentBriefModel.id == brief_id).first()
+            workspace_id = brief.workspace_id if brief else "ws_default"
+
         package = ContentPackageModel(
             id=f"pkg_{uuid.uuid4().hex[:12]}",
+            workspace_id=workspace_id,
             brief_id=brief_id,
             version=version,
             model_metadata=model_metadata or {},
@@ -787,7 +793,8 @@ class ContentOpsRepository:
         hashtags: Optional[List[str]] = None,
         media_spec: Optional[Dict[str, Any]] = None,
         claims: Optional[List[Dict[str, Any]]] = None,
-        degraded: bool = False
+        degraded: bool = False,
+        workspace_id: Optional[str] = None
     ) -> ContentVariantModel:
         m_spec = dict(media_spec or {})
         if degraded:
@@ -803,8 +810,13 @@ class ContentOpsRepository:
         }
         p_hash = compute_payload_hash(raw_payload)
 
+        if not workspace_id:
+            package = self.db.query(ContentPackageModel).filter(ContentPackageModel.id == package_id).first()
+            workspace_id = package.workspace_id if package else "ws_default"
+
         variant = ContentVariantModel(
             id=f"var_{uuid.uuid4().hex[:12]}",
+            workspace_id=workspace_id,
             package_id=package_id,
             platform=platform,
             hook=hook,
@@ -833,11 +845,7 @@ class ContentOpsRepository:
     ) -> ApprovalModel:
         query = self.db.query(ContentVariantModel)
         if workspace_id:
-            query = (
-                query.join(ContentPackageModel)
-                .join(ContentBriefModel)
-                .filter(ContentBriefModel.workspace_id == workspace_id)
-            )
+            query = query.filter(ContentVariantModel.workspace_id == workspace_id)
         variant = query.filter(ContentVariantModel.id == variant_id).first()
         if not variant:
             raise ValueError(f"Content variant '{variant_id}' not found or access denied for workspace.")
@@ -876,8 +884,11 @@ class ContentOpsRepository:
 
         setattr(variant, "status", next_status.value)
 
+        ws_id = workspace_id or str(getattr(variant, "workspace_id", "ws_default"))
+
         approval = ApprovalModel(
             id=f"appr_{uuid.uuid4().hex[:12]}",
+            workspace_id=ws_id,
             variant_id=variant.id,
             decision=decision,
             reviewer_id=reviewer_id,
@@ -898,11 +909,9 @@ class ContentOpsRepository:
     ) -> PublicationJobModel:
         variant = (
             self.db.query(ContentVariantModel)
-            .join(ContentPackageModel)
-            .join(ContentBriefModel)
             .filter(
                 ContentVariantModel.id == variant_id,
-                ContentBriefModel.workspace_id == workspace_id
+                ContentVariantModel.workspace_id == workspace_id
             )
             .first()
         )
@@ -948,11 +957,8 @@ class ContentOpsRepository:
         collision_buffer = timedelta(minutes=15)
         existing_scheduled = (
             self.db.query(PublicationJobModel)
-            .join(ContentVariantModel, PublicationJobModel.variant_id == ContentVariantModel.id)
-            .join(ContentPackageModel, ContentVariantModel.package_id == ContentPackageModel.id)
-            .join(ContentBriefModel, ContentPackageModel.brief_id == ContentBriefModel.id)
             .filter(
-                ContentBriefModel.workspace_id == workspace_id,
+                PublicationJobModel.workspace_id == workspace_id,
                 PublicationJobModel.platform == variant.platform,
                 PublicationJobModel.status.in_([ContentStatus.SCHEDULED.value, ContentStatus.PUBLISHING.value])
             )
@@ -973,6 +979,7 @@ class ContentOpsRepository:
 
         job = PublicationJobModel(
             id=f"job_{uuid.uuid4().hex[:12]}",
+            workspace_id=workspace_id,
             variant_id=variant.id,
             platform=variant.platform,
             scheduled_at=scheduled_at,
@@ -990,7 +997,8 @@ class ContentOpsRepository:
         external_post_id: str,
         final_payload: Dict[str, Any],
         platform: str,
-        permalink: str
+        permalink: str,
+        workspace_id: Optional[str] = None
     ) -> PublishedPostModel:
         job = self.db.query(PublicationJobModel).filter(PublicationJobModel.id == job_id).first()
         if job:
@@ -998,8 +1006,11 @@ class ContentOpsRepository:
             if job.variant:
                 setattr(job.variant, "status", ContentStatus.PUBLISHED.value)
 
+        ws_id = workspace_id or (job.workspace_id if job else "ws_default")
+
         post = PublishedPostModel(
             id=f"post_{uuid.uuid4().hex[:12]}",
+            workspace_id=ws_id,
             job_id=job_id,
             external_post_id=external_post_id,
             final_payload=final_payload,
@@ -1021,10 +1032,16 @@ class ContentOpsRepository:
         clicks: int,
         comments: int,
         shares: int,
-        raw_payload: Optional[Dict[str, Any]] = None
+        raw_payload: Optional[Dict[str, Any]] = None,
+        workspace_id: Optional[str] = None
     ) -> MetricSnapshotModel:
+        if not workspace_id:
+            post = self.db.query(PublishedPostModel).filter(PublishedPostModel.id == post_id).first()
+            workspace_id = post.workspace_id if post else "ws_default"
+
         metric = MetricSnapshotModel(
             id=f"met_{uuid.uuid4().hex[:12]}",
+            workspace_id=workspace_id,
             post_id=post_id,
             observed_at=datetime.now(timezone.utc),
             impressions=impressions,
@@ -1382,6 +1399,11 @@ class ContentOpsRepository:
                 self.db.refresh(existing)
             else:
                 self.db.flush()
+            try:
+                from apps.api.dependencies import AuthSessionCache
+                AuthSessionCache.invalidate_member_role(workspace_id, user_id)
+            except Exception:
+                pass
             return existing
         member = WorkspaceMemberModel(
             id=f"mem_{uuid.uuid4().hex[:12]}",

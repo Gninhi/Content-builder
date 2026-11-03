@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from fastapi.responses import FileResponse
 from PIL import Image
 
-from apps.api.dependencies import get_current_user, get_repository, UserContext
+from apps.api.dependencies import get_current_user, get_repository, UserContext, AuthSessionCache
 from infra.db.models import UserModel
 from infra.db.repository import ContentOpsRepository
 from packages.contracts.users import (
@@ -235,6 +235,7 @@ def change_password(
 
     # Revoke other sessions
     revoked_count = repo.revoke_other_sessions(user.user_id, current_jti=user.jti)
+    AuthSessionCache.invalidate_user(user.user_id)
 
     repo.record_audit_log(
         user_id=user.user_id,
@@ -285,6 +286,7 @@ def revoke_single_session(
     revoked = repo.revoke_session(user.user_id, session_id)
     if not revoked:
         raise HTTPException(status_code=404, detail="Session introuvable ou déjà révoquée.")
+    AuthSessionCache.invalidate_user(user.user_id)
 
     repo.record_audit_log(
         user_id=user.user_id,
@@ -306,6 +308,7 @@ def revoke_other_sessions(
 ):
     """Revokes all sessions except the current active session."""
     count = repo.revoke_other_sessions(user.user_id, current_jti=user.jti)
+    AuthSessionCache.invalidate_user(user.user_id)
 
     repo.record_audit_log(
         user_id=user.user_id,
@@ -430,6 +433,7 @@ def delete_my_account(
     success = repo.anonymize_user(user.user_id)
     if not success:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+    AuthSessionCache.invalidate_user(user.user_id)
 
     return {
         "message": "Votre compte a été supprimé et vos données personnelles ont été anonymisées conformément au RGPD.",

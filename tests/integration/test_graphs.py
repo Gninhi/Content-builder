@@ -1,6 +1,6 @@
 from services.orchestration.graphs.idea_research import graph as idea_research_graph
 from services.orchestration.graphs.content_production import graph as content_production_graph
-from services.orchestration.nodes.approval import create_approval_graph
+from tests.fixtures.approval_graph import create_approval_graph
 from packages.domain.state_machine import ContentStatus
 from packages.domain.idempotency import compute_payload_hash
 
