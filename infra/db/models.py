@@ -1,6 +1,6 @@
 from typing import Optional
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, Float, DateTime, Text, JSON, ForeignKey, Boolean, UniqueConstraint
+from sqlalchemy import Column, String, Integer, Float, DateTime, Text, JSON, ForeignKey, Boolean, UniqueConstraint, Index
 from sqlalchemy.orm import relationship
 from infra.db.database import Base
 
@@ -61,7 +61,7 @@ class BrandProfileModel(Base):
     __tablename__ = "brand_profiles"
 
     id = Column(String(64), primary_key=True)
-    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
     version = Column(Integer, default=1, nullable=False)
     audience = Column(JSON, default=list, nullable=False)
     voice = Column(Text, nullable=False)
@@ -77,7 +77,7 @@ class ContentSourceModel(Base):
     __tablename__ = "content_sources"
 
     id = Column(String(64), primary_key=True)
-    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
     type = Column(String(32), nullable=False)
     canonical_url = Column(Text, nullable=True)
     raw_content_ref = Column(Text, nullable=False)
@@ -91,9 +91,12 @@ class ContentSourceModel(Base):
 
 class IdeaModel(Base):
     __tablename__ = "ideas"
+    __table_args__ = (
+        Index("ix_ideas_workspace_status", "workspace_id", "status"),
+    )
 
     id = Column(String(64), primary_key=True)
-    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String(512), nullable=False)
     angle = Column(Text, nullable=False)
     pillar = Column(String(128), nullable=False)
@@ -117,8 +120,8 @@ class ContentBriefModel(Base):
     __tablename__ = "content_briefs"
 
     id = Column(String(64), primary_key=True)
-    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
-    idea_id = Column(String(64), ForeignKey("ideas.id", ondelete="SET NULL"), nullable=True)
+    workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    idea_id = Column(String(64), ForeignKey("ideas.id", ondelete="SET NULL"), nullable=True, index=True)
     objective = Column(Text, nullable=False)
     campaign_id = Column(String(64), nullable=True)
     platform_targets = Column(JSON, default=lambda: ["linkedin", "x"], nullable=False)
@@ -133,7 +136,7 @@ class ContentPackageModel(Base):
     __tablename__ = "content_packages"
 
     id = Column(String(64), primary_key=True)
-    brief_id = Column(String(64), ForeignKey("content_briefs.id", ondelete="CASCADE"), nullable=False)
+    brief_id = Column(String(64), ForeignKey("content_briefs.id", ondelete="CASCADE"), nullable=False, index=True)
     version = Column(Integer, default=1, nullable=False)
     model_metadata = Column(JSON, default=dict, nullable=False)
     qa_score = Column(Float, default=0.0)
@@ -146,9 +149,12 @@ class ContentPackageModel(Base):
 
 class ContentVariantModel(Base):
     __tablename__ = "content_variants"
+    __table_args__ = (
+        Index("ix_content_variants_package_status", "package_id", "status"),
+    )
 
     id = Column(String(64), primary_key=True)
-    package_id = Column(String(64), ForeignKey("content_packages.id", ondelete="CASCADE"), nullable=False)
+    package_id = Column(String(64), ForeignKey("content_packages.id", ondelete="CASCADE"), nullable=False, index=True)
     platform = Column(String(32), nullable=False)
     hook = Column(Text, nullable=False)
     body = Column(Text, nullable=False)
@@ -170,7 +176,7 @@ class ApprovalModel(Base):
     __tablename__ = "approvals"
 
     id = Column(String(64), primary_key=True)
-    variant_id = Column(String(64), ForeignKey("content_variants.id", ondelete="CASCADE"), nullable=False)
+    variant_id = Column(String(64), ForeignKey("content_variants.id", ondelete="CASCADE"), nullable=False, index=True)
     decision = Column(String(32), nullable=False)
     reviewer_id = Column(String(64), nullable=False)
     feedback = Column(Text, nullable=True)
@@ -182,9 +188,12 @@ class ApprovalModel(Base):
 
 class PublicationJobModel(Base):
     __tablename__ = "publication_jobs"
+    __table_args__ = (
+        Index("ix_publication_jobs_status_scheduled_at", "status", "scheduled_at"),
+    )
 
     id = Column(String(64), primary_key=True)
-    variant_id = Column(String(64), ForeignKey("content_variants.id", ondelete="CASCADE"), nullable=False)
+    variant_id = Column(String(64), ForeignKey("content_variants.id", ondelete="CASCADE"), nullable=False, index=True)
     platform = Column(String(32), nullable=False)
     scheduled_at = Column(DateTime, nullable=False)
     idempotency_key = Column(String(64), unique=True, nullable=False)
@@ -202,7 +211,7 @@ class PublishedPostModel(Base):
     __tablename__ = "published_posts"
 
     id = Column(String(64), primary_key=True)
-    job_id = Column(String(64), ForeignKey("publication_jobs.id", ondelete="CASCADE"), nullable=False)
+    job_id = Column(String(64), ForeignKey("publication_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
     external_post_id = Column(String(128), nullable=False)
     final_payload = Column(JSON, nullable=False)
     platform = Column(String(32), nullable=False)
@@ -218,7 +227,7 @@ class MetricSnapshotModel(Base):
     __tablename__ = "metric_snapshots"
 
     id = Column(String(64), primary_key=True)
-    post_id = Column(String(64), ForeignKey("published_posts.id", ondelete="CASCADE"), nullable=False)
+    post_id = Column(String(64), ForeignKey("published_posts.id", ondelete="CASCADE"), nullable=False, index=True)
     observed_at = Column(DateTime, default=utc_now, nullable=False)
     impressions = Column(Integer, default=0)
     engagements = Column(Integer, default=0)
@@ -313,6 +322,7 @@ class UserRefreshTokenModel(Base):
     family_id = Column(String(64), index=True, nullable=False)
     expires_at = Column(DateTime, nullable=False)
     is_revoked = Column(Boolean, default=False, nullable=False)
+    revoked_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utc_now, nullable=False)
 
     user = relationship("UserModel", back_populates="refresh_tokens")
@@ -425,6 +435,9 @@ class VeilleRunModel(Base):
 
 class SignalModel(Base):
     __tablename__ = "signals"
+    __table_args__ = (
+        Index("ix_signals_workspace_status", "workspace_id", "status"),
+    )
 
     id = Column(String(64), primary_key=True)
     workspace_id = Column(String(64), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -441,6 +454,7 @@ class SignalModel(Base):
     facts = Column(JSON, default=list, nullable=False)  # [{"fact": "...", "source_url": "...", "quote": "..."}]
     executive_takeaway = Column(Text, nullable=False)  # Why it matters for tech leaders / execs
     raw_content_ref = Column(Text, nullable=True)
+    enrichment_status = Column(String(32), default="deterministic_only", nullable=False)
     status = Column(String(32), default="QUALIFIED", nullable=False, index=True)  # "NEW", "QUALIFIED", "REJECTED", "CONVERTED"
     is_synthetic = Column(Boolean, default=False, nullable=False)  # True for demo mode
     created_at = Column(DateTime, default=utc_now, nullable=False, index=True)

@@ -66,6 +66,16 @@ def test_unhandled_exception_masks_internal_details(client, monkeypatch):
 
     monkeypatch.setattr(sources.WebExtractorConnector, "process_source", crashing_ingest)
 
+    from infra.db.database import get_db_session
+    from infra.db.repository import ContentOpsRepository
+    from infra.db.models import WorkspaceMemberModel
+    with get_db_session() as db:
+        repo = ContentOpsRepository(db)
+        if not repo.get_user("test_user"):
+            repo.create_user("test_user", "test_user@example.com", "Test User")
+        if not db.query(WorkspaceMemberModel).filter_by(workspace_id="ws_default", user_id="test_user").first():
+            repo.add_workspace_member("ws_default", "test_user", "Editor")
+
     token = create_access_token(
         user_id="test_user",
         role="Editor",

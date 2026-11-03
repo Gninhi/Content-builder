@@ -1,0 +1,142 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.4, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent
+configfile: pyproject.toml
+plugins: cov-7.1.0, asyncio-1.4.0, langsmith-0.14.9, anyio-4.15.1
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 402 items
+
+tests/agents/test_agent_verification_battery.py .....                    [  1%]
+tests/agents/test_claim_verification.py ...                              [  1%]
+tests/audit/test_t10_t11_editorial_duplicates.py ..                      [  2%]
+tests/audit/test_t12_connectors.py ..                                    [  2%]
+tests/audit/test_t13_load_and_scale.py .                                 [  3%]
+tests/audit/test_t14_structured_outputs.py .                             [  3%]
+tests/audit/test_t1_recall.py .                                          [  3%]
+tests/audit/test_t2_t3_grounding_hallucination.py ..                     [  4%]
+tests/audit/test_t4_t5_security_ssrf.py ..                               [  4%]
+tests/audit/test_t6_t7_resilience_concurrency.py ..                      [  5%]
+tests/audit/test_t8_t9_tenant_budgets.py ..                              [  5%]
+tests/contract/test_contracts.py ..                                      [  6%]
+tests/devops/test_docker_compose_and_ci_hardening.py ...                 [  6%]
+tests/evals/test_quality_evaluator.py ....                               [  7%]
+tests/integration/test_alembic_migrations.py .                           [  8%]
+tests/integration/test_graphs.py .....                                   [  9%]
+tests/integration/test_llm_multi_provider.py .........                   [ 11%]
+tests/integration/test_publications_router.py ........                   [ 13%]
+tests/integration/test_spa_fallback.py .                                 [ 13%]
+tests/observability/test_correlation_and_routing.py ....                 [ 14%]
+tests/observability/test_json_logger.py ..                               [ 15%]
+tests/observability/test_prometheus_metrics.py ...                       [ 16%]
+tests/reliability/test_at_most_once_publishing.py ......                 [ 17%]
+tests/reliability/test_c7_scheduler_resilient_lifespan.py ...            [ 18%]
+tests/reliability/test_checkpointer_persistence.py .                     [ 18%]
+tests/reliability/test_concurrency_race.py .                             [ 18%]
+tests/reliability/test_degraded_mode.py ..                               [ 19%]
+tests/reliability/test_n3_langgraph_cycle_budget.py .....                [ 20%]
+tests/reliability/test_resilience_and_killswitch.py ......               [ 22%]
+tests/reliability/test_state_machine_and_concurrency.py ...              [ 22%]
+tests/security/test_api_surface.py ......                                [ 24%]
+tests/security/test_avatar_mime_validation.py .......                    [ 26%]
+tests/security/test_bola_idor.py .....                                   [ 27%]
+tests/security/test_c4_email_service_and_verification.py ...             [ 28%]
+tests/security/test_complete_auth.py .........                           [ 30%]
+tests/security/test_h12_and_h13_tenant_isolation_and_sessions.py ..      [ 30%]
+tests/security/test_h1_refresh_token_grace_window.py ..                  [ 31%]
+tests/security/test_h3_and_h7_anti_enumeration_demo_mode.py ...          [ 32%]
+tests/security/test_h5_env_and_dev_token_removed.py ...                  [ 32%]
+tests/security/test_jwt_auth.py ............                             [ 35%]
+tests/security/test_langfuse_pii_sanitization.py ....                    [ 36%]
+tests/security/test_n1_workspace_creation_ownership.py .                 [ 37%]
+tests/security/test_n2_and_h4_rbac_db_truth.py ...                       [ 37%]
+tests/security/test_oauth_callback_xss_csp.py ..                         [ 38%]
+tests/security/test_oauth_flow.py .........                              [ 40%]
+tests/security/test_oauth_test_connection_readonly.py .                  [ 40%]
+tests/security/test_oauth_vault_security.py ....                         [ 41%]
+tests/security/test_prompt_injection.py .......                          [ 43%]
+tests/security/test_rate_limiter_hardening.py ....                       [ 44%]
+tests/security/test_redis_limiter_resilience.py ......                   [ 46%]
+tests/security/test_registration_hardening_and_atomicity.py .......      [ 47%]
+tests/security/test_reproduction_attacks.py ......                       [ 49%]
+tests/security/test_secret_validation_entropy.py ...                     [ 50%]
+tests/security/test_security.py ...                                      [ 50%]
+tests/security/test_security_components.py .....                         [ 51%]
+tests/security/test_user_profile.py ............                         [ 54%]
+tests/security/test_x004_pagination_bounds.py .....                      [ 56%]
+tests/security/test_xml_ssrf_security.py ...........                     [ 58%]
+tests/unit/test_agent_memory_governance.py ...                           [ 59%]
+tests/unit/test_ci_supply_chain_and_docs.py ....                         [ 60%]
+tests/unit/test_connector_error_logging.py .....                         [ 61%]
+tests/unit/test_connector_liskov_characterization.py ...                 [ 62%]
+tests/unit/test_content_rewrite_safeguard.py ....                        [ 63%]
+tests/unit/test_coverage_boost.py ....................                   [ 68%]
+tests/unit/test_db_foreign_key_indexes.py ..                             [ 69%]
+tests/unit/test_ensure_workspace_strictness.py ....                      [ 70%]
+tests/unit/test_gemini_and_langfuse.py .....                             [ 71%]
+tests/unit/test_h14_sovereign_llm_fallback_guard.py ..                   [ 71%]
+tests/unit/test_ideation_grounding.py .....                              [ 73%]
+tests/unit/test_idempotency.py ...                                       [ 73%]
+tests/unit/test_lifespan_stale_job_safeguard.py .                        [ 74%]
+tests/unit/test_llm_cache.py ......                                      [ 75%]
+tests/unit/test_llm_resolver_resilience.py .......                       [ 77%]
+tests/unit/test_no_hardcoded_seeds_in_prod.py ..                         [ 77%]
+tests/unit/test_nvidia_integration.py .........                          [ 80%]
+tests/unit/test_nvidia_resilience_and_glm.py .......                     [ 81%]
+tests/unit/test_pricing_config.py ...                                    [ 82%]
+tests/unit/test_publication_cancel_safeguard.py ...                      [ 83%]
+tests/unit/test_publishable_renderer.py ...                              [ 84%]
+tests/unit/test_publisher_idempotency_db_failure.py .                    [ 84%]
+tests/unit/test_qa_rules.py ......                                       [ 85%]
+tests/unit/test_readiness_probe.py ..                                    [ 86%]
+tests/unit/test_routers_coverage_boost.py ......                         [ 87%]
+tests/unit/test_social_publishers.py .....................               [ 93%]
+tests/unit/test_social_ready_contracts.py .....                          [ 94%]
+tests/unit/test_state_machine.py ....                                    [ 95%]
+tests/unit/test_tools_and_security.py ......                             [ 96%]
+tests/unit/test_veille_and_signals.py .......                            [ 98%]
+tests/unit/test_veille_scheduler_and_dynamic_sources.py .....            [ 99%]
+tests/unit/test_veille_to_ideation_conversion.py .                       [100%]
+
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/starlette/routing.py:672
+  /Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/.venv/lib/python3.12/site-packages/starlette/routing.py:672: PytestCollectionWarning: cannot collect 'test_router' because it is not a function.
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+
+tests/agents/test_agent_verification_battery.py::test_ideation_agent_verification
+tests/agents/test_agent_verification_battery.py::test_production_agent_verification
+tests/unit/test_llm_resolver_resilience.py::test_resolver_active_and_configured
+  /Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/.venv/lib/python3.12/site-packages/langchain_nvidia_ai_endpoints/_common.py:269: UserWarning: Found z-ai/glm-5.3-flash in available_models, but type is unknown and inference may fail.
+    warnings.warn(
+
+tests/audit/test_t1_recall.py::test_t1_recall_major_events_and_pipeline_defect
+tests/audit/test_t1_recall.py::test_t1_recall_major_events_and_pipeline_defect
+tests/audit/test_t1_recall.py::test_t1_recall_major_events_and_pipeline_defect
+tests/audit/test_t1_recall.py::test_t1_recall_major_events_and_pipeline_defect
+tests/reliability/test_n3_langgraph_cycle_budget.py::test_api_ideas_endpoint_returns_429_on_cycle_budget_exceeded
+tests/unit/test_veille_scheduler_and_dynamic_sources.py::test_veille_pipeline_fail_soft_source_isolation
+tests/unit/test_veille_scheduler_and_dynamic_sources.py::test_veille_pipeline_fail_soft_source_isolation
+  /Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/packages/tools/web_search.py:241: RuntimeWarning: This package (`duckduckgo_search`) has been renamed to `ddgs`! Use `pip install ddgs` instead.
+    with DDGS() as ddgs:
+
+tests/integration/test_llm_multi_provider.py::test_centralized_resolver_hierarchy
+  /Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/.venv/lib/python3.12/site-packages/langchain_nvidia_ai_endpoints/_common.py:269: UserWarning: Found nvidia/llama-3.1-nemotron-70b-instruct in available_models, but type is unknown and inference may fail.
+    warnings.warn(
+
+tests/security/test_complete_auth.py::test_login_and_refresh_token_rotation
+tests/security/test_complete_auth.py::test_login_and_refresh_token_rotation
+tests/security/test_complete_auth.py::test_login_and_refresh_token_rotation
+tests/security/test_complete_auth.py::test_logout_and_session_invalidation
+tests/security/test_complete_auth.py::test_logout_and_session_invalidation
+  /Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/.venv/lib/python3.12/site-packages/starlette/testclient.py:463: DeprecationWarning: Setting per-request cookies=<...> is being deprecated, because the expected behaviour on cookie persistence is ambiguous. Set cookies directly on the client instance instead.
+    return super().request(
+
+tests/security/test_h5_env_and_dev_token_removed.py::test_app_env_priority_order
+  /Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/tests/security/test_h5_env_and_dev_token_removed.py:31: DeprecationWarning: ENVIRONMENT is deprecated and will be removed in a future release. Use APP_ENV instead.
+    assert get_app_env() == "development"
+
+tests/security/test_h5_env_and_dev_token_removed.py::test_app_env_priority_order
+  /Users/seansiehigninhi/Dossier_dev/apps/F-LangGraph/DeepAgent/tests/security/test_h5_env_and_dev_token_removed.py:34: DeprecationWarning: ENV is deprecated and will be removed in a future release. Use APP_ENV instead.
+    assert get_app_env() == "local"
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 402 passed, 19 warnings in 76.71s (0:01:16) ==================

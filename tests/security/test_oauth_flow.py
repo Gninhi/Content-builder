@@ -18,7 +18,7 @@ client = TestClient(app)
 def clean_oauth_env():
     # Set required env vars for tests
     old_env = os.environ.copy()
-    os.environ["SECRET_VAULT_KEY"] = "super-secret-vault-master-key-32b!"
+    os.environ["SECRET_VAULT_KEY"] = "cbe7e00447543d905f45c9b5b702949529b8f356c6ed5c28e0ea21d53ce34536"
     os.environ["LINKEDIN_CLIENT_ID"] = "test_li_client_id"
     os.environ["LINKEDIN_CLIENT_SECRET"] = "test_li_client_secret"
     os.environ["LINKEDIN_REDIRECT_URI"] = "http://localhost:8000/v1/oauth/callback/linkedin"
@@ -281,3 +281,26 @@ def test_oauth_disconnect_account():
         assert vault.get_token(ws_id, "linkedin", "urn:li:person:to_remove") is None
     finally:
         db.close()
+
+
+def test_oauth_start_fails_cleanly_when_credentials_missing(monkeypatch):
+    owner_token = create_access_token("owner_1", Role.OWNER.value, "ws_test_oauth")
+
+    # 1. Missing LINKEDIN_CLIENT_ID -> 503 Service Unavailable
+    monkeypatch.delenv("LINKEDIN_CLIENT_ID", raising=False)
+    resp_li = client.get(
+        "/v1/oauth/start/linkedin",
+        headers={"Authorization": f"Bearer {owner_token}"}
+    )
+    assert resp_li.status_code == 503
+    assert "LINKEDIN_CLIENT_ID is not configured" in resp_li.json()["detail"]
+
+    # 2. Missing X_CLIENT_ID (even if X_API_KEY is present) -> 503 Service Unavailable
+    monkeypatch.delenv("X_CLIENT_ID", raising=False)
+    monkeypatch.setenv("X_API_KEY", "2107123456789-dummy_oauth1_key")
+    resp_x = client.get(
+        "/v1/oauth/start/x",
+        headers={"Authorization": f"Bearer {owner_token}"}
+    )
+    assert resp_x.status_code == 503
+    assert "X_CLIENT_ID (OAuth 2.0 Client ID) is not configured" in resp_x.json()["detail"]

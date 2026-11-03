@@ -1,3 +1,4 @@
+import os
 from typing import Dict, Any
 import logging
 from packages.prompts.registry import PromptRegistry
@@ -5,6 +6,7 @@ from packages.observability.tracing import ObservabilityTracer
 from services.orchestration.state.base import StrategyInsightsState
 from services.orchestration.structured_output import invoke_structured_output
 from services.orchestration.llm import get_gemini_model, resolve_and_get_llm, GeneratedStrategyBatch
+from packages.resilience.circuit_breaker import resolve_cycle_budget, BudgetExceededException
 
 logger = logging.getLogger(__name__)
 
@@ -20,15 +22,19 @@ def generate_strategy_insights_node(state: StrategyInsightsState) -> Dict[str, A
     pillars = state.get("pillars", ["IA générative", "Systèmes multi-agents"])
     snapshots = state.get("metric_snapshots", [])
 
-    total_impressions = sum(s.get("impressions", 0) for s in snapshots)
-    total_engagements = sum(s.get("engagements", 0) for s in snapshots)
-    avg_er = round((total_engagements / max(1, total_impressions)) * 100, 2)
-
     trace_meta = ObservabilityTracer.get_run_metadata(
         workspace_id=workspace_id,
         graph_name="strategy_insights_graph",
         node_name="generate_strategy_insights"
     )
+
+    # Enforce FinOps cycle budget (N3)
+    budget = resolve_cycle_budget(state)
+    budget.check_budget()
+
+    total_impressions = sum(s.get("impressions", 0) for s in snapshots)
+    total_engagements = sum(s.get("engagements", 0) for s in snapshots)
+    avg_er = round((total_engagements / max(1, total_impressions)) * 100, 2)
 
     if not snapshots:
         logger.info(f"No metric snapshots available for workspace '{workspace_id}', returning clean NO_DATA")
@@ -38,7 +44,8 @@ def generate_strategy_insights_node(state: StrategyInsightsState) -> Dict[str, A
             "status": "NO_DATA",
             "message": "Aucune métrique de publication disponible pour ce workspace. Publiez des contenus pour générer des insights.",
             "run_id": trace_meta["run_id"],
-            "resolved_llm": None
+            "resolved_llm": None,
+            "cycle_budget": budget
         }
 
     # 1. Resolve or restore frozen LLM configuration
@@ -67,7 +74,8 @@ def generate_strategy_insights_node(state: StrategyInsightsState) -> Dict[str, A
             allow_none_if_unconfigured=True
         )
 
-    if model is None:
+    allow_cross_fallback = os.getenv("ALLOW_CROSS_PROVIDER_FALLBACK", "false").lower() in ("true", "1", "yes")
+    if model is None and allow_cross_fallback:
         try:
             model = get_gemini_model(model_type="reasoning", temperature=0.2, workspace_id=workspace_id)
         except Exception:
@@ -96,15 +104,35 @@ def generate_strategy_insights_node(state: StrategyInsightsState) -> Dict[str, A
                 callbacks=callbacks
             )
             if res and res.hypotheses:
+                tokens_used = 400
+                budget.add_tokens(tokens_used)
                 return {
                     "hypotheses": [h.model_dump() for h in res.hypotheses],
                     "recommendations": [r.model_dump() for r in res.recommendations],
                     "status": "COMPLETED",
                     "run_id": trace_meta["run_id"],
-                    "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else (frozen_llm if isinstance(frozen_llm, dict) else None)
+                    "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else (frozen_llm if isinstance(frozen_llm, dict) else None),
+                    "cycle_budget": budget
                 }
+        except BudgetExceededException:
+            raise
         except Exception as e:
             logger.warning(f"Strategy insights LLM generation failed: {e}")
+
+    strict_llm = bool(
+        state.get("strict_llm")
+        or os.getenv("STRICT_LLM_AVAILABILITY", "false").lower() in ("true", "1", "yes")
+    )
+    if strict_llm:
+        return {
+            "hypotheses": [],
+            "recommendations": [],
+            "status": "LLM_PROVIDERS_DOWN",
+            "message": "Fournisseurs LLM indisponibles en mode strict.",
+            "run_id": trace_meta["run_id"],
+            "resolved_llm": None,
+            "cycle_budget": budget,
+        }
 
     # 2. Deterministic structured fallback (ensures tests and offline runs succeed)
     hypotheses = [
@@ -139,10 +167,13 @@ def generate_strategy_insights_node(state: StrategyInsightsState) -> Dict[str, A
         }
     ]
 
+    budget.add_tokens(250)
+
     return {
         "hypotheses": hypotheses,
         "recommendations": recommendations,
         "status": "COMPLETED",
         "run_id": trace_meta["run_id"],
-        "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else frozen_llm
+        "resolved_llm": resolved_ctx.to_dict() if resolved_ctx else frozen_llm,
+        "cycle_budget": budget
     }

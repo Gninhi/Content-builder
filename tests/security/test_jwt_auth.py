@@ -39,6 +39,14 @@ def ensure_default_brand_profile():
                 cta_policy={}
             ))
             db.commit()
+
+        from infra.db.repository import ContentOpsRepository
+        from infra.db.models import WorkspaceMemberModel
+        repo = ContentOpsRepository(db)
+        if not repo.get_user("user_valid"):
+            repo.create_user("user_valid", "valid@test.com", "Valid User")
+        if not db.query(WorkspaceMemberModel).filter_by(workspace_id="ws_default", user_id="user_valid").first():
+            repo.add_workspace_member("ws_default", "user_valid", "Editor")
     yield
 
 
@@ -125,22 +133,20 @@ def test_rbac_viewer_cannot_approve_content():
 
 
 def test_dev_token_endpoint_behavior():
-    """Dev token generation must work when ENV=dev and fail in production."""
+    """Dev token backdoor endpoint is permanently removed and returns 404."""
     os.environ["ENV"] = "dev"
     res_dev = client.post(
         "/v1/auth/dev-token",
         json={"user_id": "dev_user", "role": "Editor", "workspace_id": "ws_default"}
     )
-    assert res_dev.status_code == 200
-    assert "access_token" in res_dev.json()
+    assert res_dev.status_code == 404
 
     os.environ["ENV"] = "production"
     res_prod = client.post(
         "/v1/auth/dev-token",
         json={"user_id": "dev_user", "role": "Editor", "workspace_id": "ws_default"}
     )
-    assert res_prod.status_code in [403, 404]
-    os.environ["ENV"] = "dev"
+    assert res_prod.status_code == 404
 
 
 def test_jwt_key_rotation_with_kid(monkeypatch):
@@ -175,7 +181,7 @@ def test_jwt_production_validation_fail_closed(monkeypatch):
         validate_jwt_configuration()
     assert "Production Startup Denied" in str(exc2.value)
 
-    monkeypatch.setenv("JWT_SECRET_KEY", "a-very-strong-production-secret-key-for-contentops-2026-strict")
+    monkeypatch.setenv("JWT_SECRET_KEY", "9f82c4b1d607a3e5c9b2d8e4c1a705e38d9b1c2a4f6e80237d5c9e1b3a5f7024")
     validate_jwt_configuration()  # Must not raise
 
 

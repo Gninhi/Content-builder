@@ -71,7 +71,7 @@ def test_connected_social_account_schema():
 
 def test_oauth_token_vault_encryption_at_rest():
     """Verifies that tokens stored in EncryptedOAuthTokenVault are encrypted at rest."""
-    vault = EncryptedOAuthTokenVault(vault_key="super-secret-vault-master-key-32b!")
+    vault = EncryptedOAuthTokenVault(vault_key="cbe7e00447543d905f45c9b5b702949529b8f356c6ed5c28e0ea21d53ce34536")
     ws = "ws_finance"
     provider = "linkedin"
     account = "acc_linkedin_corporate"

@@ -1,4 +1,3 @@
-from langgraph.graph import StateGraph, START, END
 from typing import Dict, Any
 from packages.domain.state_machine import ContentStatus
 from packages.domain.idempotency import compute_payload_hash
@@ -44,11 +43,3 @@ def verify_approval_and_publish_node(state: PublishingState) -> Dict[str, Any]:
             "error": str(e)
         }
 
-
-builder = StateGraph(PublishingState)
-builder.add_node("verify_and_publish", verify_approval_and_publish_node)
-
-builder.add_edge(START, "verify_and_publish")
-builder.add_edge("verify_and_publish", END)
-
-graph = builder.compile()

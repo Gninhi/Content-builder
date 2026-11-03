@@ -59,8 +59,8 @@ class XSocialPublisher(BaseSocialPublisher):
         self.access_token = access_token or os.getenv("X_ACCESS_TOKEN")
         self.refresh_token = refresh_token
         self.token_expires_at = token_expires_at
-        self.client_id = client_id or os.getenv("X_CLIENT_ID") or os.getenv("X_API_KEY")
-        self.client_secret = client_secret or os.getenv("X_CLIENT_SECRET") or os.getenv("X_API_SECRET")
+        self.client_id = client_id or os.getenv("X_CLIENT_ID")
+        self.client_secret = client_secret or os.getenv("X_CLIENT_SECRET")
         self.max_text_length = max_text_length
         self.monthly_limit = monthly_limit
         self.current_month_publications = current_month_publications
@@ -102,6 +102,40 @@ class XSocialPublisher(BaseSocialPublisher):
                 f"X post content exceeds {self.max_text_length} characters limit "
                 f"({weighted_len} weighted chars, {len(body)} raw chars)."
             )
+
+    def verify_connection(self) -> Dict[str, Any]:
+        """
+        Verifies that the X connection and access token are active and valid,
+        fetching authenticated user details via GET /2/users/me without posting anything (read-only).
+        """
+        if self.sandbox_mode:
+            return {
+                "status": "OPERATIONAL",
+                "provider": self.provider.value,
+                "mode": "sandbox",
+                "account_id": "sandbox_user_x",
+                "verified_at": datetime.now(timezone.utc).isoformat(),
+            }
+        self.ensure_valid_token()
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+        try:
+            resp = self._client.get("https://api.x.com/2/users/me", headers=headers)
+            if resp.status_code == 200:
+                user_data = resp.json().get("data", {})
+                return {
+                    "status": "OPERATIONAL",
+                    "provider": self.provider.value,
+                    "mode": "live",
+                    "account_id": user_data.get("id", "unknown"),
+                    "username": user_data.get("username"),
+                    "verified_at": datetime.now(timezone.utc).isoformat(),
+                }
+            elif resp.status_code == 401:
+                raise SocialAuthenticationError("X access token unauthorized on users/me.", provider=self.provider.value)
+            else:
+                raise SocialNetworkError(f"X verify connection failed with HTTP {resp.status_code}: {resp.text}", provider=self.provider.value)
+        except httpx.RequestError as exc:
+            raise SocialNetworkError(f"Network error contacting X users/me: {exc}", provider=self.provider.value)
 
     def ensure_valid_token(self) -> None:
         """

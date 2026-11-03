@@ -12,7 +12,7 @@ def get_utc_now():
 class WorkspaceCreate(BaseModel):
     name: str = Field(..., json_schema_extra={"example": "AI & Growth Workspace"})
     timezone: str = Field("UTC", json_schema_extra={"example": "Europe/Paris"})
-    owner_id: str = Field("owner_1", json_schema_extra={"example": "owner_1"})
+    owner_id: Optional[str] = Field(None, json_schema_extra={"example": "owner_1"})
 
 
 class WorkspaceResponse(BaseModel):
@@ -49,7 +49,7 @@ class BrandProfileResponse(BaseModel):
 
 # Sources & Provenance
 class SourceIngestRequest(BaseModel):
-    workspace_id: str
+    workspace_id: Optional[str] = None
     type: str = Field("url", description="url, note, text, or rss")
     url: Optional[str] = None
     raw_text: Optional[str] = None
@@ -206,6 +206,12 @@ class PublishedPostResponse(BaseModel):
     published_at: datetime
     permalink: str
     receipt: Dict[str, Any]
+
+
+class PublicationReconcileRequest(BaseModel):
+    resolution: str  # "CONFIRMED_PUBLISHED" or "CONFIRMED_FAILED"
+    external_post_id: Optional[str] = None
+    permalink: Optional[str] = None
 
 
 # Analytics & Strategy Insights (PRD Section 3 & 6)

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -20,7 +21,12 @@ import { InboxFeedbackModal } from '../components/inbox/InboxFeedbackModal';
 import { InboxShortcutsModal } from '../components/inbox/InboxShortcutsModal';
 import { Edit3, Keyboard, Shield } from 'lucide-react';
 
-export const InboxScreen: React.FC = () => {
+interface InboxScreenProps {
+  onNavigate?: (screen: string) => void;
+}
+
+export const InboxScreen: React.FC<InboxScreenProps> = ({ onNavigate }) => {
+  const navigate = useNavigate();
   const { t, language } = useLanguage();
   const { session, canApprove, canEdit } = useAuth();
   const { showToast } = useToast();
@@ -269,7 +275,11 @@ export const InboxScreen: React.FC = () => {
           description={t.inbox.empty_desc}
           actionLabel={isEn ? 'Generate new ideas' : 'Générer de nouvelles idées'}
           onAction={() => {
-            window.location.hash = '#ideation';
+            if (onNavigate) {
+              onNavigate('ideation');
+            } else {
+              navigate('/ideation');
+            }
           }}
         />
       ) : (

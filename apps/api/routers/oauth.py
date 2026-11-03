@@ -1,5 +1,7 @@
 import os
 import json
+import html
+import secrets
 import uuid
 import urllib.parse
 from datetime import datetime, timezone, timedelta
@@ -65,8 +67,8 @@ def start_oauth_flow(
         )
         if not client_id:
             raise HTTPException(
-                status_code=500,
-                detail="LINKEDIN_CLIENT_ID is not configured in environment."
+                status_code=503,
+                detail="LINKEDIN_CLIENT_ID is not configured in environment. Please add it to .env."
             )
         
         # Scopes: openid profile w_member_social (r_liteprofile is deprecated)
@@ -81,15 +83,15 @@ def start_oauth_flow(
         auth_url = f"https://www.linkedin.com/oauth/v2/authorization?{urllib.parse.urlencode(params)}"
 
     else:  # X (Twitter)
-        client_id = os.getenv("X_CLIENT_ID") or os.getenv("X_API_KEY")
+        client_id = os.getenv("X_CLIENT_ID")
         redirect_uri = os.getenv(
             "X_REDIRECT_URI",
             "http://localhost:8000/v1/oauth/callback/x"
         )
         if not client_id:
             raise HTTPException(
-                status_code=500,
-                detail="X_CLIENT_ID is not configured in environment."
+                status_code=503,
+                detail="X_CLIENT_ID (OAuth 2.0 Client ID) is not configured in environment. Do not use OAuth 1.0a API Key here."
             )
 
         # Scopes: tweet.read tweet.write users.read offline.access
@@ -136,7 +138,17 @@ def oauth_callback(
 
     if error:
         if is_browser:
-            allowed_origins_json = json.dumps(_get_allowed_target_origins())
+            nonce = secrets.token_urlsafe(16)
+            allowed_origins_json = json.dumps(_get_allowed_target_origins()).replace("<", "\\u003c").replace(">", "\\u003e")
+            safe_error = html.escape(str(error or ""))
+            safe_error_desc = html.escape(str(error_description or "Annulation"))
+            safe_provider = html.escape(str(provider_clean.upper()))
+            post_err_payload = json.dumps({
+                "type": "CONTENTOPS_OAUTH_ERROR",
+                "provider": provider_clean,
+                "error": str(error or "")
+            }).replace("<", "\\u003c").replace(">", "\\u003e")
+
             err_html = f"""<!DOCTYPE html>
 <html lang="fr">
 <head><meta charset="utf-8"><title>Échec OAuth</title>
@@ -151,22 +163,36 @@ button {{ background: #dc2626; color: white; border: none; border-radius: 8px; p
 <body>
 <div class="card">
     <h2>Autorisation Refusée</h2>
-    <p>L'autorisation pour <strong>{provider_clean.upper()}</strong> a été interrompue : {error} ({error_description or 'Annulation'})</p>
-    <button onclick="window.close()">Fermer cet onglet</button>
+    <p>L'autorisation pour <strong>{safe_provider}</strong> a été interrompue : {safe_error} ({safe_error_desc})</p>
+    <button id="close-btn">Fermer cet onglet</button>
 </div>
-<script>
-if (window.opener) {{
-    var allowedOrigins = {allowed_origins_json};
-    for (var i = 0; i < allowedOrigins.length; i++) {{
-        try {{
-            window.opener.postMessage({{ type: 'CONTENTOPS_OAUTH_ERROR', provider: '{provider_clean}', error: '{error}' }}, allowedOrigins[i]);
-        }} catch(e) {{}}
+<script type="application/json" id="oauth-error-payload" nonce="{nonce}">{post_err_payload}</script>
+<script type="application/json" id="oauth-origins" nonce="{nonce}">{allowed_origins_json}</script>
+<script nonce="{nonce}">
+document.addEventListener("DOMContentLoaded", function() {{
+    var closeBtn = document.getElementById("close-btn");
+    if (closeBtn) {{
+        closeBtn.addEventListener("click", function() {{ window.close(); }});
     }}
-}}
+    if (window.opener) {{
+        var errEl = document.getElementById("oauth-error-payload");
+        var errData = errEl ? JSON.parse(errEl.textContent) : null;
+        var originsEl = document.getElementById("oauth-origins");
+        var allowedOrigins = originsEl ? JSON.parse(originsEl.textContent) : [];
+        if (errData) {{
+            for (var i = 0; i < allowedOrigins.length; i++) {{
+                try {{
+                    window.opener.postMessage(errData, allowedOrigins[i]);
+                }} catch(e) {{}}
+            }}
+        }}
+    }}
+}});
 </script>
 </body>
 </html>"""
-            return HTMLResponse(content=err_html, status_code=400)
+            csp = f"default-src 'self'; script-src 'self' 'nonce-{nonce}'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none';"
+            return HTMLResponse(content=err_html, status_code=400, headers={"Content-Security-Policy": csp})
         raise HTTPException(
             status_code=400,
             detail=f"OAuth authorization denied by provider: {error} ({error_description or 'No detail'})"
@@ -263,14 +289,17 @@ if (window.opener) {{
         )
 
     else:  # X (Twitter)
-        client_id = os.getenv("X_CLIENT_ID") or os.getenv("X_API_KEY")
-        client_secret = os.getenv("X_CLIENT_SECRET") or os.getenv("X_API_SECRET")
+        client_id = os.getenv("X_CLIENT_ID")
+        client_secret = os.getenv("X_CLIENT_SECRET")
         redirect_uri = os.getenv(
             "X_REDIRECT_URI",
             "http://localhost:8000/v1/oauth/callback/x"
         )
         if not client_id:
-            raise HTTPException(status_code=500, detail="X credentials missing on server.")
+            raise HTTPException(
+                status_code=503,
+                detail="X_CLIENT_ID (OAuth 2.0 Client ID) is not configured on server."
+            )
 
         token_url = "https://api.x.com/2/oauth2/token"
         data = {
@@ -341,12 +370,25 @@ if (window.opener) {{
     }
 
     if is_browser:
-        allowed_origins_json = json.dumps(_get_allowed_target_origins())
-        html = f"""<!DOCTYPE html>
+        nonce = secrets.token_urlsafe(16)
+        allowed_origins_json = json.dumps(_get_allowed_target_origins()).replace("<", "\\u003c").replace(">", "\\u003e")
+        safe_account_name = html.escape(str(account_name or ""))
+        safe_account_id = html.escape(str(account_id or ""))
+        safe_provider = html.escape(str(provider_clean.upper()))
+
+        post_data = {
+            "type": "CONTENTOPS_OAUTH_SUCCESS",
+            "provider": str(provider_clean),
+            "account_id": str(account_id),
+            "account_name": str(account_name or ""),
+        }
+        safe_json_payload = json.dumps(post_data).replace("<", "\\u003c").replace(">", "\\u003e")
+
+        html_content = f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <title>Compte {provider_clean.upper()} Connecté</title>
+  <title>Compte {safe_provider} Connecté</title>
   <style>
     body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #030712; color: #f9fafb; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
     .card {{ background: #111827; border: 1px solid #10b981; border-radius: 16px; padding: 36px 40px; max-width: 440px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }}
@@ -362,32 +404,42 @@ if (window.opener) {{
   <div class="card">
     <div class="icon">✓</div>
     <h2>Compte Connecté avec Succès !</h2>
-    <p>Votre compte <strong>{provider_clean.upper()}</strong> est synchronisé avec ContentOps.</p>
-    <div class="acc">{account_name} ({account_id})</div>
+    <p>Votre compte <strong>{safe_provider}</strong> est synchronisé avec ContentOps.</p>
+    <div class="acc">{safe_account_name} ({safe_account_id})</div>
     <br>
-    <button class="btn" onclick="window.close()">Fermer cet onglet</button>
+    <button id="close-btn" class="btn">Fermer cet onglet</button>
   </div>
-  <script>
-    if (window.opener) {{
-      var allowedOrigins = {allowed_origins_json};
-      for (var i = 0; i < allowedOrigins.length; i++) {{
-        try {{
-          window.opener.postMessage({{
-            type: 'CONTENTOPS_OAUTH_SUCCESS',
-            provider: '{provider_clean}',
-            account_id: '{account_id}',
-            account_name: '{account_name}'
-          }}, allowedOrigins[i]);
-        }} catch (e) {{}}
+  <script type="application/json" id="oauth-success-payload" nonce="{nonce}">{safe_json_payload}</script>
+  <script type="application/json" id="oauth-origins" nonce="{nonce}">{allowed_origins_json}</script>
+  <script nonce="{nonce}">
+    document.addEventListener("DOMContentLoaded", function() {{
+      var closeBtn = document.getElementById("close-btn");
+      if (closeBtn) {{
+        closeBtn.addEventListener("click", function() {{ window.close(); }});
       }}
-      setTimeout(function() {{ window.close(); }}, 1200);
-    }} else {{
-      setTimeout(function() {{ window.location.href = '/ui/#connections?oauth=success&provider={provider_clean}'; }}, 1500);
-    }}
+      var dataEl = document.getElementById("oauth-success-payload");
+      var data = dataEl ? JSON.parse(dataEl.textContent) : null;
+      var originsEl = document.getElementById("oauth-origins");
+      var allowedOrigins = originsEl ? JSON.parse(originsEl.textContent) : [];
+      if (window.opener && data) {{
+        for (var i = 0; i < allowedOrigins.length; i++) {{
+          try {{
+            window.opener.postMessage(data, allowedOrigins[i]);
+          }} catch (e) {{}}
+        }}
+        setTimeout(function() {{ window.close(); }}, 1200);
+      }} else if (data) {{
+        var prov = encodeURIComponent(data.provider || '');
+        setTimeout(function() {{
+          window.location.href = '/ui/connections?oauth=success&provider=' + prov;
+        }}, 1500);
+      }}
+    }});
   </script>
 </body>
 </html>"""
-        return HTMLResponse(content=html)
+        csp = f"default-src 'self'; script-src 'self' 'nonce-{nonce}'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none';"
+        return HTMLResponse(content=html_content, headers={"Content-Security-Policy": csp})
 
     return payload
 
@@ -407,23 +459,33 @@ def list_connected_accounts(
         .all()
     )
 
+    now_utc = datetime.now(timezone.utc)
+    res_accounts = []
+    for acc in accounts:
+        status_val = str(acc.status)
+        if acc.expires_at:
+            exp_dt = acc.expires_at
+            if exp_dt.tzinfo is None:
+                exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+            if exp_dt < now_utc and status_val == "ACTIVE":
+                status_val = "EXPIRED"
+
+        res_accounts.append({
+            "id": str(acc.id),
+            "provider": str(acc.provider),
+            "account_id": str(acc.account_id),
+            "account_name": str(acc.account_name),
+            "status": status_val,
+            "scopes": acc.scopes or [],
+            "expires_at": acc.expires_at.isoformat() if acc.expires_at else None,
+            "created_at": acc.created_at.isoformat() if acc.created_at else None,
+            "updated_at": acc.updated_at.isoformat() if acc.updated_at else None,
+        })
+
     return {
         "workspace_id": user.workspace_id,
-        "count": len(accounts),
-        "accounts": [
-            {
-                "id": str(acc.id),
-                "provider": str(acc.provider),
-                "account_id": str(acc.account_id),
-                "account_name": str(acc.account_name),
-                "status": str(acc.status),
-                "scopes": acc.scopes or [],
-                "expires_at": acc.expires_at.isoformat() if acc.expires_at else None,
-                "created_at": acc.created_at.isoformat() if acc.created_at else None,
-                "updated_at": acc.updated_at.isoformat() if acc.updated_at else None,
-            }
-            for acc in accounts
-        ]
+        "count": len(res_accounts),
+        "accounts": res_accounts
     }
 
 
@@ -527,19 +589,14 @@ def test_social_connection(
     worker = PublisherWorker(db)
     try:
         publisher = worker.resolve_publisher(provider_clean, user.workspace_id)
-        timestamp_str = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
-        test_content = f"Vérification ContentOps : le connecteur {provider_clean.upper()} est 100% opérationnel à {timestamp_str}."
-        res = publisher.publish(
-            content=test_content
-        )
+        verification = publisher.verify_connection()
         return {
             "status": "OPERATIONAL",
             "provider": provider_clean,
-            "external_post_id": res.platform_post_id,
-            "url": res.permalink_url,
-            "verified_at": res.published_at.isoformat() if res.published_at else datetime.now(timezone.utc).isoformat(),
-            "receipt": res.metadata,
-            "message": f"Connecteur {provider_clean.upper()} vérifié et 100% opérationnel !"
+            "account_id": verification.get("account_id"),
+            "mode": verification.get("mode", "sandbox"),
+            "verified_at": verification.get("verified_at", datetime.now(timezone.utc).isoformat()),
+            "message": f"Connecteur {provider_clean.upper()} vérifié et 100% opérationnel (lecture seule)."
         }
     except Exception as e:
         raise HTTPException(

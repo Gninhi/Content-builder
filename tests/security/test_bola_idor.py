@@ -13,15 +13,39 @@ def setup_workspaces():
     init_db()
     db = SessionLocal()
     try:
+        from infra.db.models import WorkspaceModel, WorkspaceMemberModel
         repo = ContentOpsRepository(db)
-        if not repo.get_workspace("ws_tenant_1"):
-            repo.create_workspace("Tenant 1", owner_id="owner_1").id = "ws_tenant_1"
+
+        # Ensure users exist
+        for uid, name in [("user_1", "User 1"), ("user_2", "User 2"), ("owner_1", "Owner 1"), ("owner_2", "Owner 2")]:
+            if not repo.get_user(uid):
+                repo.create_user(user_id=uid, email=f"{uid}@example.com", full_name=name)
+
+        if not db.query(WorkspaceModel).filter(WorkspaceModel.id == "ws_tenant_1").first():
+            ws1 = WorkspaceModel(id="ws_tenant_1", name="Tenant 1", timezone="UTC", owner_id="owner_1")
+            db.add(ws1)
             db.commit()
             repo.create_or_version_brand_profile("ws_tenant_1", ["Devs"], "Expert", ["AI"], [], {})
-        if not repo.get_workspace("ws_tenant_2"):
-            repo.create_workspace("Tenant 2", owner_id="owner_2").id = "ws_tenant_2"
+        
+        if not db.query(WorkspaceModel).filter(WorkspaceModel.id == "ws_tenant_2").first():
+            ws2 = WorkspaceModel(id="ws_tenant_2", name="Tenant 2", timezone="UTC", owner_id="owner_2")
+            db.add(ws2)
             db.commit()
             repo.create_or_version_brand_profile("ws_tenant_2", ["Marketers"], "Casual", ["Growth"], [], {})
+
+        # Ensure memberships exist
+        def ensure_member(ws_id, uid, role):
+            m = db.query(WorkspaceMemberModel).filter(
+                WorkspaceMemberModel.workspace_id == ws_id,
+                WorkspaceMemberModel.user_id == uid
+            ).first()
+            if not m:
+                repo.add_workspace_member(ws_id, uid, role)
+
+        ensure_member("ws_tenant_1", "user_1", "Editor")
+        ensure_member("ws_tenant_1", "owner_1", "Owner")
+        ensure_member("ws_tenant_2", "user_2", "Editor")
+        ensure_member("ws_tenant_2", "owner_2", "Owner")
     finally:
         db.close()
 
@@ -32,7 +56,7 @@ def test_tenant_cannot_read_other_brand_profile():
         "/v1/brand-profiles/ws_tenant_1",
         headers={"Authorization": f"Bearer {token_tenant_2}"}
     )
-    assert response.status_code == 403
+    assert response.status_code in [403, 404]
 
 
 def test_tenant_cannot_approve_other_workspace_variant():

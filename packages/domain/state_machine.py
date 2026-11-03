@@ -62,7 +62,12 @@ class ContentStateMachine:
         ContentStatus.IDEA: {ContentStatus.BRIEFED, ContentStatus.ARCHIVED},
         ContentStatus.BRIEFED: {ContentStatus.DRAFT, ContentStatus.ARCHIVED},
         ContentStatus.DRAFT: {ContentStatus.QA_FAILED, ContentStatus.IN_REVIEW},
-        ContentStatus.QA_FAILED: {ContentStatus.DRAFT, ContentStatus.ARCHIVED},
+        ContentStatus.QA_FAILED: {
+            ContentStatus.DRAFT,
+            ContentStatus.REWRITE_REQUESTED,
+            ContentStatus.REJECTED,
+            ContentStatus.ARCHIVED,
+        },
         ContentStatus.IN_REVIEW: {
             ContentStatus.REWRITE_REQUESTED,
             ContentStatus.REJECTED,

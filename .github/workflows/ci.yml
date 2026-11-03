@@ -69,11 +69,11 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql+psycopg2://postgres:postgrespassword@localhost:5432/contentops_test
-      REDIS_URL: redis://localhost:6379/0
-      ENV: production
-      JWT_SECRET_KEY: ci-very-strong-production-test-jwt-secret-key-32b!
-      SECRET_VAULT_KEY: ci-very-strong-vault-master-key-32b-minimum!
+      DATABASE_URL: ${{ secrets.CI_DATABASE_URL || 'postgresql+psycopg2://postgres:postgrespassword@localhost:5432/contentops_test' }}
+      REDIS_URL: ${{ secrets.CI_REDIS_URL || 'redis://localhost:6379/0' }}
+      APP_ENV: production
+      JWT_SECRET_KEY: ${{ secrets.CI_JWT_SECRET_KEY || '9f82c4b1d607a3e5c9b2d8e4c1a705e38d9b1c2a4f6e80237d5c9e1b3a5f7024' }}
+      SECRET_VAULT_KEY: ${{ secrets.CI_SECRET_VAULT_KEY || 'cbe7e00447543d905f45c9b5b702949529b8f356c6ed5c28e0ea21d53ce34536' }}
       SOCIAL_SANDBOX_MODE: "true"
       LIVE_PUBLISHING_ENABLED: "false"
 
@@ -117,10 +117,18 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Run Gitleaks Secret Scanner
+      - name: Run Gitleaks Secret Scanner with SHA256 Verification
         run: |
-          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | sudo tar -xz -C /usr/local/bin gitleaks
+          curl -sSfL -o gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz
+          echo "5bc41815076e6ed6ef8fbecc9d9b75bcae31f39029ceb55da08086315316e3ba  gitleaks.tar.gz" | sha256sum -c -
+          sudo tar -xz -C /usr/local/bin -f gitleaks.tar.gz gitleaks
+          rm -f gitleaks.tar.gz
           gitleaks detect --source . --config .gitleaks.toml --redact
+
+      - name: Run Bandit SAST Security Scan
+        run: |
+          python -m pip install --upgrade pip bandit
+          bandit -r services/ packages/ apps/ infra/ -ll
 
       - name: Audit Dependencies for Known Vulnerabilities (pip-audit)
         run: |

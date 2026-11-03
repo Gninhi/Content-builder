@@ -1,4 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -23,34 +31,128 @@ const AgentsScreen = React.lazy(() => import('./screens/AgentsScreen').then(m =>
 const UserProfileScreen = React.lazy(() => import('./screens/UserProfileScreen').then(m => ({ default: m.UserProfileScreen })));
 const StyleGuideScreen = React.lazy(() => import('./screens/StyleGuideScreen').then(m => ({ default: m.StyleGuideScreen })));
 
-const MainRouter: React.FC = () => {
-  const { isAuthenticated, isInitializing } = useAuth();
-  const [currentScreen, setCurrentScreen] = useState<string>(() => {
-    if (typeof window !== 'undefined' && window.location.hash) {
-      const hash = window.location.hash.replace('#', '').trim();
-      if (hash) return hash;
-    }
-    return 'dashboard';
-  });
+const KNOWN_SCREENS = new Set([
+  'dashboard',
+  'inbox',
+  'calendar',
+  'veille',
+  'ideation',
+  'insights',
+  'brand',
+  'connections',
+  'settings',
+  'agents',
+  'styleguide',
+  'profile',
+]);
 
-  // Sync with URL hash for deep linking
+/**
+ * Handles seamless legacy hash migration (e.g., /ui/#veille or /ui/#/connections?oauth=success)
+ * to clean HTML5 URLs (/ui/veille, /ui/connections?oauth=success).
+ */
+const HashMigrationHandler: React.FC = () => {
+  const navigate = useNavigate();
+
   useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash.replace('#', '').trim();
-      if (hash) {
-        setCurrentScreen(hash);
+    if (typeof window === 'undefined') return;
+
+    const checkAndMigrateHash = () => {
+      const rawHash = window.location.hash;
+      if (!rawHash) return;
+
+      // Extract route and search params from hash: #/veille?filter=ia or #veille
+      const cleanHash = rawHash.replace(/^#\/?/, '').trim();
+      if (!cleanHash) return;
+
+      const [routePart, queryPart] = cleanHash.split('?');
+      const targetRoute = routePart.replace(/\/$/, '');
+
+      if (KNOWN_SCREENS.has(targetRoute)) {
+        const dest = `/${targetRoute}${queryPart ? `?${queryPart}` : ''}`;
+        // Clean hash from window history to avoid loops
+        window.history.replaceState(null, '', window.location.pathname);
+        navigate(dest, { replace: true });
       }
     };
 
-    handleHashChange();
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
+    checkAndMigrateHash();
+    window.addEventListener('hashchange', checkAndMigrateHash);
+    return () => window.removeEventListener('hashchange', checkAndMigrateHash);
+  }, [navigate]);
 
-  const navigateTo = (screen: string) => {
-    setCurrentScreen(screen);
-    window.location.hash = screen;
+  return null;
+};
+
+/**
+ * Synchronous Root Redirector that inspects window.location.hash
+ * BEFORE defaulting to /dashboard. This ensures that deep links like
+ * /ui/#calendar or /ui/#/connections?oauth=success cleanly navigate to /calendar
+ * without being overwritten by an eager redirect to /dashboard.
+ */
+const RootRedirect: React.FC = () => {
+  if (typeof window !== 'undefined' && window.location.hash) {
+    const rawHash = window.location.hash;
+    const cleanHash = rawHash.replace(/^#\/?/, '').trim();
+    if (cleanHash) {
+      const [routePart, queryPart] = cleanHash.split('?');
+      const targetRoute = routePart.replace(/\/$/, '');
+      if (KNOWN_SCREENS.has(targetRoute)) {
+        return <Navigate to={`/${targetRoute}${queryPart ? `?${queryPart}` : ''}`} replace />;
+      }
+    }
+  }
+  return <Navigate to="/dashboard" replace />;
+};
+
+const AuthenticatedAppLayout: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Extract active screen identifier from URL pathname (e.g., /ui/veille -> veille)
+  const currentScreen = useMemo(() => {
+    const segments = location.pathname.split('/').filter(Boolean);
+    const screen = segments[0] || 'dashboard';
+    return KNOWN_SCREENS.has(screen) ? screen : 'dashboard';
+  }, [location.pathname]);
+
+  const handleNavigate = (screen: string) => {
+    navigate(`/${screen}`);
   };
+
+  return (
+    <AppShell currentScreen={currentScreen} onNavigate={handleNavigate}>
+      <ErrorBoundary level="page" onNavigate={handleNavigate} key={currentScreen}>
+        <React.Suspense
+          fallback={
+            <div className="flex h-64 items-center justify-center text-txt-muted text-sm font-mono animate-pulse">
+              Chargement du module...
+            </div>
+          }
+        >
+          <Routes>
+            <Route path="/" element={<RootRedirect />} />
+            <Route path="/dashboard" element={<DashboardScreen onNavigate={handleNavigate} />} />
+            <Route path="/inbox" element={<InboxScreen onNavigate={handleNavigate} />} />
+            <Route path="/calendar" element={<CalendarScreen />} />
+            <Route path="/veille" element={<VeilleScreen onNavigate={handleNavigate} />} />
+            <Route path="/ideation" element={<IdeationScreen onNavigate={handleNavigate} />} />
+            <Route path="/insights" element={<InsightsScreen />} />
+            <Route path="/brand" element={<BrandProfileScreen />} />
+            <Route path="/connections" element={<ConnectionsScreen />} />
+            <Route path="/settings" element={<SettingsScreen />} />
+            <Route path="/agents" element={<AgentsScreen onNavigate={handleNavigate} />} />
+            <Route path="/styleguide" element={<StyleGuideScreen />} />
+            <Route path="/profile" element={<UserProfileScreen onNavigate={handleNavigate} />} />
+            <Route path="*" element={<RootRedirect />} />
+          </Routes>
+        </React.Suspense>
+      </ErrorBoundary>
+    </AppShell>
+  );
+};
+
+const MainRouter: React.FC = () => {
+  const { isAuthenticated, isInitializing } = useAuth();
 
   if (isInitializing) {
     return (
@@ -69,49 +171,11 @@ const MainRouter: React.FC = () => {
     return <AuthScreen />;
   }
 
-  const renderActiveScreen = () => {
-    switch (currentScreen) {
-      case 'dashboard':
-        return <DashboardScreen onNavigate={navigateTo} />;
-      case 'inbox':
-        return <InboxScreen />;
-      case 'calendar':
-        return <CalendarScreen />;
-      case 'veille':
-        return <VeilleScreen onNavigate={navigateTo} />;
-      case 'ideation':
-        return <IdeationScreen />;
-      case 'insights':
-        return <InsightsScreen />;
-      case 'brand':
-        return <BrandProfileScreen />;
-      case 'connections':
-        return <ConnectionsScreen />;
-      case 'settings':
-        return <SettingsScreen />;
-      case 'agents':
-        return <AgentsScreen />;
-      case 'styleguide':
-        return <StyleGuideScreen />;
-      case 'profile':
-        return <UserProfileScreen onNavigate={navigateTo} />;
-      default:
-        return <DashboardScreen onNavigate={navigateTo} />;
-    }
-  };
-
   return (
-    <AppShell currentScreen={currentScreen} onNavigate={navigateTo}>
-      <React.Suspense
-        fallback={
-          <div className="flex h-64 items-center justify-center text-txt-muted text-sm font-mono animate-pulse">
-            Chargement du module...
-          </div>
-        }
-      >
-        {renderActiveScreen()}
-      </React.Suspense>
-    </AppShell>
+    <>
+      <HashMigrationHandler />
+      <AuthenticatedAppLayout />
+    </>
   );
 };
 
@@ -122,7 +186,9 @@ export const App: React.FC = () => {
         <LanguageProvider>
           <AuthProvider>
             <ToastProvider>
-              <MainRouter />
+              <BrowserRouter basename="/ui">
+                <MainRouter />
+              </BrowserRouter>
             </ToastProvider>
           </AuthProvider>
         </LanguageProvider>

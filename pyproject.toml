@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "contentops-harness"
-version = "1.0.0"
+version = "2.0.0"
 description = "Governed agentic editorial operating system built with LangGraph, FastAPI, and React/Vite"
 authors = [{ name = "Martial Gninhi" }]
 readme = "README.md"
@@ -60,8 +60,12 @@ follow_imports = "silent"
 [[tool.mypy.overrides]]
 module = [
     "infra.db.*",
-    "services.orchestration.*",
-    "packages.tools.*",
+    "packages.security.email_service",
+    "packages.tools.browse",
+    "packages.tools.data_connectors",
+    "services.publisher.worker",
+    "services.orchestration.veille.pipeline",
+    "apps.api.dependencies",
     "apps.api.routers.*",
     "tests.audit.*",
     "tests.unit.*"

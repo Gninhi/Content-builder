@@ -7,7 +7,7 @@ from packages.contracts.schemas import (
     BrandProfileCreate,
     BrandProfileResponse,
 )
-from apps.api.dependencies import get_repository, UserContext, require_roles
+from apps.api.dependencies import get_repository, UserContext, require_roles, get_current_user
 from infra.db.repository import ContentOpsRepository
 
 router = APIRouter(tags=["Workspaces & Brand Profiles"])
@@ -17,9 +17,9 @@ router = APIRouter(tags=["Workspaces & Brand Profiles"])
 def create_workspace(
     req: WorkspaceCreate,
     repo: ContentOpsRepository = Depends(get_repository),
-    user: UserContext = Depends(require_roles("Owner"))
+    user: UserContext = Depends(get_current_user)
 ):
-    ws = repo.create_workspace(name=req.name, timezone=req.timezone, owner_id=req.owner_id)
+    ws = repo.create_workspace(name=req.name, timezone=req.timezone, owner_id=user.user_id)
     return WorkspaceResponse(
         id=str(ws.id),
         name=str(ws.name),
@@ -36,7 +36,7 @@ def create_or_update_brand_profile(
     user: UserContext = Depends(require_roles("Owner", "Editor"))
 ):
     if req.workspace_id and req.workspace_id != user.workspace_id:
-        raise HTTPException(status_code=403, detail="Cannot create or update brand profile for another workspace.")
+        raise HTTPException(status_code=404, detail="Workspace not found.")
     bp = repo.create_or_version_brand_profile(
         workspace_id=user.workspace_id,
         audience=req.audience,
@@ -65,10 +65,10 @@ def get_brand_profile(
     user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer", "ServiceAgent"))
 ):
     if user.workspace_id != workspace_id:
-        raise HTTPException(status_code=403, detail="Access to other workspace's brand profile is forbidden.")
+        raise HTTPException(status_code=404, detail="Brand profile not found.")
     bp = repo.get_latest_brand_profile(workspace_id)
     if not bp:
-        raise HTTPException(status_code=404, detail="Brand profile not found for workspace.")
+        raise HTTPException(status_code=404, detail="Brand profile not found.")
     return BrandProfileResponse(
         id=str(bp.id),
         workspace_id=str(bp.workspace_id),
@@ -90,7 +90,7 @@ def get_brand_profile_versions(
 ):
     from infra.db.models import BrandProfileModel
     if user.workspace_id != workspace_id:
-        raise HTTPException(status_code=403, detail="Access to other workspace's brand profile is forbidden.")
+        raise HTTPException(status_code=404, detail="Brand profile not found.")
     versions = (
         repo.db.query(BrandProfileModel)
         .filter(BrandProfileModel.workspace_id == workspace_id)
@@ -120,7 +120,7 @@ def get_workspace_details(
     user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer", "ServiceAgent"))
 ):
     if user.workspace_id != workspace_id:
-        raise HTTPException(status_code=403, detail="Access to other workspace is forbidden.")
+        raise HTTPException(status_code=404, detail="Workspace not found.")
     ws = repo.get_workspace(workspace_id)
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace not found.")
@@ -142,7 +142,7 @@ def toggle_workspace_kill_switch(
     user: UserContext = Depends(require_roles("Owner"))
 ):
     if user.workspace_id != workspace_id:
-        raise HTTPException(status_code=403, detail="Cannot configure kill switch for another workspace.")
+        raise HTTPException(status_code=404, detail="Workspace not found.")
     ws = repo.get_workspace(workspace_id)
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace not found.")

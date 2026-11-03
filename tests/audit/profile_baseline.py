@@ -65,16 +65,9 @@ def run_benchmarks():
         results["GET /ready"] = benchmark_endpoint(client, "GET", "/ready", n=30)
 
         # 3. Dev Token generation & benchmark
-        print("Benchmarking POST /v1/auth/dev-token...")
-        results["POST /v1/auth/dev-token"] = benchmark_endpoint(
-            client, "POST", "/v1/auth/dev-token",
-            json_data={"user_id": "audit_user", "role": "Owner", "workspace_id": "ws_default"},
-            n=20
-        )
-
-        # Obtain valid token for authenticated calls
-        r = client.post("/v1/auth/dev-token", json={"user_id": "audit_user", "role": "Owner", "workspace_id": "ws_default"})
-        token = r.json().get("access_token", "")
+        # 3. Auth token generation
+        from packages.security.auth import create_access_token
+        token = create_access_token(user_id="audit_user", role="Owner", workspace_id="ws_default")
         headers = {"Authorization": f"Bearer {token}"}
 
         # 4. User profile (GET /v1/auth/me)

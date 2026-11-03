@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from infra.db.models import PublicationJobModel
 from packages.domain.state_machine import ContentStatus
@@ -11,11 +11,13 @@ class SchedulerDispatcher:
     Queue dispatcher polling for due publication jobs and executing them safely.
     """
 
-    def __init__(self, db_session: Session):
+    def __init__(self, db_session: Optional[Session] = None):
         self.db = db_session
-        self.worker = PublisherWorker(db_session)
+        self.worker = PublisherWorker(db_session) if db_session else None
 
     def process_due_jobs(self) -> List[Dict[str, Any]]:
+        if not self.db or not self.worker:
+            raise ValueError("SchedulerDispatcher requires a valid db_session to process due jobs.")
         now = datetime.now(timezone.utc)
         due_jobs = (
             self.db.query(PublicationJobModel)
@@ -39,6 +41,39 @@ class SchedulerDispatcher:
                     "error": str(e)
                 })
         return results
+
+    @staticmethod
+    def _poll_due_jobs_once() -> List[Dict[str, Any]]:
+        from infra.db.database import get_db_session
+
+        with get_db_session() as db:
+            dispatcher = SchedulerDispatcher(db)
+            return dispatcher.process_due_jobs()
+
+    async def run_daemon_loop(self, poll_interval_seconds: int = 15, stop_event: Any = None) -> None:
+        """
+        Continuous async background loop polling for due publication jobs.
+        Offloads synchronous DB and HTTP publishing calls via asyncio.to_thread
+        to prevent blocking the FastAPI event loop.
+        """
+        import asyncio
+        import logging
+
+        log = logging.getLogger("SchedulerDispatcher")
+        log.info(f"Starting SchedulerDispatcher daemon loop (poll interval: {poll_interval_seconds}s)")
+        while stop_event is None or not stop_event.is_set():
+            try:
+                await asyncio.to_thread(self._poll_due_jobs_once)
+            except Exception as e:
+                log.error(f"Error in SchedulerDispatcher daemon loop: {e}", exc_info=True)
+
+            try:
+                if stop_event:
+                    await asyncio.wait_for(stop_event.wait(), timeout=poll_interval_seconds)
+                else:
+                    await asyncio.sleep(poll_interval_seconds)
+            except asyncio.TimeoutError:
+                pass
 
 
 if __name__ == "__main__":

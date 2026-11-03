@@ -121,6 +121,27 @@ export async function performSilentRefresh(): Promise<string | null> {
   return refreshPromise;
 }
 
+export async function parseResponseBody(res: Response): Promise<any> {
+  if (!res || res.status === 204 || res.headers?.get?.('content-length') === '0') {
+    return null;
+  }
+  if (typeof res.text === 'function') {
+    const text = await res.text();
+    if (!text || text.trim() === '') {
+      return null;
+    }
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
+  }
+  if (typeof res.json === 'function') {
+    return await res.json();
+  }
+  return null;
+}
+
 export async function apiClient<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -149,8 +170,6 @@ export async function apiClient<T>(
     );
   }
 
-  const correlationId = response.headers.get('x-correlation-id') || undefined;
-
   // Transparent automatic token refresh on 401 (excluding auth endpoints)
   if (response.status === 401 && !endpoint.includes('/v1/auth/')) {
     const freshToken = await performSilentRefresh();
@@ -163,44 +182,49 @@ export async function apiClient<T>(
           credentials: 'include',
         });
         if (retryResponse.ok) {
-          return retryResponse.json();
+          return await parseResponseBody(retryResponse);
         }
-      } catch {
-        // Fall through to error handling
+        // If the retry responded with a non-401 error (e.g. 404, 422, 500),
+        // we must NOT treat it as an auth failure. Replace response and fall through to standard error handling.
+        if (retryResponse.status !== 401) {
+          response = retryResponse;
+        }
+      } catch (retryErr: any) {
+        throw new ApiError(
+          0,
+          `Erreur de connexion lors du rejeu de la requête. (${retryErr.message || 'Serveur indisponible'})`,
+          retryErr.message
+        );
       }
     }
-
-    if (onAuthFailureCallback) {
-      onAuthFailureCallback();
-    }
-    const errData = await response.json().catch(() => ({}));
-    const msg = extractErrorMessage(errData, 'Session expirée ou non authentifiée');
-    throw new ApiError(401, msg, msg, correlationId);
   }
 
+  const correlationId = response.headers.get('x-correlation-id') || undefined;
+
   if (response.status === 401) {
-    if (onAuthFailureCallback) {
+    // Only call onAuthFailureCallback for authenticated session failures, not login credential errors
+    if (!endpoint.includes('/v1/auth/') && onAuthFailureCallback) {
       onAuthFailureCallback();
     }
-    const errData = await response.json().catch(() => ({}));
+    const errData = await parseResponseBody(response).catch(() => ({}));
     const msg = extractErrorMessage(errData, 'Session expirée ou non authentifiée');
     throw new ApiError(401, msg, msg, correlationId);
   }
 
   if (response.status === 403) {
-    const errData = await response.json().catch(() => ({}));
+    const errData = await parseResponseBody(response).catch(() => ({}));
     const msg = extractErrorMessage(errData, 'Droits insuffisants pour cette action');
     throw new ApiError(403, msg, msg, correlationId);
   }
 
   if (response.status === 429) {
-    const errData = await response.json().catch(() => ({}));
+    const errData = await parseResponseBody(response).catch(() => ({}));
     const msg = extractErrorMessage(errData, 'Limite de requêtes atteinte (Rate limit)');
     throw new ApiError(429, msg, msg, correlationId);
   }
 
   if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
+    const errData = await parseResponseBody(response).catch(() => ({}));
     const defaultMsg = `Erreur serveur (${response.status})`;
     const msg = extractErrorMessage(errData, defaultMsg);
     throw new ApiError(
@@ -211,5 +235,5 @@ export async function apiClient<T>(
     );
   }
 
-  return response.json();
+  return await parseResponseBody(response);
 }

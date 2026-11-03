@@ -1,15 +1,16 @@
-from typing import cast
+from typing import cast, List, Optional
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from packages.contracts.schemas import (
     PublicationScheduleRequest,
     PublicationJobResponse,
+    PublicationReconcileRequest,
 )
-from packages.domain.state_machine import ContentStatus
+from packages.domain.state_machine import ContentStatus, ContentStateMachine
 from services.publisher.worker import PublisherWorker
 from apps.api.dependencies import get_repository, UserContext, require_roles
 from infra.db.repository import ContentOpsRepository
-from infra.db.models import PublicationJobModel
+from infra.db.models import PublicationJobModel, ContentVariantModel, ContentPackageModel, ContentBriefModel
 
 router = APIRouter(tags=["Publications & Scheduling"])
 
@@ -51,7 +52,7 @@ def publish_now(
         raise HTTPException(status_code=404, detail="Publication job not found.")
     job_ws = job.variant.package.brief.workspace_id if (job.variant and job.variant.package and job.variant.package.brief) else None
     if job_ws != user.workspace_id:
-        raise HTTPException(status_code=403, detail="Access to publication job in another workspace is forbidden.")
+        raise HTTPException(status_code=404, detail="Publication job not found.")
 
     worker = PublisherWorker(repo.db)
     try:
@@ -72,14 +73,85 @@ def cancel_publication_job(
         raise HTTPException(status_code=404, detail="Publication job not found.")
     job_ws = job.variant.package.brief.workspace_id if (job.variant and job.variant.package and job.variant.package.brief) else None
     if job_ws != user.workspace_id:
-        raise HTTPException(status_code=403, detail="Access to publication job in another workspace is forbidden.")
+        raise HTTPException(status_code=404, detail="Publication job not found.")
 
-    if str(job.status) == ContentStatus.PUBLISHED.value:
+    current_status = ContentStatus.parse(str(job.status))
+    if current_status == ContentStatus.PUBLISHED:
         raise HTTPException(status_code=400, detail="Cannot cancel an already published post.")
+    if current_status in (ContentStatus.PUBLISHING, ContentStatus.PUBLISH_UNKNOWN):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot cancel publication job in state '{current_status.value}'. Job is currently publishing or in indeterminate state; reconcile first."
+        )
 
-    setattr(job, "status", ContentStatus.ARCHIVED.value)
+    # State machine transition enforcement
+    ContentStateMachine.transition(current_status, ContentStatus.ARCHIVED)
+    job.status = ContentStatus.ARCHIVED.value
+
     if job.variant:
-        setattr(job.variant, "status", ContentStatus.APPROVED.value)
+        var_status = ContentStatus.parse(str(job.variant.status))
+        ContentStateMachine.transition(var_status, ContentStatus.APPROVED)
+        job.variant.status = ContentStatus.APPROVED.value
+
     repo.db.commit()
 
     return {"message": "Job successfully cancelled and reset to APPROVED state.", "job_id": str(job.id)}
+
+
+@router.post("/v1/publications/{job_id}/reconcile")
+def reconcile_publication_job(
+    job_id: str,
+    req: PublicationReconcileRequest,
+    repo: ContentOpsRepository = Depends(get_repository),
+    user: UserContext = Depends(require_roles("Owner", "Editor"))
+):
+    job = repo.db.query(PublicationJobModel).filter(PublicationJobModel.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Publication job not found.")
+    job_ws = job.variant.package.brief.workspace_id if (job.variant and job.variant.package and job.variant.package.brief) else None
+    if job_ws != user.workspace_id:
+        raise HTTPException(status_code=404, detail="Publication job not found.")
+
+    worker = PublisherWorker(repo.db)
+    try:
+        result = worker.reconcile_job(
+            job_id=job_id,
+            manual_resolution=req.resolution,
+            external_post_id=req.external_post_id,
+            permalink=req.permalink,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/v1/publications", response_model=List[PublicationJobResponse])
+def list_publications(
+    status: Optional[str] = Query(None, description="Filter by publication status"),
+    limit: int = Query(50, ge=1, le=100, description="Max jobs to return (1-100)"),
+    repo: ContentOpsRepository = Depends(get_repository),
+    user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer", "ServiceAgent"))
+):
+    query = (
+        repo.db.query(PublicationJobModel)
+        .join(ContentVariantModel)
+        .join(ContentPackageModel)
+        .join(ContentBriefModel)
+        .filter(ContentBriefModel.workspace_id == user.workspace_id)
+    )
+    if status:
+        query = query.filter(PublicationJobModel.status == status)
+    jobs = query.order_by(PublicationJobModel.scheduled_at.desc()).limit(limit).all()
+    return [
+        PublicationJobResponse(
+            id=str(j.id),
+            variant_id=str(j.variant_id),
+            platform=str(j.platform),
+            scheduled_at=cast(datetime, j.scheduled_at),
+            idempotency_key=str(j.idempotency_key),
+            status=ContentStatus(str(j.status)),
+            attempt_count=int(j.attempt_count) if j.attempt_count is not None else 0,
+            error_message=str(j.error_message) if j.error_message else None,
+        )
+        for j in jobs
+    ]

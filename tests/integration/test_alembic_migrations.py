@@ -53,10 +53,28 @@ def test_alembic_migration_upgrade_and_downgrade_cycle(temp_alembic_db):
         "metric_snapshots",
         "agent_runs",
         "connected_social_accounts",
+        "users",
+        "user_refresh_tokens",
+        "workspace_invitations",
+        "workspace_members",
+        "user_sessions",
+        "audit_logs",
+        "veille_sources",
+        "veille_runs",
+        "signals",
+        "workspace_llm_settings",
     }
 
     for table in expected_tables:
         assert table in tables, f"Expected table '{table}' not created by migration upgrade"
+
+    # Verify reconciled columns exist
+    idea_cols = {c["name"] for c in inspector.get_columns("ideas")}
+    assert "signal_id" in idea_cols
+    signal_cols = {c["name"] for c in inspector.get_columns("signals")}
+    assert "enrichment_status" in signal_cols
+    token_cols = {c["name"] for c in inspector.get_columns("user_refresh_tokens")}
+    assert "revoked_at" in token_cols
 
     # Verify connected_social_accounts structure
     social_cols = {c["name"] for c in inspector.get_columns("connected_social_accounts")}

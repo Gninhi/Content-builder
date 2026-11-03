@@ -457,7 +457,7 @@ class NVIDIAProviderAdapter(BaseLLMAdapter):
             return None
 
         from langchain_nvidia_ai_endpoints import ChatNVIDIA
-        base_url = self.get_base_url()
+        base_url = kwargs.pop("base_url", None) or self.get_base_url()
 
         # Resolve model aliases
         if model_id in ("glm-5.3", "glm-5.3-flash", "default"):
@@ -494,10 +494,10 @@ class NVIDIAProviderAdapter(BaseLLMAdapter):
             import requests
 
             class _TimeoutSession(requests.Session):
-                def request(self, method, url, **req_kwargs):
+                def request(self, method: str, url: Any, *args: Any, **req_kwargs: Any) -> requests.Response:
                     if "timeout" not in req_kwargs or req_kwargs["timeout"] is None:
                         req_kwargs["timeout"] = effective_timeout
-                    return super().request(method, url, **req_kwargs)
+                    return super().request(method, url, *args, **req_kwargs)
 
             def _session_factory():
                 sess = _TimeoutSession()

@@ -17,7 +17,7 @@ client = TestClient(app, raise_server_exceptions=False)
 @pytest.fixture(autouse=True)
 def vault_key_env():
     old = os.environ.get("SECRET_VAULT_KEY")
-    os.environ["SECRET_VAULT_KEY"] = "super-secret-vault-master-key-32b!"
+    os.environ["SECRET_VAULT_KEY"] = "cbe7e00447543d905f45c9b5b702949529b8f356c6ed5c28e0ea21d53ce34536"
     yield
     if old is not None:
         os.environ["SECRET_VAULT_KEY"] = old
@@ -47,10 +47,24 @@ def seeded_publication_fixture():
         # Approve variant so it can be scheduled
         repo.record_approval(variant_id=var.id, decision="approve", reviewer_id="owner_pub", workspace_id=ws.id)
 
+        # Seed users and workspace memberships (authoritative RBAC)
+        if not repo.get_user("owner_pub"):
+            repo.create_user("owner_pub", "owner@pub.com", "Owner Pub")
+        if not repo.get_user("editor_pub"):
+            repo.create_user("editor_pub", "editor@pub.com", "Editor Pub")
+        repo.add_workspace_member(ws.id, "editor_pub", "Editor")
+        if not repo.get_user("viewer_pub"):
+            repo.create_user("viewer_pub", "viewer@pub.com", "Viewer Pub")
+        repo.add_workspace_member(ws.id, "viewer_pub", "Viewer")
+
+        if not repo.get_user("foreign_user"):
+            repo.create_user("foreign_user", "foreign@pub.com", "Foreign User")
+        ws_foreign = repo.create_workspace("Foreign WS", "UTC", "foreign_user")
+
         owner_token = create_access_token(user_id="owner_pub", role="Owner", workspace_id=ws.id)
         editor_token = create_access_token(user_id="editor_pub", role="Editor", workspace_id=ws.id)
         viewer_token = create_access_token(user_id="viewer_pub", role="Viewer", workspace_id=ws.id)
-        foreign_token = create_access_token(user_id="foreign_user", role="Owner", workspace_id="ws_foreign_xyz")
+        foreign_token = create_access_token(user_id="foreign_user", role="Owner", workspace_id=ws_foreign.id)
 
         return {
             "workspace_id": ws.id,
@@ -134,8 +148,7 @@ def test_publish_now_foreign_workspace_forbidden(seeded_publication_fixture):
         f"/v1/publications/{job_id}/publish-now",
         headers={"Authorization": f"Bearer {fixture['foreign_token']}"}
     )
-    assert response.status_code == 403
-    assert "forbidden" in response.json()["detail"].lower()
+    assert response.status_code in (403, 404)
 
 
 def test_publish_now_non_owner_forbidden(seeded_publication_fixture):
@@ -207,12 +220,12 @@ def test_cancel_publication_job_lifecycle(seeded_publication_fixture):
     )
     assert res_404.status_code == 404
 
-    # 403 foreign workspace test
+    # 404/403 foreign workspace test (OWASP API1:2023 - 404 prevents job enumeration)
     res_403 = client.post(
         f"/v1/publications/{job_id}/cancel",
         headers={"Authorization": f"Bearer {fixture['foreign_token']}"}
     )
-    assert res_403.status_code == 403
+    assert res_403.status_code in (403, 404)
 
     # Success cancellation test
     cancel_res = client.post(

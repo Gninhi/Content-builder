@@ -2,6 +2,7 @@ import os
 import uuid
 import urllib.parse
 from datetime import datetime, timezone, timedelta
+import logging
 from typing import Dict, Any, List, Optional
 import httpx
 
@@ -24,6 +25,8 @@ from packages.connectors.social.exceptions import (
     SocialPublishUnknownError,
     TokenExpiringSoonError,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class LinkedInSocialPublisher(BaseSocialPublisher):
@@ -128,6 +131,29 @@ class LinkedInSocialPublisher(BaseSocialPublisher):
                 raise SocialNetworkError(f"LinkedIn userinfo failed with HTTP {resp.status_code}: {resp.text}", provider=self.provider.value)
         except httpx.RequestError as exc:
             raise SocialNetworkError(f"Network error contacting LinkedIn userinfo: {exc}", provider=self.provider.value)
+
+    def verify_connection(self) -> Dict[str, Any]:
+        """
+        Verifies that the LinkedIn connection and access token are active and valid,
+        fetching member identity without performing any public posting (read-only).
+        """
+        if self.sandbox_mode:
+            return {
+                "status": "OPERATIONAL",
+                "provider": self.provider.value,
+                "mode": "sandbox",
+                "account_id": "urn:li:person:sandbox_sub_12345",
+                "verified_at": datetime.now(timezone.utc).isoformat(),
+            }
+        self.check_token_liveness()
+        author_urn = self.resolve_author_urn()
+        return {
+            "status": "OPERATIONAL",
+            "provider": self.provider.value,
+            "mode": "live",
+            "account_id": author_urn,
+            "verified_at": datetime.now(timezone.utc).isoformat(),
+        }
 
     def validate_content(self, content: str) -> None:
         """Validates body constraints for LinkedIn personal posts (10 to 3,000 characters)."""
@@ -236,8 +262,8 @@ class LinkedInSocialPublisher(BaseSocialPublisher):
             if not post_urn and resp.text:
                 try:
                     post_urn = resp.json().get("id")
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Failed to parse JSON body for LinkedIn post URN: %s", exc)
             if not post_urn:
                 post_urn = f"urn:li:share:{uuid.uuid4().hex[:12]}"
 
@@ -309,7 +335,8 @@ class LinkedInSocialPublisher(BaseSocialPublisher):
                 headers=headers
             )
             return resp.status_code in (200, 204)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Error deleting LinkedIn post %s: %s", platform_post_id, exc)
             return False
 
     def get_status(self, platform_post_id: str) -> PublicationStatus:
@@ -333,7 +360,8 @@ class LinkedInSocialPublisher(BaseSocialPublisher):
             elif resp.status_code == 404:
                 return PublicationStatus.DELETED
             return PublicationStatus.FAILED
-        except Exception:
+        except Exception as exc:
+            logger.warning("Error fetching status for LinkedIn post %s: %s", platform_post_id, exc)
             return PublicationStatus.FAILED
 
 

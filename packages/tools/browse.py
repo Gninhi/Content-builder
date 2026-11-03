@@ -43,12 +43,30 @@ CLOUD_METADATA_HOSTS: Set[str] = {
 }
 
 
+ALLOWED_PORTS: Set[int] = {80, 443}
+
+
+def _is_forbidden_ip(ip_obj: ipaddress._BaseAddress) -> bool:
+    """Returns True if an IPv4 or IPv6 address (or its mapped IPv4) is private, loopback, link-local, or reserved."""
+    mapped = getattr(ip_obj, "ipv4_mapped", None)
+    if mapped is not None and _is_forbidden_ip(mapped):
+        return True
+    return bool(
+        ip_obj.is_private
+        or ip_obj.is_loopback
+        or ip_obj.is_link_local
+        or ip_obj.is_unspecified
+        or ip_obj.is_multicast
+        or ip_obj.is_reserved
+    )
+
+
 def validate_target_url_security(url: str) -> None:
     """
     Strict SSRF and domain guard:
-    1. Rejects non-HTTP(S) protocols.
+    1. Rejects non-HTTP(S) protocols and non-standard ports (only 80/443 allowed).
     2. Rejects user credentials embedded in URLs.
-    3. Blocks private IPs, loopback, link-local, cloud metadata endpoints.
+    3. Blocks private IPs, loopback, link-local, IPv6 mapped, octal/hex IPs, cloud metadata endpoints.
     4. Blocks scraping targets with strictly enforced official APIs (LinkedIn, X).
     5. Resolves hostname to underlying IP and verifies none are in prohibited ranges.
     """
@@ -61,9 +79,14 @@ def validate_target_url_security(url: str) -> None:
     if parsed.username or parsed.password:
         raise PermissionError("Sécurité SSRF : Identifiants d'authentification intégrés dans l'URL interdits.")
 
-    hostname = (parsed.hostname or "").lower()
+    hostname = (parsed.hostname or "").lower().strip().rstrip(".")
     if not hostname:
         raise ValueError("URL sans nom d'hôte valide.")
+
+    if hostname in ("localhost", "localhost.localdomain") or hostname.endswith(".localhost"):
+        raise PermissionError(
+            f"Sécurité SSRF : L'hôte cible ({hostname}) est une adresse privée ou locale interdite."
+        )
 
     if hostname in CLOUD_METADATA_HOSTS or any(hostname.endswith(f".{m}") for m in CLOUD_METADATA_HOSTS):
         raise PermissionError(
@@ -77,40 +100,48 @@ def validate_target_url_security(url: str) -> None:
                 f"Navigation/scraping interdit sur '{hostname}' : usage exclusif des APIs officielles."
             )
 
-    # 2. Block Local/Private IPs (SSRF protection)
+    # 2. Block Local/Private IPs (including IPv6, IPv4-mapped IPv6, integer/hex/octal literals)
+    ip_candidate = None
     try:
-        ip = ipaddress.ip_address(hostname)
-        if (
-            ip.is_private
-            or ip.is_loopback
-            or ip.is_link_local
-            or ip.is_unspecified
-            or ip.is_multicast
-            or ip.is_reserved
-        ):
+        ip_candidate = ipaddress.ip_address(hostname)
+    except ValueError:
+        # Check for octal/hex/dword IPv4 notations (e.g., 0x7f000001, 2130706433, 0177.0.0.1)
+        if re.fullmatch(r"[0-9a-fx.]+", hostname):
+            try:
+                packed = socket.inet_aton(hostname)
+                ip_candidate = ipaddress.ip_address(packed)
+            except OSError:
+                ip_candidate = None
+
+    if ip_candidate is not None:
+        if _is_forbidden_ip(ip_candidate):
             raise PermissionError(
                 f"Sécurité SSRF : L'IP cible ({hostname}) est une adresse privée ou locale interdite."
             )
-    except ValueError:
+    else:
         # Resolve hostname to check underlying IP
         try:
             resolved_ips = socket.getaddrinfo(hostname, None)
             for item in resolved_ips:
-                target_ip = item[4][0]
+                target_ip = item[4][0].split("%")[0]
                 ip_obj = ipaddress.ip_address(target_ip)
-                if (
-                    ip_obj.is_private
-                    or ip_obj.is_loopback
-                    or ip_obj.is_link_local
-                    or ip_obj.is_unspecified
-                    or ip_obj.is_multicast
-                    or ip_obj.is_reserved
-                ):
+                if _is_forbidden_ip(ip_obj):
                     raise PermissionError(
                         f"Sécurité SSRF : Le domaine '{hostname}' résout vers une IP privée ou locale interdite ({target_ip})."
                     )
         except socket.gaierror:
             pass  # DNS resolution will fail naturally later
+
+    # 3. Block non-standard ports on public hosts (only 80 and 443 allowed)
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise PermissionError(f"Sécurité SSRF : Port invalide dans l'URL : {exc}") from exc
+
+    if port is not None and port not in ALLOWED_PORTS:
+        raise PermissionError(
+            f"Sécurité SSRF : Port non standard interdit ({port}). Seuls les ports 80 et 443 sont autorisés."
+        )
 
 
 def fetch_safe_url(
@@ -148,21 +179,22 @@ def fetch_safe_url(
 
 
 def check_robots_txt_allowed(url: str, user_agent: str = "*") -> bool:
-    """Checks robots.txt compliance before reading an external page."""
+    """Checks robots.txt compliance before reading an external page, using SSRF-safe fetching."""
     try:
         parsed = urlparse(url)
         robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
         rp = urllib.robotparser.RobotFileParser()
         rp.set_url(robots_url)
-        # Fast 3s read of robots.txt
-        with httpx.Client(timeout=3.0, follow_redirects=True) as client:
-            resp = client.get(robots_url)
-            if resp.status_code == 200:
-                rp.parse(resp.text.splitlines())
-                return rp.can_fetch(user_agent, url)
-            elif resp.status_code in (401, 403):
-                return False
-            return True
+        # Fast 3s SSRF-protected read of robots.txt
+        resp = fetch_safe_url(robots_url, timeout=3.0, max_redirects=2)
+        if resp.status_code == 200:
+            rp.parse(resp.text.splitlines())
+            return rp.can_fetch(user_agent, url)
+        elif resp.status_code in (401, 403):
+            return False
+        return True
+    except PermissionError:
+        return False
     except Exception:
         # Default allow if robots.txt unreachable
         return True

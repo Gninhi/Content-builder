@@ -52,27 +52,36 @@ class WebExtractorConnector:
         content: str,
         url: str | None = None,
         author: str | None = None,
-        workspace_id: str = "default"
+        workspace_id: str = "default",
+        extraction_status: str = "ingested",
+        metadata: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         """
         Normalizes source data, tags provenance, computes deduplication hash.
+        Never fabricates placeholder S3 URIs or synthetic text.
         """
-        sanitized_content = cls.sanitize_untrusted_input(content)
+        sanitized_content = cls.sanitize_untrusted_input(content or "")
         content_hash = hashlib.sha256(sanitized_content.strip().encode("utf-8")).hexdigest()
         facts = cls.extract_facts(sanitized_content)
+        meta = metadata or {}
 
         return {
             "workspace_id": workspace_id,
             "type": source_type,
-            "canonical_url": url,
-            "raw_content_ref": f"storage/sources/{content_hash[:16]}.txt",
+            "canonical_url": meta.get("canonical_url") or url,
+            "raw_content_ref": f"sha256:{content_hash}",
             "extracted_facts": facts,
             "provenance": {
                 "hash": content_hash,
-                "author": author or "Unknown",
+                "author": author or meta.get("author") or "Unknown",
+                "title": meta.get("title"),
+                "published_date": meta.get("published_date"),
                 "extracted_at": datetime.now(timezone.utc).isoformat(),
                 "url": url,
-                "untrusted_sanitized": True
+                "extraction_status": extraction_status,
+                "extracted_chars": len(sanitized_content),
+                "content_preview": sanitized_content[:2000],
+                "untrusted_sanitized": True,
             },
-            "status": "ingested"
+            "status": extraction_status,
         }

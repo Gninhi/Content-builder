@@ -1,13 +1,24 @@
+import ipaddress
 import logging
 import os
-from typing import Any, Dict
+import re
+from typing import Any, Dict, Optional
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from packages.security.auth import decode_access_token
+from packages.security.env import get_app_env
 
 logger = logging.getLogger("security.limiter")
+
+
+def mask_storage_uri(uri: Optional[str]) -> Optional[str]:
+    """Masks credentials in storage URIs (e.g. redis://:pass@host:port/0)."""
+    if not uri:
+        return uri
+    return re.sub(r"://([^:@/]*):([^@/]+)@", r"://\1:***@", uri)
+
 
 # Global diagnostics for storage status
 _storage_diagnostic: Dict[str, Any] = {
@@ -15,8 +26,32 @@ _storage_diagnostic: Dict[str, Any] = {
     "effective_uri": "memory://",
     "status": "uninitialized",
     "degraded": False,
-    "environment": os.getenv("ENVIRONMENT", os.getenv("APP_ENV", "development")).lower(),
+    "environment": get_app_env(),
 }
+
+
+def is_ip_in_trusted_proxies(ip_str: str, trusted_set: set[str]) -> bool:
+    """Checks whether ip_str matches an exact IP or CIDR network in trusted_set."""
+    if not ip_str or not trusted_set:
+        return False
+    try:
+        ip = ipaddress.ip_address(ip_str)
+    except ValueError:
+        return False
+
+    for item in trusted_set:
+        if not item:
+            continue
+        try:
+            if "/" in item:
+                if ip in ipaddress.ip_network(item, strict=False):
+                    return True
+            else:
+                if ip == ipaddress.ip_address(item):
+                    return True
+        except ValueError:
+            continue
+    return False
 
 
 def get_client_ip(request: Request) -> str:
@@ -30,7 +65,7 @@ def get_client_ip(request: Request) -> str:
 
     direct_ip = request.client.host if request.client else "127.0.0.1"
 
-    if trust_all or direct_ip in trusted_proxies:
+    if trust_all or is_ip_in_trusted_proxies(direct_ip, trusted_proxies):
         forwarded_for = request.headers.get("x-forwarded-for") or request.headers.get("X-Forwarded-For")
         if forwarded_for:
             ips = [ip.strip() for ip in forwarded_for.split(",")]
@@ -70,7 +105,7 @@ def check_redis_connectivity(url: str, timeout: float = 0.5) -> bool:
         client.close()
         return True
     except Exception as exc:
-        logger.debug(f"[RateLimiter] Redis ping failed on {url}: {exc}")
+        logger.debug(f"[RateLimiter] Redis ping failed on {mask_storage_uri(url)}: {exc}")
         return False
 
 
@@ -84,12 +119,13 @@ def _init_limiter() -> Limiter:
     Initializes SlowAPI Limiter with robust storage resolution and clear diagnostic logging.
     Guarantees that uncontactable Redis instances do not silently break or cause crash cascades.
     """
-    env = os.getenv("ENVIRONMENT", os.getenv("APP_ENV", "development")).lower()
+    env = get_app_env()
     candidate = os.getenv("RATE_LIMIT_STORAGE_URI") or os.getenv("REDIS_URL")
     allow_memory_fallback = os.getenv("RATE_LIMIT_ALLOW_MEMORY_FALLBACK", "true").lower() in ("true", "1", "yes")
-    default_limits: list[Any] = [os.getenv("RATE_LIMIT_DEFAULT", "200/minute")]
+    global_limit = os.getenv("RATE_LIMIT_GLOBAL") or os.getenv("RATE_LIMIT_DEFAULT", "60/minute")
+    default_limits: list[Any] = [global_limit]
 
-    _storage_diagnostic["configured_uri"] = candidate
+    _storage_diagnostic["configured_uri"] = mask_storage_uri(candidate)
     _storage_diagnostic["environment"] = env
 
     effective_uri = "memory://"
@@ -100,13 +136,13 @@ def _init_limiter() -> Limiter:
             effective_uri = candidate
             _storage_diagnostic["status"] = "connected"
             _storage_diagnostic["degraded"] = False
-            logger.info(f"[RateLimiter] Connected to Redis rate limit storage: {candidate}")
+            logger.info(f"[RateLimiter] Connected to Redis rate limit storage: {mask_storage_uri(candidate)}")
         else:
             if env in ("production", "prod") and not allow_memory_fallback:
                 _storage_diagnostic["status"] = "redis_unreachable_fail_closed"
                 _storage_diagnostic["degraded"] = True
                 logger.critical(
-                    f"[RateLimiter] CRITICAL: Redis storage '{candidate}' is unreachable in {env} "
+                    f"[RateLimiter] CRITICAL: Redis storage '{mask_storage_uri(candidate)}' is unreachable in {env} "
                     "and memory fallback is disabled. Rate limiting will reject or report degraded status."
                 )
                 effective_uri = candidate
@@ -114,7 +150,7 @@ def _init_limiter() -> Limiter:
                 _storage_diagnostic["status"] = "degraded_memory"
                 _storage_diagnostic["degraded"] = True
                 logger.warning(
-                    f"[RateLimiter] Redis storage '{candidate}' is unreachable in {env} environment. "
+                    f"[RateLimiter] Redis storage '{mask_storage_uri(candidate)}' is unreachable in {env} environment. "
                     "Gracefully activating controlled in-memory rate limiting fallback."
                 )
                 effective_uri = "memory://"
@@ -123,7 +159,7 @@ def _init_limiter() -> Limiter:
         _storage_diagnostic["degraded"] = False
         effective_uri = "memory://"
 
-    _storage_diagnostic["effective_uri"] = effective_uri
+    _storage_diagnostic["effective_uri"] = mask_storage_uri(effective_uri)
 
     try:
         return Limiter(
@@ -132,7 +168,7 @@ def _init_limiter() -> Limiter:
             storage_uri=effective_uri,
         )
     except Exception as exc:
-        logger.error(f"[RateLimiter] Error initializing Limiter with '{effective_uri}': {exc}. Falling back to memory://")
+        logger.error(f"[RateLimiter] Error initializing Limiter with '{mask_storage_uri(effective_uri)}': {exc}. Falling back to memory://")
         _storage_diagnostic["status"] = "degraded_memory_fallback"
         _storage_diagnostic["degraded"] = True
         _storage_diagnostic["effective_uri"] = "memory://"

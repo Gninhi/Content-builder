@@ -280,6 +280,7 @@ export interface VeilleSignal {
   qualification_criteria: Record<string, any>;
   facts: SignalFact[];
   executive_takeaway: string;
+  enrichment_status?: string;
   status: SignalStatus | string;
   is_synthetic: boolean;
   created_at: string;

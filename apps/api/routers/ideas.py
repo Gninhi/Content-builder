@@ -1,6 +1,7 @@
 from typing import cast, Dict, Any, Optional
 from langchain_core.runnables import RunnableConfig
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from packages.resilience.circuit_breaker import resolve_cycle_budget, BudgetExceededException
 from packages.contracts.schemas import (
     IdeaResearchRequest,
     IdeaResearchResponse,
@@ -57,6 +58,7 @@ def research_ideas(
             "title": s.canonical_url or "Source",
         })
 
+    budget = resolve_cycle_budget()
     initial_state = {
         "workspace_id": ws_id,
         "topic_or_brief": req.topic_or_brief,
@@ -67,13 +69,26 @@ def research_ideas(
         "generated_ideas": [],
         "llm_override": req.llm_override,
         "run_id": "",
-        "errors": []
+        "errors": [],
+        "cycle_budget": budget,
     }
 
     # Run LangGraph idea_research workflow with Langfuse tracing
     callback = ObservabilityTracer.get_callback_handler()
     config: RunnableConfig = cast(RunnableConfig, {"callbacks": [callback]} if callback else {})
-    result = cast(Dict[str, Any], idea_research_graph.invoke(cast(Any, initial_state), config=config))
+    try:
+        result = cast(Dict[str, Any], idea_research_graph.invoke(cast(Any, initial_state), config=config))
+    except BudgetExceededException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"LLM cycle budget exceeded: {str(exc)}"
+        )
+
+    if result.get("status") == "LLM_PROVIDERS_DOWN":
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"error_code": "LLM_PROVIDERS_DOWN", "message": "LLM providers unavailable for idea research."}
+        )
 
     generated = result.get("generated_ideas", [])
     run_id = result.get("run_id", "run_local")
@@ -166,12 +181,13 @@ def research_ideas(
 @router.get("/v1/ideas")
 def list_ideas(
     workspace_id: Optional[str] = None,
+    limit: int = Query(50, ge=1, le=100, description="Max ideas to return (1-100)"),
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer", "ServiceAgent"))
 ):
     if workspace_id and workspace_id != user.workspace_id:
         raise HTTPException(status_code=403, detail="Access to other workspace ideas is forbidden.")
-    ideas = repo.list_ideas(user.workspace_id)
+    ideas = repo.list_ideas(user.workspace_id, limit=limit)
     return [
         {
             "id": i.id,

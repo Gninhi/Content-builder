@@ -1,17 +1,32 @@
 import os
 import uuid
+import logging
 from typing import Optional, List, Any, cast
 from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from packages.security.auth import create_access_token, decode_access_token, Role
-from packages.security.passwords import hash_password, verify_password, validate_password_strength
+from packages.security.env import is_production
+from packages.security.passwords import (
+    hash_password,
+    verify_password,
+    validate_password_strength,
+    check_needs_rehash,
+    MAX_PASSWORD_LENGTH,
+)
 from packages.security.tokens import generate_crypto_token, hash_crypto_token, generate_refresh_token
-from packages.security.email_service import get_email_service
+from packages.security.email_service import (
+    get_email_service,
+    is_dev_mailbox_allowed,
+    MemoryLogEmailService,
+)
 from packages.security.limiter import limiter, get_client_ip
 from apps.api.dependencies import get_repository, get_current_user, UserContext
-from infra.db.repository import ContentOpsRepository
+from infra.db.repository import ContentOpsRepository, DuplicateUserError
 from infra.db.models import utc_now, ensure_utc
+
+logger = logging.getLogger(__name__)
+
 
 router = APIRouter(prefix="/v1/auth", tags=["Authentication"])
 
@@ -21,12 +36,23 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15")
 
 
 def _is_cookie_secure(request: Request) -> bool:
-    env = (os.getenv("ENV") or "dev").strip().lower()
-    if env in ("production", "prod"):
+    if is_production():
         return True
     if os.getenv("COOKIE_SECURE", "false").lower() in ("true", "1", "yes"):
         return True
     return request.url.scheme == "https"
+
+
+def is_email_verification_required() -> bool:
+    """
+    Enforces email verification requirement by default across production, staging, and local development (D-02).
+    Only disabled when REQUIRE_EMAIL_VERIFICATION is explicitly set to 'false'/'0'/'no' (e.g. in legacy unit tests).
+    """
+    env_val = os.getenv("REQUIRE_EMAIL_VERIFICATION")
+    if env_val is not None and env_val.strip():
+        return env_val.strip().lower() not in ("false", "0", "no")
+    return True
+
 
 
 def _set_refresh_cookie(response: Response, raw_token: str, request: Request) -> None:
@@ -56,10 +82,10 @@ class RegisterRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     email: EmailStr = Field(..., description="Adresse email professionnelle")
-    password: str = Field(..., description="Mot de passe robuste (min 10 caractères)")
+    password: str = Field(..., max_length=MAX_PASSWORD_LENGTH, description="Mot de passe robuste (10 à 128 caractères)")
     full_name: str = Field(..., min_length=2, max_length=120, description="Nom complet")
     workspace_name: Optional[str] = Field(None, max_length=120, description="Nom de l'organisation ou workspace")
-    invitation_code: Optional[str] = Field(None, description="Code d'invitation optionnel")
+    invitation_code: Optional[str] = Field(None, max_length=128, description="Code d'invitation optionnel")
     cgu_accepted: bool = Field(False, description="Acceptation des CGU")
     privacy_accepted: bool = Field(False, description="Acceptation de la Politique de Confidentialité")
     language: str = Field("fr", max_length=8)
@@ -68,7 +94,7 @@ class RegisterRequest(BaseModel):
 
 class VerifyEmailRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    token: str = Field(..., description="Jeton de vérification reçu par email")
+    token: str = Field(..., min_length=1, max_length=256, description="Jeton de vérification reçu par email")
 
 
 class ResendVerificationRequest(BaseModel):
@@ -83,15 +109,16 @@ class ForgotPasswordRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    token: str = Field(..., description="Jeton de réinitialisation reçu par email")
-    new_password: str = Field(..., description="Nouveau mot de passe")
+    token: str = Field(..., min_length=1, max_length=256, description="Jeton de réinitialisation reçu par email")
+    new_password: str = Field(..., max_length=MAX_PASSWORD_LENGTH, description="Nouveau mot de passe")
 
 
 class LoginRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     email: EmailStr = Field(..., description="Adresse email de l'utilisateur")
-    password: str = Field(..., description="Mot de passe du compte")
-    workspace_id: Optional[str] = Field(None, description="Workspace cible optionnel")
+    password: str = Field(..., min_length=1, max_length=MAX_PASSWORD_LENGTH, description="Mot de passe du compte")
+    workspace_id: Optional[str] = Field(None, max_length=64, description="Workspace cible optionnel")
+
 
 
 class RefreshRequest(BaseModel):
@@ -104,11 +131,6 @@ class SwitchWorkspaceRequest(BaseModel):
     workspace_id: str = Field(..., description="Identifiant du workspace cible")
 
 
-class DevTokenRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    user_id: str = Field("dev_user", description="ID de l'utilisateur")
-    role: str = Field(Role.EDITOR.value, description="Rôle RBAC (Owner, Editor, Viewer, ServiceAgent)")
-    workspace_id: str = Field("ws_default", description="ID du workspace tenant")
 
 
 class UserSummary(BaseModel):
@@ -187,27 +209,38 @@ def register(
     email_svc = get_email_service()
 
     if existing_user:
-        # OWASP anti-enumeration: return timing-safe identical success response
+        # OWASP anti-enumeration: return timing-safe identical success response and status
+        delivery_status = "already_verified"
         if not existing_user.email_verified:
             raw_token = generate_crypto_token(32)
             token_hash = hash_crypto_token(raw_token)
             repo.set_email_verification_token(str(existing_user.id), token_hash, utc_now() + timedelta(hours=24))
-            email_svc.send_verification_email(
-                to_email=str(existing_user.email),
-                token=raw_token,
-                user_name=str(existing_user.full_name or "Utilisateur"),
-            )
+            try:
+                res_mail = email_svc.send_verification_email(
+                    to_email=str(existing_user.email),
+                    token=raw_token,
+                    user_name=str(existing_user.full_name or "Utilisateur"),
+                )
+                delivery_status = "sent" if res_mail.success else "pending_retry"
+            except Exception as exc:
+                logger.error("Failed to dispatch verification email for existing unverified user: %s", exc)
+                delivery_status = "pending_retry"
         return {
-            "message": "Si l'adresse est valide, un email de confirmation a été envoyé pour activer le compte.",
+            "message": "Si l'adresse est valide, un email de confirmation a été envoyé pour activer votre accès.",
             "email": email_clean,
             "requires_verification": True,
+            "email_delivery_status": delivery_status,
         }
 
     pwd_hash = hash_password(req.password)
     invitation_code_hash = hash_crypto_token(req.invitation_code) if req.invitation_code else None
 
-    require_verification = os.getenv("REQUIRE_EMAIL_VERIFICATION", "false").lower() in ("true", "1")
+    require_verification = is_email_verification_required()
     email_verified = not require_verification
+
+    raw_token = generate_crypto_token(32)
+    token_hash = hash_crypto_token(raw_token)
+    verif_expires_at = utc_now() + timedelta(hours=24)
 
     try:
         user, ws, role = repo.register_user_atomic(
@@ -221,31 +254,70 @@ def register(
             language=req.language,
             theme=req.theme,
             email_verified=email_verified,
+            email_verification_token_hash=token_hash,
+            email_verification_expires_at=verif_expires_at,
+            ip_address=get_client_ip(request),
+            user_agent=request.headers.get("user-agent"),
         )
+    except DuplicateUserError:
+        return {
+            "message": "Si l'adresse est valide, un email de confirmation a été envoyé pour activer votre accès.",
+            "email": email_clean,
+            "requires_verification": True,
+            "email_delivery_status": "sent",
+        }
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
 
-    raw_token = generate_crypto_token(32)
-    token_hash = hash_crypto_token(raw_token)
-    repo.set_email_verification_token(str(user.id), token_hash, utc_now() + timedelta(hours=24))
-    email_svc.send_verification_email(
-        to_email=str(user.email),
-        token=raw_token,
-        user_name=str(user.full_name or req.full_name),
-    )
+    email_delivery_status = "sent"
+    try:
+        delivery_res = email_svc.send_verification_email(
+            to_email=str(user.email),
+            token=raw_token,
+            user_name=str(user.full_name or req.full_name),
+        )
+        if not delivery_res.success:
+            email_delivery_status = "pending_retry"
+    except Exception as exc:
+        logger.error("Verification email delivery failed after atomic registration for %s: %s", user.id, exc)
+        email_delivery_status = "pending_retry"
+
+    if email_delivery_status != "sent":
+        try:
+            repo.record_audit_log(
+                user_id=str(user.id),
+                workspace_id=str(ws.id),
+                event_type="verification_email_delivery_failed",
+                severity="WARNING",
+                details={"email_delivery_status": "pending_retry"},
+                ip_address=get_client_ip(request),
+                user_agent=request.headers.get("user-agent"),
+            )
+        except Exception as exc:
+            logger.warning("Failed to record verification email delivery audit log for user %s: %s", user.id, exc)
+        return {
+            "message": (
+                "Compte créé. L'envoi de l'email de confirmation est en attente ou a rencontré une erreur temporaire ; "
+                "vous pouvez demander un nouvel envoi depuis l'écran de confirmation."
+            ),
+            "email": str(user.email),
+            "requires_verification": require_verification,
+            "email_delivery_status": "pending_retry",
+        }
 
     return {
-        "message": "Compte créé avec succès. Un email de confirmation a été envoyé pour activer votre accès.",
-        "user_id": str(user.id),
+        "message": "Si l'adresse est valide, un email de confirmation a été envoyé pour activer votre accès.",
         "email": str(user.email),
-        "workspace_id": str(ws.id),
         "requires_verification": require_verification,
+        "email_delivery_status": "sent",
     }
 
 
 @router.post("/verify-email")
+@limiter.limit("10/minute")
 def verify_email(
     req: VerifyEmailRequest,
+    request: Request,
     repo: ContentOpsRepository = Depends(get_repository),
 ):
     """Verifies a user's email address using the one-time cryptographic token."""
@@ -261,8 +333,11 @@ def verify_email(
         user_id=str(user.id),
         event_type="email_verified",
         severity="INFO",
+        ip_address=get_client_ip(request),
+        user_agent=request.headers.get("user-agent"),
     )
     return {"message": "Adresse email vérifiée avec succès. Vous pouvez maintenant vous connecter."}
+
 
 
 @router.post("/resend-verification")
@@ -372,19 +447,15 @@ def login_with_password(
         locked_dt = ensure_utc(cast(Optional[datetime], user.locked_until))
         if locked_dt and locked_dt > utc_now():
             raise HTTPException(
-                status_code=423,
-                detail="Compte temporairement verrouillé suite à plusieurs tentatives infructueuses. Veuillez réessayer plus tard.",
+                status_code=401,
+                detail="Email ou mot de passe invalide.",
+                headers={"WWW-Authenticate": "Bearer"},
             )
         else:
             repo.reset_failed_logins(user_id)
 
     if not verify_password(req.password, str(user.password_hash or "")):
         attempts, locked = repo.record_failed_login(user_id)
-        if locked:
-            raise HTTPException(
-                status_code=423,
-                detail="Compte temporairement verrouillé suite à plusieurs tentatives infructueuses. Veuillez réessayer plus tard.",
-            )
         raise HTTPException(
             status_code=401,
             detail="Email ou mot de passe invalide.",
@@ -393,7 +464,15 @@ def login_with_password(
 
     repo.reset_failed_logins(user_id)
 
-    require_verification = os.getenv("REQUIRE_EMAIL_VERIFICATION", "false").lower() in ("true", "1")
+    # Transparently upgrade Argon2id hash if cost parameters changed
+    if check_needs_rehash(str(user.password_hash or "")):
+        try:
+            repo.update_user_password(user_id, hash_password(req.password))
+        except Exception as exc:
+            logger.warning("Failed to transparently rehash password for user %s: %s", user_id, exc)
+
+
+    require_verification = is_email_verification_required()
     if require_verification and not user.email_verified:
         raise HTTPException(
             status_code=403,
@@ -446,8 +525,8 @@ def login_with_password(
             user_agent=user_agent,
             ip_address=client_ip,
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Failed to record login session: %s", exc)
 
     repo.record_audit_log(
         user_id=user_id,
@@ -516,8 +595,48 @@ def refresh_session(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # REUSE DETECTION: if revoked, breach or replay detected -> revoke family
+    # REUSE DETECTION WITH 20-SECOND GRACE WINDOW (RFC 6749 BCP)
     if rt.is_revoked:
+        revoked_at_dt = ensure_utc(cast(Optional[datetime], getattr(rt, "revoked_at", None))) or ensure_utc(cast(Optional[datetime], rt.created_at))
+        if revoked_at_dt and (utc_now() - revoked_at_dt).total_seconds() <= 20:
+            active_rt = repo.get_active_refresh_token_in_family(str(rt.family_id))
+            if active_rt:
+                user = repo.get_user(str(active_rt.user_id))
+                if user and user.is_active:
+                    workspaces = repo.get_user_workspaces(str(user.id))
+                    target_ws = workspaces[0]["workspace_id"] if workspaces else "ws_default"
+                    target_role = workspaces[0]["role"] if workspaces else Role.VIEWER.value
+                    session_jti = uuid.uuid4().hex
+                    access_token = create_access_token(
+                        user_id=str(user.id),
+                        role=target_role,
+                        workspace_id=target_ws,
+                        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+                        jti=session_jti,
+                    )
+                    ws_list = [
+                        WorkspaceMembershipSummary(
+                            workspace_id=w["workspace_id"],
+                            name=w["name"],
+                            role=w["role"],
+                            timezone=w.get("timezone", "UTC"),
+                            is_owner=w.get("is_owner", False),
+                            is_demo=False,
+                        )
+                        for w in workspaces
+                    ]
+                    return LoginResponse(
+                        access_token=access_token,
+                        token_type="bearer",
+                        user_id=str(user.id),
+                        role=target_role,
+                        workspace_id=target_ws,
+                        user=_build_user_summary(user),
+                        workspaces=ws_list,
+                        is_demo=False,
+                    )
+
+        # Replay outside grace window: breach detected -> revoke family
         repo.revoke_refresh_token_family(str(rt.family_id))
         _clear_refresh_cookie(response)
         repo.record_audit_log(
@@ -554,15 +673,15 @@ def refresh_session(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # ROTATION
-    repo.revoke_refresh_token(str(rt.id))
+    # ATOMIC ROTATION
     new_raw_refresh, new_token_hash, family_id = generate_refresh_token(family_id=str(rt.family_id))
     refresh_expires_at = utc_now() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    repo.create_refresh_token(
+    repo.rotate_refresh_token_atomic(
+        old_token_id=str(rt.id),
         user_id=str(user.id),
-        token_hash=new_token_hash,
+        new_token_hash=new_token_hash,
         family_id=family_id,
-        expires_at=refresh_expires_at,
+        new_expires_at=refresh_expires_at,
     )
     _set_refresh_cookie(response, new_raw_refresh, request)
 
@@ -596,8 +715,8 @@ def refresh_session(
             user_agent=user_agent,
             ip_address=client_ip,
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Failed to record session during email verification: %s", exc)
 
     ws_list = [
         WorkspaceMembershipSummary(
@@ -656,8 +775,8 @@ def logout(
                 if sess:
                     setattr(sess, "is_revoked", True)
                     repo.db.commit()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to revoke session on logout: %s", exc)
 
     _clear_refresh_cookie(response)
     return {"message": "Déconnexion réussie."}
@@ -730,7 +849,19 @@ def switch_workspace(
         jti=session_jti,
     )
 
+    try:
+        repo.create_session(
+            user_id=str(user.id),
+            token_jti=session_jti,
+            expires_at=utc_now() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+            user_agent=request.headers.get("user-agent") or "ContentOps Client",
+            ip_address=get_client_ip(request),
+        )
+    except Exception as exc:
+        logger.warning("Failed to record session during workspace switch: %s", exc)
+
     ws_list = [
+
         WorkspaceMembershipSummary(
             workspace_id=w["workspace_id"],
             name=w["name"],
@@ -769,7 +900,7 @@ def start_demo_session(
     Creates an isolated ephemeral demo workspace with rich pre-seeded data
     for 2 hours without requiring registration. Controlled by DEMO_MODE_ENABLED.
     """
-    demo_enabled = os.getenv("DEMO_MODE_ENABLED", "true").strip().lower() in ("true", "1", "yes")
+    demo_enabled = os.getenv("DEMO_MODE_ENABLED", "false").strip().lower() in ("true", "1", "yes")
     if not demo_enabled:
         raise HTTPException(
             status_code=404,
@@ -778,8 +909,8 @@ def start_demo_session(
 
     try:
         repo.cleanup_expired_demo_workspaces()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Failed to cleanup expired demo workspaces: %s", exc)
 
     user, ws, role = repo.create_demo_workspace_session(duration_minutes=120)
 
@@ -811,8 +942,8 @@ def start_demo_session(
             user_agent=user_agent,
             ip_address=client_ip,
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Failed to record demo session: %s", exc)
 
     ws_list = [
         WorkspaceMembershipSummary(
@@ -838,46 +969,41 @@ def start_demo_session(
     )
 
 
-@router.post("/dev-token")
-def issue_dev_token(req: DevTokenRequest):
+@router.get("/dev/mailbox")
+def get_dev_mailbox(
+    request: Request,
+    email: Optional[str] = None,
+):
     """
-    Issues signed JWT access tokens strictly in local development environment (ENV=dev).
-    Blocked in production.
+    Strictly local development mailbox endpoint (D-02).
+    Allows inspecting verification & password reset emails in APP_ENV=development/test without external SMTP.
+    Hard-blocked in staging and production (returns 404) and restricted to loopback clients (returns 403).
     """
-    env = (os.getenv("ENV") or "production").strip().lower()
-    if env not in ("dev", "development", "local", "test"):
+    if not is_dev_mailbox_allowed():
+        raise HTTPException(
+            status_code=404,
+            detail="La boîte de réception de développement est désactivée hors environnement de développement.",
+        )
+
+    client_host = (request.client.host if request.client else "") or ""
+    forwarded_for = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    allowed_loopback = {"127.0.0.1", "::1", "localhost", "testclient", ""}
+    if client_host not in allowed_loopback or (forwarded_for and forwarded_for not in allowed_loopback):
         raise HTTPException(
             status_code=403,
-            detail="Dev token generation is strictly disabled in non-dev environments.",
+            detail="Accès à la boîte de réception de développement strictement réservé à l'interface locale (loopback).",
         )
-    session_jti = uuid.uuid4().hex
-    token = create_access_token(
-        user_id=req.user_id,
-        role=req.role,
-        workspace_id=req.workspace_id,
-        jti=session_jti,
-    )
-    try:
-        from infra.db.database import SessionLocal
-        db = SessionLocal()
-        try:
-            repo = ContentOpsRepository(db)
-            repo.get_or_create_user(req.user_id, default_role=req.role, workspace_id=req.workspace_id)
-            repo.create_session(
-                user_id=req.user_id,
-                token_jti=session_jti,
-                expires_at=utc_now() + timedelta(hours=24),
-                user_agent="DevClient/1.0",
-                ip_address="127.0.0.1",
-            )
-        finally:
-            db.close()
-    except Exception:
-        pass
 
+    email_svc = get_email_service()
+    if not isinstance(email_svc, MemoryLogEmailService):
+        return {"enabled": False, "adapter": type(email_svc).__name__, "messages": []}
+
+    messages = email_svc.list_messages_for(email=email)
     return {
-        "access_token": token,
-        "token_type": "bearer",
-        "role": req.role,
-        "workspace_id": req.workspace_id,
+        "enabled": True,
+        "adapter": "dev_mailbox",
+        "messages": messages,
     }
+
+
+

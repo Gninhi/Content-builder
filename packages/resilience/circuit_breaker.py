@@ -3,7 +3,7 @@ import time
 import random
 import logging
 import threading
-from typing import Callable, Any, Type, Tuple, Optional
+from typing import Callable, Any, Type, Tuple, Optional, Dict
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -153,6 +153,14 @@ class CycleBudget:
                 f"Cycle exceeded maximum token budget ({self.used_tokens} > {self.max_tokens})"
             )
 
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "max_tokens": self.max_tokens,
+            "max_duration_seconds": self.max_duration_seconds,
+            "used_tokens": self.used_tokens,
+            "start_time": self.start_time
+        }
+
     def track_in_langfuse(self, trace_id: Optional[str] = None) -> bool:
         """
         Records cycle tokens, execution duration, and estimated USD cost as scores in Langfuse.
@@ -175,6 +183,26 @@ class CycleBudget:
         except Exception as e:
             logger.warning(f"Failed to track cycle budget metrics in Langfuse: {e}")
             return False
+
+
+def resolve_cycle_budget(state: Optional[Any] = None) -> CycleBudget:
+    """
+    Resolves an active CycleBudget from state or initializes a new one from environment variables.
+    """
+    if state and "cycle_budget" in state and state["cycle_budget"] is not None:
+        budget = state["cycle_budget"]
+        if isinstance(budget, CycleBudget):
+            return budget
+        if isinstance(budget, dict):
+            max_tokens_val = int(budget.get("max_tokens") or os.getenv("CYCLE_BUDGET_MAX_TOKENS") or "50000")
+            max_duration_val = float(budget.get("max_duration_seconds") or os.getenv("CYCLE_BUDGET_MAX_DURATION_SECONDS") or "60.0")
+            cb = CycleBudget(max_tokens=max_tokens_val, max_duration_seconds=max_duration_val)
+            cb.used_tokens = int(budget.get("used_tokens", 0))
+            return cb
+
+    max_tokens = int(os.getenv("CYCLE_BUDGET_MAX_TOKENS", "50000"))
+    max_duration = float(os.getenv("CYCLE_BUDGET_MAX_DURATION_SECONDS", "60.0"))
+    return CycleBudget(max_tokens=max_tokens, max_duration_seconds=max_duration)
 
 
 _CIRCUIT_BREAKERS: dict[str, CircuitBreaker] = {}

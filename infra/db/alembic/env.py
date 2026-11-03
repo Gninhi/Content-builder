@@ -4,13 +4,13 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 
-from infra.db.database import Base, SYNC_DATABASE_URL
+from infra.db.database import Base, SYNC_DATABASE_URL, resolve_database_url
 import infra.db.models  # noqa: F401 - register all tables
 
 config = context.config
 
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+if config.config_file_name is not None and not os.getenv("PYTEST_CURRENT_TEST"):
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 
@@ -22,20 +22,21 @@ def get_url() -> str:
 
     # If caller/test explicitly configured a database url different from default ini
     if config_url and config_url not in (ini_default, "driver://user:pass@localhost/dbname"):
-        return config_url
+        return resolve_database_url(config_url)
 
     db_env_url = os.getenv("DATABASE_URL")
     if db_env_url:
-        if db_env_url.startswith("sqlite+aiosqlite"):
-            return db_env_url.replace("sqlite+aiosqlite", "sqlite")
-        elif db_env_url.startswith("postgresql+asyncpg"):
-            return db_env_url.replace("postgresql+asyncpg", "postgresql+psycopg2")
-        elif db_env_url.startswith("postgresql://"):
-            return db_env_url.replace("postgresql://", "postgresql+psycopg2://")
-        return db_env_url
+        resolved_env_url = resolve_database_url(db_env_url)
+        if resolved_env_url.startswith("sqlite+aiosqlite"):
+            return resolved_env_url.replace("sqlite+aiosqlite", "sqlite")
+        elif resolved_env_url.startswith("postgresql+asyncpg"):
+            return resolved_env_url.replace("postgresql+asyncpg", "postgresql+psycopg2")
+        elif resolved_env_url.startswith("postgresql://"):
+            return resolved_env_url.replace("postgresql://", "postgresql+psycopg2://")
+        return resolved_env_url
 
     if config_url and config_url != "driver://user:pass@localhost/dbname":
-        return config_url
+        return resolve_database_url(config_url)
 
     return SYNC_DATABASE_URL
 

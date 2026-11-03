@@ -275,7 +275,9 @@ class WebSearchTool:
         workspace_id: str = "default"
     ) -> WebSearchResponse:
         t0 = time.time()
-        cache_key = f"{engine}:{country}:{language}:{query.strip().lower()}"
+        ws_scope = (workspace_id or "default").strip() or "default"
+        tp_scope = (time_period or "any").strip() or "any"
+        cache_key = f"v2:{ws_scope}:{engine}:{country}:{language}:{tp_scope}:{query.strip().lower()}"
 
         # 1. Check persistent cache
         cached_data = _SEARCH_CACHE.get(cache_key)

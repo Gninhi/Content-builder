@@ -48,8 +48,7 @@ def test_veille_scheduler_timezone_due_logic():
     with get_db_session() as db:
         repo = ContentOpsRepository(db)
         ws_id = "ws_test_scheduler_tz"
-        repo.ensure_workspace(ws_id)
-        ws = repo.get_workspace(ws_id)
+        ws = repo.get_workspace(ws_id) or repo.create_workspace(name=ws_id, workspace_id=ws_id)
         ws.timezone = "Europe/Paris"
         db.commit()
 
@@ -78,7 +77,7 @@ def test_veille_pipeline_fail_soft_source_isolation():
     with get_db_session() as db:
         repo = ContentOpsRepository(db)
         ws_id = "ws_test_fail_soft"
-        repo.ensure_workspace(ws_id)
+        repo.get_workspace(ws_id) or repo.create_workspace(name=ws_id, workspace_id=ws_id)
 
         # Clear existing sources for this test workspace
         existing = repo.list_veille_sources(ws_id)
@@ -159,7 +158,7 @@ def test_veille_scheduler_worker_concurrency_guard():
     with get_db_session() as db:
         repo = ContentOpsRepository(db)
         ws_id = "ws_test_concurrency"
-        repo.ensure_workspace(ws_id)
+        repo.get_workspace(ws_id) or repo.create_workspace(name=ws_id, workspace_id=ws_id)
 
         # Mark workspace run as currently RUNNING
         run = repo.create_veille_run(ws_id, trigger_type="SCHEDULED")

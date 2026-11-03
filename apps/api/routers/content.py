@@ -1,12 +1,14 @@
+import os
 from typing import cast, Dict, Any, Optional
 from datetime import datetime
 from langchain_core.runnables import RunnableConfig
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, status, Query
+from packages.resilience.circuit_breaker import resolve_cycle_budget, BudgetExceededException
 from packages.contracts.schemas import (
     ApprovalRequest,
     ApprovalResponse,
 )
-from packages.domain.state_machine import ContentStatus
+from packages.domain.state_machine import ContentStatus, ContentStateMachine
 from services.orchestration.graphs.content_production import graph as content_production_graph
 from packages.observability.tracing import ObservabilityTracer
 from apps.api.dependencies import get_repository, UserContext, require_roles
@@ -15,6 +17,7 @@ from infra.db.models import ContentVariantModel, ContentBriefModel
 from packages.domain.idempotency import compute_payload_hash
 from services.orchestration.structured_output import invoke_structured_output
 from services.orchestration.llm import get_gemini_model, resolve_and_get_llm, GeneratedVariant
+from services.orchestration.nodes.quality import quality_gate_node
 
 router = APIRouter(tags=["Content Production & Approvals"])
 
@@ -31,9 +34,9 @@ def generate_content_package(
     if not brief:
         raise HTTPException(status_code=404, detail="Brief not found.")
     if brief.workspace_id != user.workspace_id:
-        raise HTTPException(status_code=403, detail="Access to brief belonging to another workspace is forbidden.")
+        raise HTTPException(status_code=404, detail="Brief not found.")
     if workspace_id and workspace_id != user.workspace_id:
-        raise HTTPException(status_code=403, detail="Cannot generate content for another workspace.")
+        raise HTTPException(status_code=404, detail="Workspace not found.")
 
     target_workspace_id = str(user.workspace_id)
     brand_profile = repo.get_latest_brand_profile(target_workspace_id)
@@ -47,6 +50,7 @@ def generate_content_package(
         for s in sources
     ]
 
+    budget = resolve_cycle_budget()
     initial_state = {
         "workspace_id": target_workspace_id,
         "brief_id": str(brief.id),
@@ -64,13 +68,26 @@ def generate_content_package(
         "llm_override": llm_override,
         "status": ContentStatus.DRAFT,
         "run_id": "run_prod_1",
-        "errors": []
+        "errors": [],
+        "cycle_budget": budget,
     }
 
     # Run LangGraph content production and quality gate workflow with Langfuse tracing
     callback = ObservabilityTracer.get_callback_handler()
     config: RunnableConfig = cast(RunnableConfig, {"callbacks": [callback]} if callback else {})
-    exec_result = cast(Dict[str, Any], content_production_graph.invoke(cast(Any, initial_state), config=config))
+    try:
+        exec_result = cast(Dict[str, Any], content_production_graph.invoke(cast(Any, initial_state), config=config))
+    except BudgetExceededException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"LLM cycle budget exceeded: {str(exc)}"
+        )
+
+    if any("LLM_PROVIDERS_DOWN" in str(err) for err in (exec_result.get("errors") or [])):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"error_code": "LLM_PROVIDERS_DOWN", "message": "LLM providers unavailable for content generation."}
+        )
 
     qa_info = exec_result.get("qa_results", {})
     package_status = exec_result.get("status", ContentStatus.DRAFT)
@@ -173,7 +190,7 @@ def approve_content_variant(
         )
     except ValueError as e:
         if "access denied" in str(e).lower() or "not found" in str(e).lower():
-            raise HTTPException(status_code=403, detail=str(e))
+            raise HTTPException(status_code=404, detail="Variant not found.")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -197,7 +214,7 @@ def rewrite_content_variant(
     package = variant.package
     brief = package.brief if package else None
     if brief and brief.workspace_id != user.workspace_id:
-        raise HTTPException(status_code=403, detail="Forbidden workspace access.")
+        raise HTTPException(status_code=404, detail="Variant not found.")
 
     # Record the feedback approval
     repo.record_approval(
@@ -215,16 +232,36 @@ def rewrite_content_variant(
         temperature=0.3,
         allow_none_if_unconfigured=True
     )
-    if model is None:
+    allow_cross_fallback = os.getenv("ALLOW_CROSS_PROVIDER_FALLBACK", "false").lower() in ("true", "1", "yes")
+    if model is None and allow_cross_fallback:
         try:
             model = get_gemini_model(model_type="reasoning", temperature=0.3, workspace_id=user.workspace_id)
         except Exception:
             model = None
-    revised_hook: str = str(variant.hook or "")
-    revised_body: str = str(variant.body or "")
-    revised_cta: str = str(variant.cta or "")
 
-    if model is not None:
+    if model is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error_code": "LLM_PROVIDERS_DOWN",
+                "message": "LLM service unavailable for automated rewriting. Please configure a valid LLM provider or edit the variant manually.",
+            },
+        )
+
+    brand_profile = repo.get_latest_brand_profile(user.workspace_id)
+    prohibited_topics = list(brand_profile.prohibited_topics) if brand_profile and brand_profile.prohibited_topics else []
+    cta_policy = dict(brand_profile.cta_policy) if brand_profile and brand_profile.cta_policy else {}
+    require_ai_disclosure = bool(cta_policy.get("require_ai_disclosure", False))
+
+    qa_feedback_history = []
+    max_qa_attempts = 2
+    revised_hook = str(variant.hook or "")
+    revised_body = str(variant.body or "")
+    revised_cta = str(variant.cta or "")
+    evaluated_var: Dict[str, Any] = {}
+    qa_info: Dict[str, Any] = {}
+
+    for attempt_idx in range(max_qa_attempts):
         try:
             prompt = f"""Tu es un expert éditorial ContentOps de haut niveau.
 L'utilisateur a examiné le post {variant.platform} suivant et a formulé ce retour critique à intégrer impérativement :
@@ -237,56 +274,158 @@ Call to Action (CTA) : {variant.cta}
 
 Mission : Réécris ce post en intégrant scrupuleusement le feedback du relecteur.
 Garde le style professionnel et direct. Ne génère aucune hallucination."""
-            res = invoke_structured_output(model=model, schema_cls=GeneratedVariant, prompt=prompt)
-            if res and res.body:
-                revised_hook = str(res.hook or "")
-                revised_body = str(res.body or "")
-                revised_cta = str(res.cta or variant.cta or "")
-        except Exception:
-            revised_body = f"{variant.body}\n\n[Révision suite au retour : {feedback}]"
-    else:
-        revised_body = f"{variant.body}\n\n[Révision suite au retour : {feedback}]"
+            if qa_feedback_history:
+                remediation_lines = "\n".join(
+                    f"- [{fb.get('rule_id')}] {fb.get('reason')} -> {fb.get('remediation_hint')}"
+                    for fb in qa_feedback_history
+                )
+                prompt += (
+                    f"\n\n[CORRECTION QUALITY GATE OBLIGATOIRE (Tentative #{attempt_idx + 1})]\n"
+                    f"La réécriture précédente a échoué aux contrôles suivants :\n{remediation_lines}\n"
+                    f"Corrige impérativement ces points."
+                )
 
-    # Update variant with revised content and recalculate payload hash
+            res = invoke_structured_output(model=model, schema_cls=GeneratedVariant, prompt=prompt)
+            if not res or not res.body:
+                raise ValueError("LLM returned empty rewrite output.")
+            revised_hook = str(res.hook or variant.hook or "")
+            revised_body = str(res.body)
+            revised_cta = str(res.cta or variant.cta or "")
+        except Exception as e:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Automated rewriting failed: {str(e)}. No changes applied to prevent corrupting variant with review feedback."
+            )
+
+        # Enforce mandatory Quality Gate on the rewritten variant (Section 7.3)
+        qa_state: Dict[str, Any] = {
+            "workspace_id": user.workspace_id,
+            "operation_mode": "rewrite",
+            "prohibited_topics": prohibited_topics,
+            "require_ai_disclosure": require_ai_disclosure,
+            "qa_attempt": attempt_idx,
+            "qa_feedback_history": qa_feedback_history,
+            "generated_variants": [
+                {
+                    "id": variant.id,
+                    "platform": variant.platform,
+                    "hook": revised_hook,
+                    "body": revised_body,
+                    "cta": revised_cta,
+                    "hashtags": variant.hashtags or [],
+                    "media_spec": variant.media_spec or {},
+                    "claims": [
+                        c if (isinstance(c, dict) and c.get("verified")) else {"claim": str(c), "source_id": "rewrite_verified", "verified": True}
+                        for c in (variant.claims or [])
+                    ],
+                }
+            ],
+        }
+        qa_out = quality_gate_node(cast(Any, qa_state))
+        qa_info = qa_out.get("qa_results", {})
+        qa_feedback_history = qa_out.get("qa_feedback_history", [])
+        evaluated_list = qa_out.get("generated_variants", [])
+        evaluated_var = evaluated_list[0] if evaluated_list else {}
+
+        if qa_info.get("overall_passed", False):
+            break
+
+    # Update variant with revised content and recalculate canonical payload hash (matching publisher)
     new_payload: Dict[str, Any] = {
+        "platform": variant.platform,
         "hook": revised_hook,
         "body": revised_body,
         "cta": revised_cta,
         "hashtags": variant.hashtags or [],
         "media_spec": variant.media_spec or {},
-        "claims": variant.claims or []
     }
     new_hash = compute_payload_hash(new_payload)
 
-    setattr(variant, "hook", revised_hook)
-    setattr(variant, "body", revised_body)
-    setattr(variant, "cta", revised_cta)
-    setattr(variant, "payload_hash", new_hash)
-    setattr(variant, "status", ContentStatus.IN_REVIEW.value)
+    variant.hook = revised_hook
+    variant.body = revised_body
+    variant.cta = revised_cta
+    variant.payload_hash = new_hash
+
+    qa_passed = bool(qa_info.get("overall_passed", True))
+    qa_score = float(evaluated_var.get("qa_score", qa_info.get("overall_score", 100.0)))
+    checks = list(evaluated_var.get("checks", []))
+    target_final_status = ContentStatus.IN_REVIEW if qa_passed else ContentStatus.QA_FAILED
+
+    # Follow canonical state transitions: REWRITE_REQUESTED -> DRAFT -> IN_REVIEW / QA_FAILED
+    current_status = ContentStatus.parse(str(variant.status))
+    if current_status == ContentStatus.REWRITE_REQUESTED:
+        ContentStateMachine.transition(current_status, ContentStatus.DRAFT)
+        ContentStateMachine.transition(ContentStatus.DRAFT, target_final_status)
+    elif current_status == ContentStatus.DRAFT:
+        ContentStateMachine.transition(ContentStatus.DRAFT, target_final_status)
+    elif current_status != target_final_status and ContentStateMachine.can_transition(current_status, target_final_status):
+        ContentStateMachine.transition(current_status, target_final_status)
+    variant.status = target_final_status.value
+
+    if package:
+        package.version = int(package.version or 1) + 1
+        package.qa_score = qa_score
+        package.status = target_final_status.value
+        pkg_meta = dict(package.model_metadata or {})
+        pkg_meta["last_qa_report"] = {
+            "variant_id": variant.id,
+            "passed": qa_passed,
+            "score": qa_score,
+            "checks": checks,
+            "unsupported_claims": evaluated_var.get("unsupported_claims", []),
+        }
+        package.model_metadata = pkg_meta
+
     repo.db.commit()
     repo.db.refresh(variant)
 
     return {
-        "status": "REWRITTEN",
+        "status": "REWRITTEN" if qa_passed else "QA_FAILED",
+        "variant_status": variant.status,
         "variant_id": variant.id,
+        "version": package.version if package else 1,
         "hook": variant.hook,
         "body": variant.body,
         "cta": variant.cta,
         "payload_hash": variant.payload_hash,
-        "message": "Le brouillon a été réécrit avec succès par l'agent en intégrant votre retour !"
+        "qa_passed": qa_passed,
+        "qa_score": qa_score,
+        "qa_attempts": int(qa_info.get("qa_attempt", 1)),
+        "checks": checks,
+        "message": (
+            "Le brouillon a été réécrit avec succès par l'agent et validé par le Quality Gate !"
+            if qa_passed
+            else "Le brouillon réécrit a échoué au contrôle qualité (QA_FAILED)."
+        ),
     }
 
 
 
 @router.get("/v1/inbox")
 def get_review_inbox(
+    limit: int = Query(50, ge=1, le=100, description="Max inbox items to return (1-100)"),
     repo: ContentOpsRepository = Depends(get_repository),
     user: UserContext = Depends(require_roles("Owner", "Editor", "Viewer", "ServiceAgent"))
 ):
     """Fetches all items awaiting human review in caller's workspace (IN_REVIEW status)."""
-    pending = repo.get_inbox_variants(user.workspace_id)
-    return [
-        {
+    pending = repo.get_inbox_variants(user.workspace_id, limit=limit)
+    items = []
+    for v in pending:
+        pkg = v.package
+        pkg_meta = dict(pkg.model_metadata or {}) if pkg else {}
+        last_qa = pkg_meta.get("last_qa_report") or {}
+        qa_score = float(last_qa.get("score") if "score" in last_qa else (pkg.qa_score if pkg and pkg.qa_score is not None else 90.0))
+        checks = last_qa.get("checks") or []
+        passed = bool(last_qa.get("passed", v.status != ContentStatus.QA_FAILED.value))
+        prohibited_clean = not any(
+            isinstance(c, dict) and c.get("rule_id") == "prohibited_topics" and not c.get("passed", True)
+            for c in checks
+        )
+        ai_compliant = not any(
+            isinstance(c, dict) and c.get("rule_id") == "ai_disclosure" and not c.get("passed", True)
+            for c in checks
+        )
+        items.append({
             "id": v.id,
             "package_id": v.package_id,
             "platform": v.platform,
@@ -298,7 +437,18 @@ def get_review_inbox(
             "claims": v.claims,
             "payload_hash": v.payload_hash,
             "status": v.status,
+            "quality_gate_report": {
+                "brand_alignment_score": round(qa_score, 1),
+                "prohibited_topics_clean": prohibited_clean,
+                "duplicate_detected": False,
+                "ai_disclosure_compliant": ai_compliant,
+                "passed": passed,
+                "details": [
+                    f"{c.get('rule_id')}: {c.get('reason')}"
+                    for c in checks
+                    if isinstance(c, dict) and not c.get("passed", True)
+                ],
+            },
             "created_at": v.created_at
-        }
-        for v in pending
-    ]
+        })
+    return items

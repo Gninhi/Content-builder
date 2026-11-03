@@ -226,12 +226,13 @@ class VeilleSchedulerWorker:
     async def run_daemon_loop(self, poll_interval_seconds: int = 60, stop_event: Optional[asyncio.Event] = None):
         """
         Continuous async background loop polling every poll_interval_seconds.
-        Safe for long-running service execution in production container.
+        Executes synchronous DB/HTTP/LLM work in a worker thread via asyncio.to_thread
+        so the FastAPI event loop is never blocked.
         """
         logger.info(f"Starting VeilleSchedulerWorker daemon loop (poll interval: {poll_interval_seconds}s)")
         while stop_event is None or not stop_event.is_set():
             try:
-                self.process_due_veille_cycles()
+                await asyncio.to_thread(self.process_due_veille_cycles)
             except Exception as e:
                 logger.error(f"Error in VeilleSchedulerWorker loop: {e}", exc_info=True)
 

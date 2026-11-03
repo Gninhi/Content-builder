@@ -1,7 +1,16 @@
-from typing import Dict, Any
+import sys
+from typing import Dict, Any, Optional
+from langgraph.graph import StateGraph, START, END
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from packages.domain.state_machine import ContentStatus
 from packages.domain.idempotency import compute_payload_hash
 from services.orchestration.state.base import ApprovalState
+from services.orchestration.checkpointer import get_checkpointer
+
+
+def prepare_for_review_node(state: ApprovalState) -> ApprovalState:
+    """Prepares payload and ensures hash integrity prior to human interrupt."""
+    return state
 
 
 def human_review_decision_node(state: ApprovalState) -> Dict[str, Any]:
@@ -34,3 +43,25 @@ def human_review_decision_node(state: ApprovalState) -> Dict[str, Any]:
         }
     else:
         return {"status": ContentStatus.IN_REVIEW}
+
+
+def create_approval_graph(checkpointer: Optional[BaseCheckpointSaver] = None):
+    """
+    Helper factory compiling a durable HITL approval workflow with interrupt_before=["human_review"]
+    for checkpointer durability verification.
+    """
+    g = StateGraph(ApprovalState)
+    g.add_node("prepare_for_review", prepare_for_review_node)
+    g.add_node("human_review", human_review_decision_node)
+    g.add_edge(START, "prepare_for_review")
+    g.add_edge("prepare_for_review", "human_review")
+    g.add_edge("human_review", END)
+
+    if "langgraph_api" in sys.modules and checkpointer is None:
+        return g.compile(interrupt_before=["human_review"])
+
+    cp = checkpointer if checkpointer is not None else get_checkpointer()
+    return g.compile(
+        checkpointer=cp,
+        interrupt_before=["human_review"]
+    )
