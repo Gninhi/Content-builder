@@ -1,11 +1,14 @@
 import os
 import json
+import logging
 import secrets
 import hashlib
 import base64
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 
 class OAuthState(BaseModel):
@@ -75,8 +78,8 @@ class OAuthStateManager:
                     ex=self.ttl_minutes * 60
                 )
                 return state_token
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Redis failed to store OAuth state (%s), falling back to memory store: %s", state_token, exc)
 
         self._memory_store[state_token] = oauth_state
         return state_token
@@ -100,8 +103,8 @@ class OAuthStateManager:
                     if datetime.now(timezone.utc) > state_obj.expires_at:
                         return None
                     return state_obj
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Redis failed to retrieve OAuth state (%s), falling back to memory store: %s", state_token, exc)
 
         # 2. Memory store fallback
         if state_token in self._memory_store:

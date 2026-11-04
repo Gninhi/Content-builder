@@ -46,3 +46,46 @@ def _ensure_test_db_initialized():
         db.close()
 
 
+@pytest.fixture(autouse=True)
+def mock_nvidia_discovery(monkeypatch):
+    """Intercepte les requêtes sortantes de découverte de modèles NVIDIA dans l'environnement de test (ANOM-41)."""
+    from services.orchestration.providers.nvidia import NVIDIAProviderAdapter
+    from packages.contracts.llm import LLMModelInfo
+
+    def _mock_discover(self):
+        return [
+            LLMModelInfo(
+                provider_id="nvidia",
+                model_id="nvidia/llama-3.1-nemotron-70b-instruct",
+                display_name="Llama 3.1 Nemotron 70b Instruct",
+                capabilities={"text_generation": True, "structured_output": True, "streaming": True},
+                parameters={"temperature": {"min": 0.0, "max": 1.0, "default": 0.2}},
+                provenance="mocked_discovery",
+                is_available=True,
+            ),
+            LLMModelInfo(
+                provider_id="nvidia",
+                model_id="z-ai/glm-5.3-flash",
+                display_name="Glm 5.3 Flash",
+                capabilities={"text_generation": True, "structured_output": True, "streaming": True},
+                parameters={"temperature": {"min": 0.0, "max": 1.0, "default": 0.2}},
+                provenance="mocked_discovery",
+                is_available=True,
+            ),
+        ]
+
+    monkeypatch.setattr(NVIDIAProviderAdapter, "_discover_remote_models", _mock_discover)
+
+    try:
+        from langchain_nvidia_ai_endpoints._common import _NVIDIABaseClient, Model
+
+        mock_models = [
+            Model(id="nvidia/llama-3.1-nemotron-70b-instruct", model_type="chat", client="ChatNVIDIA"),
+            Model(id="z-ai/glm-5.3-flash", model_type="chat", client="ChatNVIDIA"),
+        ]
+        monkeypatch.setattr(_NVIDIABaseClient, "available_models", property(lambda self: mock_models))
+    except (ImportError, AttributeError):
+        pass
+
+
+

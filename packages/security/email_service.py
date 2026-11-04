@@ -147,8 +147,8 @@ class MemoryLogEmailService(BaseEmailService):
                 for item in reversed(disk_items):
                     if item.get("recipient", "").strip().lower() == target and item.get("type") == email_type:
                         return dict(item)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Could not read dev mailbox entry: %s", exc)
         return None
 
     def list_messages_for(self, email: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -237,11 +237,12 @@ class SMTPEmailService(BaseEmailService):
         from_email: Optional[str] = None,
         use_tls: bool = True,
     ):
-        self.host = host or os.getenv("SMTP_HOST", "localhost")
-        self.port = int(port or os.getenv("SMTP_PORT", "587"))
+        self.host: str = host or os.getenv("SMTP_HOST") or "localhost"
+        raw_port = port if port is not None else os.getenv("SMTP_PORT")
+        self.port: int = int(raw_port) if raw_port else 587
         self.username = username or os.getenv("SMTP_USERNAME")
         self.password = password or os.getenv("SMTP_PASSWORD")
-        self.from_email = from_email or os.getenv("SMTP_FROM_EMAIL", "noreply@contentops.io")
+        self.from_email: str = from_email or os.getenv("SMTP_FROM_EMAIL") or "noreply@contentops.io"
         self.use_tls = use_tls
 
     def _send_smtp_message(self, to_email: str, subject: str, text_content: str, html_content: Optional[str] = None) -> EmailDeliveryResult:

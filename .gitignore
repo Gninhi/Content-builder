@@ -62,6 +62,7 @@ Thumbs.db
 .opencode-logs/
 .antigravitycli/
 .langgraph_api/
+.agents/
 
 # Databases, Storage & Local State
 *.db

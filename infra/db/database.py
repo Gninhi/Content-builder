@@ -1,9 +1,16 @@
 import os
+import logging
 from pathlib import Path
 from contextlib import contextmanager
 from dotenv import load_dotenv, find_dotenv
 from sqlalchemy import create_engine, event
-from sqlalchemy.orm import declarative_base, sessionmaker, scoped_session
+from sqlalchemy.orm import DeclarativeBase, sessionmaker, scoped_session
+
+
+class Base(DeclarativeBase):
+    pass
+
+logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -69,16 +76,14 @@ def _configure_sqlite_connection(dbapi_connection, connection_record) -> None:
         if enable_wal and ":memory:" not in SYNC_DATABASE_URL:
             cursor.execute("PRAGMA journal_mode = WAL")
             cursor.execute("PRAGMA synchronous = NORMAL")
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Failed to configure SQLite connection PRAGMAs: %s", exc)
     finally:
         cursor.close()
 
 
 session_factory = sessionmaker(autocommit=False, autoflush=False, expire_on_commit=False, bind=engine)
 SessionLocal = scoped_session(session_factory)
-
-Base = declarative_base()
 
 
 @contextmanager
@@ -104,6 +109,7 @@ def set_db_workspace_context(db, workspace_id: str) -> None:
     """
     Binds the active workspace_id to the SQLAlchemy session and, on PostgreSQL,
     sets the transaction-local variable `app.current_workspace_id` used by RLS policies.
+    Enforces fail-closed isolation on PostgreSQL: failure to configure RLS context raises SecurityContextError.
     """
     if not workspace_id or db is None:
         return
@@ -116,8 +122,24 @@ def set_db_workspace_context(db, workspace_id: str) -> None:
                 text("SELECT set_config('app.current_workspace_id', :ws_id, true)"),
                 {"ws_id": str(workspace_id)},
             )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.critical(
+            "CRITICAL: Failed to configure PostgreSQL RLS isolation context ('app.current_workspace_id' = '%s'): %s",
+            workspace_id,
+            exc,
+        )
+        is_pg = False
+        try:
+            bind = db.get_bind()
+            if bind is not None and bind.dialect.name == "postgresql":
+                is_pg = True
+        except Exception as bind_err:
+            logger.debug("Failed to inspect database bind dialect: %s", bind_err)
+        if is_pg:
+            from packages.security.exceptions import SecurityContextError
+            raise SecurityContextError(
+                f"Fail-closed tenant isolation failure: unable to set RLS context for workspace '{workspace_id}'"
+            ) from exc
 
 
 def init_db():
@@ -170,6 +192,6 @@ def init_db():
                     with engine.begin() as conn:
                         conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN workspace_id VARCHAR(64) DEFAULT 'ws_default'"))
                         conn.execute(text(f"CREATE INDEX IF NOT EXISTS ix_{tbl}_workspace_id ON {tbl}(workspace_id)"))
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Schema auto-migration adjustments encountered an issue: %s", exc)
 

@@ -6,14 +6,7 @@ from langchain_core.runnables import RunnableConfig
 from packages.contracts.schemas import StrategyInsightsResponse, StrategyInsight
 from services.orchestration.graphs.strategy_insights import graph as strategy_insights_graph
 from packages.observability.tracing import ObservabilityTracer
-from infra.db.models import (
-    MetricSnapshotModel,
-    PublishedPostModel,
-    PublicationJobModel,
-    ContentVariantModel,
-    ContentPackageModel,
-    ContentBriefModel
-)
+from infra.db.models import MetricSnapshotModel
 from infra.db.repository import ContentOpsRepository
 from apps.api.dependencies import get_repository, UserContext, require_roles
 
@@ -51,12 +44,7 @@ def generate_strategy_insights(
     # Gather recent snapshots strictly isolated by workspace
     snapshots_models = (
         repo.db.query(MetricSnapshotModel)
-        .join(PublishedPostModel, MetricSnapshotModel.post_id == PublishedPostModel.id)
-        .join(PublicationJobModel, PublishedPostModel.job_id == PublicationJobModel.id)
-        .join(ContentVariantModel, PublicationJobModel.variant_id == ContentVariantModel.id)
-        .join(ContentPackageModel, ContentVariantModel.package_id == ContentPackageModel.id)
-        .join(ContentBriefModel, ContentPackageModel.brief_id == ContentBriefModel.id)
-        .filter(ContentBriefModel.workspace_id == ws_id)
+        .filter(MetricSnapshotModel.workspace_id == ws_id)
         .all()
     )
     snapshots = [

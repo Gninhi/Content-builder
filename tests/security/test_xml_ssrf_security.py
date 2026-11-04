@@ -153,3 +153,31 @@ def test_xxe_payload_defused_and_rejected():
         items = OfficialDataConnectors.fetch_rss_feed("https://tech.example.com/xxe.xml")
         # Either handled cleanly returning [] or logged without expanding
         assert items == []
+
+
+def test_dns_rebinding_toctou_prevention_pinned_transport():
+    """Verify that PinnedIPTransport pins connection to validated IP and prevents DNS rebinding TOCTOU."""
+    from packages.tools.browse import PinnedIPTransport, PinnedIPBackend
+
+    # 1. Validated IP is resolved and returned by validate_target_url_security
+    with patch("socket.getaddrinfo", return_value=[(None, None, None, None, ("93.184.216.34", 80))]):
+        resolved_ip = validate_target_url_security("http://rebinding-victim.example.com")
+        assert resolved_ip == "93.184.216.34"
+
+    # 2. PinnedIPTransport initializes with PinnedIPBackend
+    transport = PinnedIPTransport(pinned_ip="93.184.216.34")
+    assert transport.pinned_ip == "93.184.216.34"
+    assert isinstance(transport._pool._network_backend, PinnedIPBackend)
+    assert transport._pool._network_backend.pinned_ip == "93.184.216.34"
+
+    # 3. Backend connect_tcp redirects host connection to pinned IP
+    with patch("httpcore.SyncBackend.connect_tcp") as mock_connect:
+        transport._pool._network_backend.connect_tcp("rebinding-victim.example.com", 80)
+        mock_connect.assert_called_once_with(
+            "93.184.216.34",
+            80,
+            timeout=None,
+            local_address=None,
+            socket_options=None,
+        )
+

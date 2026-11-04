@@ -17,6 +17,7 @@ import {
   Shield,
   Palette,
   Radar,
+  X,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -50,6 +51,73 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { t, language } = useLanguage();
   const { session, user, workspaces, switchWorkspace, logout, isOwner, isDemo } = useAuth();
   const isEn = language === 'en';
+
+  const sidebarRef = React.useRef<HTMLElement>(null);
+  const triggerElementRef = React.useRef<HTMLElement | null>(null);
+
+  // Focus trap, Escape key, and focus restore for accessible mobile drawer (ANOM-10)
+  React.useEffect(() => {
+    if (!isOpenMobile) return;
+
+    triggerElementRef.current = document.activeElement as HTMLElement | null;
+
+    // Focus the first focusable element inside the drawer
+    const timer = setTimeout(() => {
+      const focusable = sidebarRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable && focusable.length > 0) {
+        focusable[0].focus();
+      }
+    }, 50);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        onCloseMobile?.();
+        return;
+      }
+
+      if (e.key === 'Tab') {
+        if (!sidebarRef.current) return;
+        const focusable = Array.from(
+          sidebarRef.current.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          )
+        );
+
+        if (focusable.length === 0) {
+          e.preventDefault();
+          return;
+        }
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === first || !sidebarRef.current.contains(document.activeElement)) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last || !sidebarRef.current.contains(document.activeElement)) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('keydown', handleKeyDown);
+      if (triggerElementRef.current && typeof triggerElementRef.current.focus === 'function') {
+        triggerElementRef.current.focus();
+      }
+    };
+  }, [isOpenMobile, onCloseMobile]);
 
   const sections: NavSection[] = [
     {
@@ -177,7 +245,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       <aside
+        ref={sidebarRef}
         id="sidebar-navigation"
+        role={isOpenMobile ? 'dialog' : undefined}
+        aria-modal={isOpenMobile ? true : undefined}
         aria-label="Navigation principale"
         className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-border-default bg-surface transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 ${
           isOpenMobile ? 'translate-x-0 shadow-elevated' : '-translate-x-full'
@@ -199,8 +270,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
-          {/* Environment Badge */}
-          <div className="shrink-0">
+          {/* Environment Badge & Mobile Close Button */}
+          <div className="flex items-center gap-2 shrink-0">
             {isSandboxMode ? (
               <Badge variant="warning" className="px-1.5 py-0.2 text-[10px] font-medium">
                 {t.header.sandbox_mode}
@@ -209,6 +280,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Badge variant="success" className="px-1.5 py-0.2 text-[10px] font-medium">
                 {t.header.live_mode}
               </Badge>
+            )}
+
+            {isOpenMobile && onCloseMobile && (
+              <button
+                type="button"
+                onClick={onCloseMobile}
+                aria-label="Fermer le menu"
+                className="lg:hidden p-1.5 rounded-md text-txt-secondary hover:text-txt-primary hover:bg-surface-elevated focus:outline-none focus:ring-2 focus:ring-border-focus"
+              >
+                <X className="h-4 w-4" />
+              </button>
             )}
           </div>
         </div>

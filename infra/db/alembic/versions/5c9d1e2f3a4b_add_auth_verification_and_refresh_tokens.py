@@ -5,7 +5,7 @@ Revises: 4b8c0d2e3f1a
 Create Date: 2026-10-10 12:00:00.000000
 
 """
-from typing import Sequence, Union
+from typing import Sequence, Union, Any
 from alembic import op
 import sqlalchemy as sa
 
@@ -38,7 +38,7 @@ def upgrade() -> None:
     inspector = sa.inspect(bind)
 
     # 1. Add auth verification & consent fields to users
-    user_cols_to_add = [
+    user_cols_to_add: list[tuple[str, sa.Column[Any]]] = [
         ('email_verified', sa.Column('email_verified', sa.Boolean(), nullable=False, server_default=sa.false())),
         ('email_verification_token_hash', sa.Column('email_verification_token_hash', sa.String(length=128), nullable=True)),
         ('email_verification_expires_at', sa.Column('email_verification_expires_at', sa.DateTime(), nullable=True)),
@@ -64,7 +64,7 @@ def upgrade() -> None:
         op.create_index('ix_users_password_reset_token_hash', 'users', ['password_reset_token_hash'])
 
     # 2. Add is_demo and expires_at to workspaces
-    ws_cols_to_add = [
+    ws_cols_to_add: list[tuple[str, sa.Column[Any]]] = [
         ('is_demo', sa.Column('is_demo', sa.Boolean(), nullable=False, server_default=sa.false())),
         ('expires_at', sa.Column('expires_at', sa.DateTime(), nullable=True)),
     ]

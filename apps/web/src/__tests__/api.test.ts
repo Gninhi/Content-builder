@@ -122,4 +122,36 @@ describe('apiClient hardening (Finding H2)', () => {
     await expect(apiClient('/v1/workspaces')).rejects.toThrow(ApiError);
     expect(onAuthFailure).toHaveBeenCalledTimes(1);
   });
+
+  it('deduplicates concurrent in-flight GET requests (ANOM-35)', async () => {
+    let resolveFirstFetch: (res: Response) => void;
+    const fetchPromise = new Promise<Response>((resolve) => {
+      resolveFirstFetch = resolve;
+    });
+
+    const mockFetch = vi.fn().mockReturnValue(fetchPromise);
+    global.fetch = mockFetch;
+
+    // Fire 3 simultaneous GET calls to /v1/inbox
+    const call1 = apiClient('/v1/inbox');
+    const call2 = apiClient('/v1/inbox');
+    const call3 = apiClient('/v1/inbox');
+
+    // Only 1 real network fetch should have been dispatched
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    // Resolve the promise
+    resolveFirstFetch!(
+      new Response(JSON.stringify([{ id: 'draft-1' }]), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+
+    const [res1, res2, res3] = await Promise.all([call1, call2, call3]);
+    expect(res1).toEqual([{ id: 'draft-1' }]);
+    expect(res2).toEqual([{ id: 'draft-1' }]);
+    expect(res3).toEqual([{ id: 'draft-1' }]);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
 });

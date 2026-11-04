@@ -10,15 +10,16 @@ def test_liveness_endpoint_health():
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "healthy"
-    assert "version" in data
+    assert data["version"] == "2.0.0"
     assert "engine" in data
 
 
 def test_readiness_endpoint_ready():
-    """Verifies that /ready checks database, checkpointer, and LLM key."""
+    """Verifies that /ready checks database, checkpointer, and LLM key and returns version 2.0.0."""
     res = client.get("/ready")
     assert res.status_code in [200, 503]
     data = res.json()
+    assert data["version"] == "2.0.0"
     assert "status" in data
     assert "checks" in data
     assert "database" in data["checks"]

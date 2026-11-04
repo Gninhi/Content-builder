@@ -28,6 +28,7 @@ export default {
         },
         /* Semantic Text Tokens */
         txt: {
+          DEFAULT: 'var(--text-primary)',
           primary: 'var(--text-primary)',
           secondary: 'var(--text-secondary)',
           muted: 'var(--text-muted)',

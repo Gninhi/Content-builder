@@ -1,9 +1,11 @@
 import os
+import html
 import logging
 import re
-from typing import Dict, Any, List, Optional, Literal
+from typing import Dict, Any, List, Optional, Literal, cast
 from pydantic import BaseModel, Field
 from packages.security.env import is_production
+from packages.security.prompt_injection import PromptInjectionGuard
 from packages.observability.tracing import ObservabilityTracer
 from packages.prompts.registry import PromptRegistry
 from packages.cache.factory import (
@@ -14,7 +16,7 @@ from packages.cache.factory import (
 )
 from packages.tools.web_search import WebSearchTool
 from packages.tools.registry import AgentToolRegistry
-from services.orchestration.state.base import IdeaResearchState
+from services.orchestration.state.base import IdeaResearchState, SourceEvidenceDict
 from services.orchestration.structured_output import invoke_structured_output
 from services.orchestration.llm import resolve_and_get_llm, GeneratedIdeasBatch
 from packages.resilience.circuit_breaker import resolve_cycle_budget, BudgetExceededException, CycleBudget
@@ -175,7 +177,7 @@ def evidence_enrichment_node(state: IdeaResearchState) -> Dict[str, Any]:
                     updated = True
                     break
             if not updated:
-                sources.append(browsed)
+                sources.append(cast(SourceEvidenceDict, browsed))
     elif decision.recommended_action == "search_web":
         tool_res = registry.execute("web_search", {"query": decision.query_or_url, "limit": 2})
         enrichment_count += 1
@@ -183,7 +185,7 @@ def evidence_enrichment_node(state: IdeaResearchState) -> Dict[str, Any]:
             existing_urls = {s.get("url") for s in sources}
             for item in tool_res.data:
                 if isinstance(item, dict) and item.get("url") not in existing_urls:
-                    sources.append(item)
+                    sources.append(cast(SourceEvidenceDict, item))
                     existing_urls.add(item.get("url"))
     else:
         tool_res = None
@@ -287,6 +289,9 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
         claim_text = src.get("content") or src.get("title") or f"Signal vérifié sur {topic}"
         evidence_pool.append({
             "source_id": src_url,
+            "url": src.get("url") or src_url,
+            "title": src.get("title") or "",
+            "content": src.get("content") or claim_text,
             "claim": claim_text[:280],
         })
 
@@ -416,15 +421,37 @@ def ideation_and_scoring_node(state: IdeaResearchState) -> Dict[str, Any]:
         }
 
     try:
+        formatted_sources = []
+        for evidence_item in evidence_pool[:6]:
+            if isinstance(evidence_item, dict):
+                raw_url = str(evidence_item.get("url") or "unknown").strip()
+                safe_url = html.escape(raw_url, quote=True).replace("\n", "").replace("\r", "")
+                title = PromptInjectionGuard.defang_text(str(evidence_item.get("title", "")))
+                snippet = PromptInjectionGuard.defang_text(str(evidence_item.get("content", evidence_item.get("snippet", ""))))
+                formatted_sources.append(
+                    f'<untrusted_external_data origin="{safe_url}">\n'
+                    f'Titre: {title}\n'
+                    f'Extrait: {snippet}\n'
+                    f'</untrusted_external_data>'
+                )
+            else:
+                cleaned_src = PromptInjectionGuard.defang_text(str(evidence_item))
+                formatted_sources.append(
+                    f'<untrusted_external_data origin="unknown">\n'
+                    f'{cleaned_src}\n'
+                    f'</untrusted_external_data>'
+                )
+        sources_str = "\n\n".join(formatted_sources) if formatted_sources else "Aucune source externe."
+
         rendered_prompt = PromptRegistry.render(
             "idea_research",
             {
                 "pillars": ", ".join(pillars),
                 "audience": ", ".join(audience),
                 "topic_or_brief": topic,
-                "sources": str(evidence_pool[:6]),
-                "target_count": target_count
-            }
+                "sources": sources_str,
+                "target_count": target_count,
+            },
         )
         callback = ObservabilityTracer.get_callback_handler()
         callbacks = [callback] if callback else []

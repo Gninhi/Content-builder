@@ -3,7 +3,7 @@ import time
 import asyncio
 import random
 import logging
-from typing import Callable, Coroutine, Any, Dict
+from typing import Callable, Coroutine, Any, Dict, cast
 from pathlib import Path
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv, find_dotenv
@@ -17,7 +17,7 @@ _is_test_mode = (
 load_dotenv(find_dotenv(usecwd=True), override=not _is_test_mode)
 
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -145,13 +145,13 @@ async def lifespan(app: FastAPI):
                 "Transitioning to PUBLISH_UNKNOWN for safe at-most-once reconciliation."
             )
             ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISH_UNKNOWN)
-            job.status = ContentStatus.PUBLISH_UNKNOWN.value  # type: ignore[assignment]
+            setattr(job, "status", ContentStatus.PUBLISH_UNKNOWN.value)
             variant = db.query(ContentVariantModel).filter(ContentVariantModel.id == job.variant_id).first()
             if variant:
                 var_status = ContentStatus.parse(str(variant.status))
                 if var_status == ContentStatus.PUBLISHING:
                     ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISH_UNKNOWN)
-                variant.status = ContentStatus.PUBLISH_UNKNOWN.value  # type: ignore[assignment]
+                setattr(variant, "status", ContentStatus.PUBLISH_UNKNOWN.value)
         if stale_orphan_jobs:
             db.commit()
 
@@ -163,7 +163,7 @@ async def lifespan(app: FastAPI):
             if not default_ws:
                 ws = repo.create_workspace(name="Default Editorial Workspace", timezone="UTC", owner_id="owner_martial")
                 # Force the ID to be ws_default for consistent quickstart
-                ws.id = "ws_default"  # type: ignore[assignment]
+                setattr(ws, "id", "ws_default")
                 db.commit()
 
                 repo.create_or_version_brand_profile(
@@ -265,14 +265,15 @@ app = FastAPI(
 
 # Attach resilient rate limiter
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, safe_rate_limit_exceeded_handler)  # type: ignore[arg-type]
+_rate_limit_handler = cast(Callable[[Request, Any], Response], safe_rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 try:
     import redis.exceptions
-    app.add_exception_handler(redis.exceptions.ConnectionError, safe_rate_limit_exceeded_handler)  # type: ignore[arg-type]
-    app.add_exception_handler(redis.exceptions.RedisError, safe_rate_limit_exceeded_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(redis.exceptions.ConnectionError, _rate_limit_handler)
+    app.add_exception_handler(redis.exceptions.RedisError, _rate_limit_handler)
 except ImportError:
     pass
-app.add_exception_handler(ConnectionError, safe_rate_limit_exceeded_handler)  # type: ignore[arg-type]
+app.add_exception_handler(ConnectionError, _rate_limit_handler)
 app.add_middleware(SlowAPIMiddleware)
 
 # Restrictive CORS configuration
@@ -526,7 +527,7 @@ def readiness_check():
         content={
             "status": "ready" if is_ready else "not_ready",
             "checks": checks,
-            "version": "1.0.0"
+            "version": app.version
         }
     )
 

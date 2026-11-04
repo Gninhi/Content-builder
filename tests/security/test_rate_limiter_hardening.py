@@ -54,3 +54,21 @@ def test_rate_limit_global_is_honored(monkeypatch):
     limiter_instance = _init_limiter()
     limit_items = [item.limit for lg in limiter_instance._default_limits for item in lg]
     assert any(limit.amount == 45 for limit in limit_items)
+
+
+def test_x_forwarded_for_spoofing_leftmost_injection_rejected(monkeypatch):
+    """
+    When an attacker prepends a forged IP into X-Forwarded-For (e.g. 1.2.3.4, 203.0.113.195, 10.0.0.1),
+    right-to-left traversal strips the trusted proxy 10.0.0.1 and selects the true client 203.0.113.195,
+    ignoring the leftmost spoofed 1.2.3.4.
+    """
+    monkeypatch.setenv("TRUSTED_PROXIES", "127.0.0.1,::1,10.0.0.0/8")
+    monkeypatch.setenv("TRUST_ALL_PROXIES", "false")
+
+    req = MagicMock()
+    req.client.host = "127.0.0.1"
+    req.headers = {"X-Forwarded-For": "1.2.3.4, 203.0.113.195, 10.0.0.1"}
+
+    resolved_ip = get_client_ip(req)
+    assert resolved_ip == "203.0.113.195"
+

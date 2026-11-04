@@ -50,9 +50,9 @@ export const Topbar: React.FC<TopbarProps> = ({
         </button>
 
         <div className="min-w-0">
-          <h1 className="text-sm md:text-base font-semibold text-txt-primary tracking-tight truncate">
+          <span className="text-sm md:text-base font-semibold text-txt-primary tracking-tight truncate block">
             {currentScreenTitle}
-          </h1>
+          </span>
           <div className="flex items-center gap-2 text-xs text-txt-muted">
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3 text-accent" />

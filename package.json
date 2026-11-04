@@ -1,0 +1,17 @@
+{
+  "name": "contentops-harness-root",
+  "private": true,
+  "version": "2.0.0",
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "web:dev": "cd apps/web && npm run dev",
+    "web:build": "cd apps/web && npm run build",
+    "web:test": "cd apps/web && npm test",
+    "web:lint": "cd apps/web && npm run lint",
+    "test:all": "cd apps/web && npm test",
+    "lint": "cd apps/web && npm run lint",
+    "build": "cd apps/web && npm run build"
+  }
+}

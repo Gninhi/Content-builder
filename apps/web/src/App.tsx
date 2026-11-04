@@ -8,14 +8,17 @@ import {
   useNavigate,
 } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { LanguageProvider } from './context/LanguageContext';
+import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import { AppShell } from './components/layout/AppShell';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { useDocumentTitle } from './hooks/useDocumentTitle';
+
+// Lazy-loaded auth screen (ANOM-36)
+const AuthScreen = React.lazy(() => import('./screens/AuthScreen').then(m => ({ default: m.AuthScreen })));
 
 // Primary screens (critical path)
-import { AuthScreen } from './screens/AuthScreen';
 import { DashboardScreen } from './screens/DashboardScreen';
 import { InboxScreen } from './screens/InboxScreen';
 
@@ -104,9 +107,25 @@ const RootRedirect: React.FC = () => {
   return <Navigate to="/dashboard" replace />;
 };
 
+const SCREEN_TITLES: Record<string, { fr: string; en: string }> = {
+  dashboard: { fr: 'Tableau de bord', en: 'Dashboard' },
+  inbox: { fr: 'Revue HITL', en: 'HITL Review' },
+  calendar: { fr: 'Calendrier', en: 'Calendar' },
+  veille: { fr: 'Veille', en: 'Monitoring' },
+  ideation: { fr: 'Idéation', en: 'Ideation' },
+  insights: { fr: 'Insights', en: 'Insights' },
+  brand: { fr: 'Profil de Marque', en: 'Brand Profile' },
+  connections: { fr: 'Connexions', en: 'Connections' },
+  settings: { fr: 'Paramètres', en: 'Settings' },
+  agents: { fr: "Banc d'Essai", en: 'Agents' },
+  styleguide: { fr: 'Guide de Style', en: 'Style Guide' },
+  profile: { fr: 'Mon Profil', en: 'Profile' },
+};
+
 const AuthenticatedAppLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { language } = useLanguage();
 
   // Extract active screen identifier from URL pathname (e.g., /ui/veille -> veille)
   const currentScreen = useMemo(() => {
@@ -114,6 +133,13 @@ const AuthenticatedAppLayout: React.FC = () => {
     const screen = segments[0] || 'dashboard';
     return KNOWN_SCREENS.has(screen) ? screen : 'dashboard';
   }, [location.pathname]);
+
+  const screenTitle = useMemo(() => {
+    const info = SCREEN_TITLES[currentScreen] || { fr: 'Tableau de bord', en: 'Dashboard' };
+    return language === 'en' ? info.en : info.fr;
+  }, [currentScreen, language]);
+
+  useDocumentTitle(screenTitle);
 
   const handleNavigate = (screen: string) => {
     navigate(`/${screen}`);
@@ -153,6 +179,9 @@ const AuthenticatedAppLayout: React.FC = () => {
 
 const MainRouter: React.FC = () => {
   const { isAuthenticated, isInitializing } = useAuth();
+  const { language } = useLanguage();
+
+  useDocumentTitle(!isAuthenticated ? (language === 'en' ? 'Sign In' : 'Connexion') : undefined);
 
   if (isInitializing) {
     return (
@@ -168,7 +197,22 @@ const MainRouter: React.FC = () => {
   }
 
   if (!isAuthenticated) {
-    return <AuthScreen />;
+    return (
+      <React.Suspense
+        fallback={
+          <div className="flex min-h-screen items-center justify-center bg-app text-txt-primary">
+            <div className="flex flex-col items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-accent-foreground shadow-subtle animate-pulse">
+                <span className="font-bold text-lg font-mono">CO</span>
+              </div>
+              <span className="text-xs font-mono text-txt-muted">Chargement...</span>
+            </div>
+          </div>
+        }
+      >
+        <AuthScreen />
+      </React.Suspense>
+    );
   }
 
   return (

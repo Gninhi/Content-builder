@@ -13,7 +13,6 @@ from services.orchestration.structured_output import invoke_structured_output
 from services.orchestration.llm import get_gemini_model, resolve_and_get_llm, GeneratedVariant
 
 from packages.resilience.circuit_breaker import resolve_cycle_budget
-from packages.security.env import is_production
 
 logger = logging.getLogger(__name__)
 

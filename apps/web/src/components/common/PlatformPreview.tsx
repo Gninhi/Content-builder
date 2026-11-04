@@ -90,18 +90,34 @@ export const LinkedInPreviewStrategy: PlatformPreviewStrategy = {
         {/* LinkedIn Character Counter & Action Bar */}
         <div className="pt-2 border-t border-border-subtle flex items-center justify-between text-txt-muted text-xs">
           <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1 hover:text-txt-primary cursor-pointer transition-colors">
+            <button
+              type="button"
+              aria-label={t.preview.like}
+              className="flex items-center gap-1 hover:text-txt-primary cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-border-focus rounded-sm px-1 py-0.5"
+            >
               <ThumbsUp className="w-3.5 h-3.5" /> {t.preview.like}
-            </span>
-            <span className="flex items-center gap-1 hover:text-txt-primary cursor-pointer transition-colors">
+            </button>
+            <button
+              type="button"
+              aria-label={t.preview.comment}
+              className="flex items-center gap-1 hover:text-txt-primary cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-border-focus rounded-sm px-1 py-0.5"
+            >
               <MessageSquare className="w-3.5 h-3.5" /> {t.preview.comment}
-            </span>
-            <span className="flex items-center gap-1 hover:text-txt-primary cursor-pointer transition-colors">
+            </button>
+            <button
+              type="button"
+              aria-label={t.preview.repost}
+              className="flex items-center gap-1 hover:text-txt-primary cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-border-focus rounded-sm px-1 py-0.5"
+            >
               <Repeat2 className="w-3.5 h-3.5" /> {t.preview.repost}
-            </span>
-            <span className="flex items-center gap-1 hover:text-txt-primary cursor-pointer transition-colors">
+            </button>
+            <button
+              type="button"
+              aria-label={t.preview.send}
+              className="flex items-center gap-1 hover:text-txt-primary cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-border-focus rounded-sm px-1 py-0.5"
+            >
               <Send className="w-3.5 h-3.5" /> {t.preview.send}
-            </span>
+            </button>
           </div>
           <span className={`text-[11px] ${isOverflow ? 'text-status-danger-text font-bold' : 'text-txt-muted'}`}>
             {charCount.toLocaleString()} / {charLimit.toLocaleString()}
@@ -170,12 +186,42 @@ export const XPreviewStrategy: PlatformPreviewStrategy = {
 
         {/* X Character Counter & Action Bar */}
         <div className="pt-2 border-t border-border-subtle flex items-center justify-between text-txt-muted text-xs">
-          <div className="flex items-center gap-4">
-            <MessageSquare className="w-3.5 h-3.5 hover:text-txt-primary cursor-pointer transition-colors" />
-            <Repeat2 className="w-3.5 h-3.5 hover:text-txt-primary cursor-pointer transition-colors" />
-            <Heart className="w-3.5 h-3.5 hover:text-txt-primary cursor-pointer transition-colors" />
-            <Bookmark className="w-3.5 h-3.5 hover:text-txt-primary cursor-pointer transition-colors" />
-            <Share className="w-3.5 h-3.5 hover:text-txt-primary cursor-pointer transition-colors" />
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              aria-label={t.preview.comment || 'Commenter'}
+              className="p-1 hover:text-txt-primary cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-border-focus rounded-sm"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label={t.preview.repost || 'Republier'}
+              className="p-1 hover:text-txt-primary cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-border-focus rounded-sm"
+            >
+              <Repeat2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label={t.preview.like || 'Aimer'}
+              className="p-1 hover:text-txt-primary cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-border-focus rounded-sm"
+            >
+              <Heart className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label="Enregistrer dans les signets"
+              className="p-1 hover:text-txt-primary cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-border-focus rounded-sm"
+            >
+              <Bookmark className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label="Partager"
+              className="p-1 hover:text-txt-primary cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-border-focus rounded-sm"
+            >
+              <Share className="w-3.5 h-3.5" />
+            </button>
           </div>
           <span className={`text-[11px] ${isOverflow ? 'text-status-danger-text font-bold' : 'text-txt-muted'}`}>
             {charCount} / {charLimit}

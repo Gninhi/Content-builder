@@ -68,9 +68,28 @@ export const CalendarScreen: React.FC = () => {
     })),
   ];
 
+  const now = new Date();
+  const dayOfWeek = (now.getDay() + 6) % 7;
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - dayOfWeek);
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
+  endOfWeek.setHours(23, 59, 59, 999);
+
   const filteredPosts = allPosts.filter((p) => {
-    if (platformFilter === 'all') return true;
-    return p.platform.toLowerCase() === platformFilter.toLowerCase();
+    if (platformFilter !== 'all' && p.platform.toLowerCase() !== platformFilter.toLowerCase()) {
+      return false;
+    }
+    if (viewMode === 'week') {
+      const dateStr = p.scheduled_at || (p as any).published_at;
+      if (!dateStr) return false;
+      const postDate = new Date(dateStr);
+      if (isNaN(postDate.getTime())) return false;
+      return postDate >= startOfWeek && postDate <= endOfWeek;
+    }
+    return true;
   });
 
   const checkCollision = (dateIso: string, currentJobId?: string) => {

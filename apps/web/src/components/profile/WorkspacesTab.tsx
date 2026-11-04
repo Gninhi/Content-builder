@@ -60,7 +60,7 @@ export const WorkspacesTab: React.FC<WorkspacesTabProps> = ({ profile }) => {
                 {ws.timezone}
               </span>
               {ws.is_owner && (
-                <span className="text-emerald-500 font-medium text-[11px] flex items-center gap-1">
+                <span className="text-status-success-text font-medium text-[11px] flex items-center gap-1">
                   <Shield className="h-3 w-3" />
                   {isEn ? 'Primary Owner' : 'Propriétaire Principal'}
                 </span>

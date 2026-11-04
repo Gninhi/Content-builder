@@ -10,7 +10,7 @@ from packages.domain.state_machine import ContentStatus, ContentStateMachine
 from services.publisher.worker import PublisherWorker
 from apps.api.dependencies import get_repository, UserContext, require_roles
 from infra.db.repository import ContentOpsRepository
-from infra.db.models import PublicationJobModel, ContentVariantModel, ContentPackageModel, ContentBriefModel
+from infra.db.models import PublicationJobModel
 
 router = APIRouter(tags=["Publications & Scheduling"])
 
@@ -86,12 +86,12 @@ def cancel_publication_job(
 
     # State machine transition enforcement
     ContentStateMachine.transition(current_status, ContentStatus.ARCHIVED)
-    job.status = ContentStatus.ARCHIVED.value
+    setattr(job, "status", ContentStatus.ARCHIVED.value)
 
     if job.variant:
         var_status = ContentStatus.parse(str(job.variant.status))
         ContentStateMachine.transition(var_status, ContentStatus.APPROVED)
-        job.variant.status = ContentStatus.APPROVED.value
+        setattr(job.variant, "status", ContentStatus.APPROVED.value)
 
     repo.db.commit()
 

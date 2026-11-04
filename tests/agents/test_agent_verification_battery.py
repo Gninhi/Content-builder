@@ -4,7 +4,7 @@ from packages.domain.idempotency import compute_payload_hash
 from services.orchestration.nodes.research import ideation_and_scoring_node
 from services.orchestration.nodes.production import generate_variants_node
 from services.orchestration.nodes.quality import quality_gate_node
-from services.orchestration.nodes.approval import human_review_decision_node
+from tests.fixtures.approval_graph import human_review_decision_node
 from services.orchestration.nodes.insights import generate_strategy_insights_node
 
 

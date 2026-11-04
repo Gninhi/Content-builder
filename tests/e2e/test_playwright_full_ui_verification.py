@@ -11,7 +11,8 @@ Validates:
 
 import os
 import pytest
-from playwright.sync_api import sync_playwright, Page
+pytest.importorskip("playwright")
+from playwright.sync_api import sync_playwright, Page  # type: ignore[import-untyped]
 
 CHROME_BIN = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 BASE_URL = os.environ.get("CONTENTOPS_BASE_URL", "http://localhost:3000/ui/")
@@ -205,13 +206,15 @@ def test_03_exhaustive_sidebar_links_navigation(page: Page):
         if nav_button.count() > 0 and nav_button.first.is_visible():
             nav_button.first.click()
         else:
-            page.evaluate(f"window.location.hash = '{screen_id}'")
+            page.evaluate(
+                f"window.history.pushState(null, '', '/ui/{screen_id}'); window.dispatchEvent(new PopStateEvent('popstate')); window.location.hash = '{screen_id}';"
+            )
 
         page.wait_for_timeout(1000)
 
-        # Confirm hash is updated
-        current_hash = page.evaluate("window.location.hash")
-        assert screen_id in current_hash, f"Expected hash #{screen_id}, got {current_hash}"
+        # Confirm pathname is updated (aligned with HTML5 routing)
+        current_path = page.evaluate("window.location.pathname")
+        assert screen_id in current_path or f"/{screen_id}" in current_path, f"Expected path containing /{screen_id}, got {current_path}"
 
         # Verify page content is rendered (not empty or crashed)
         root_content = page.inner_html("#root")
@@ -222,7 +225,9 @@ def test_03_exhaustive_sidebar_links_navigation(page: Page):
         assert found_keyword, f"Screen {screen_id} should display at least one of {expected_keywords}"
 
     # Return to dashboard
-    page.evaluate("window.location.hash = 'dashboard'")
+    page.evaluate(
+        "window.history.pushState(null, '', '/ui/dashboard'); window.dispatchEvent(new PopStateEvent('popstate')); window.location.hash = 'dashboard';"
+    )
     page.wait_for_timeout(500)
     assert len(page._page_errors) == 0, f"Page errors during navigation cycle: {page._page_errors}"
 
@@ -245,10 +250,10 @@ def test_04_dashboard_screen_components_and_actions(page: Page):
     if inbox_link.is_visible():
         inbox_link.click()
         page.wait_for_timeout(1000)
-        assert "inbox" in page.evaluate("window.location.hash")
+        assert "inbox" in page.evaluate("window.location.pathname")
 
     # Navigate back to dashboard
-    page.evaluate("window.location.hash = 'dashboard'")
+    page.evaluate("window.history.pushState(null, '', '/ui/dashboard'); window.dispatchEvent(new PopStateEvent('popstate')); window.location.hash = 'dashboard';")
     page.wait_for_timeout(500)
     assert len(page._page_errors) == 0
 
@@ -698,7 +703,7 @@ def test_17_responsive_mobile_viewport_and_drawer(page: Page):
     if veille_nav.is_visible():
         veille_nav.click()
         page.wait_for_timeout(800)
-        assert "veille" in page.evaluate("window.location.hash")
+        assert "veille" in page.evaluate("window.location.pathname")
 
     # Restore desktop viewport
     page.set_viewport_size({"width": 1440, "height": 900})

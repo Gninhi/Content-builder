@@ -43,47 +43,72 @@ class CircuitBreaker:
         self.state = CircuitState.CLOSED
         self.failure_count = 0
         self.last_failure_time: Optional[float] = None
+        self._half_open_in_flight: int = 0
+        self._lock = threading.RLock()
 
-    def can_execute(self) -> bool:
-        if self.state == CircuitState.CLOSED:
-            return True
-        if self.state == CircuitState.OPEN:
-            if self.last_failure_time and (time.time() - self.last_failure_time >= self.recovery_timeout):
-                logger.info(f"[{self.name}] Recovery timeout elapsed. Transitioning OPEN -> HALF_OPEN")
-                self.state = CircuitState.HALF_OPEN
+    def can_execute(self, reserve_probe: bool = False) -> bool:
+        with self._lock:
+            if self.state == CircuitState.CLOSED:
                 return True
+            if self.state == CircuitState.OPEN:
+                if self.last_failure_time and (time.time() - self.last_failure_time >= self.recovery_timeout):
+                    logger.info(f"[{self.name}] Recovery timeout elapsed. Transitioning OPEN -> HALF_OPEN (probe reserved)")
+                    self.state = CircuitState.HALF_OPEN
+                    if reserve_probe:
+                        self._half_open_in_flight = 1
+                    return True
+                return False
+            if self.state == CircuitState.HALF_OPEN:
+                if self._half_open_in_flight == 0:
+                    if reserve_probe:
+                        self._half_open_in_flight = 1
+                    return True
+                # Concurrency throttled: probe is already executing
+                return False
             return False
-        if self.state == CircuitState.HALF_OPEN:
-            return True
-        return False
 
     def record_success(self) -> None:
-        if self.state in (CircuitState.HALF_OPEN, CircuitState.OPEN):
-            logger.info(f"[{self.name}] Call succeeded in {self.state.value}. Resetting to CLOSED.")
-        self.state = CircuitState.CLOSED
-        self.failure_count = 0
-        self.last_failure_time = None
+        with self._lock:
+            if self.state in (CircuitState.HALF_OPEN, CircuitState.OPEN):
+                logger.info(f"[{self.name}] Call succeeded in {self.state.value}. Resetting to CLOSED.")
+            self.state = CircuitState.CLOSED
+            self.failure_count = 0
+            self.last_failure_time = None
+            self._half_open_in_flight = 0
 
     def record_failure(self, exc: Exception) -> None:
-        self.failure_count += 1
-        self.last_failure_time = time.time()
-        logger.warning(f"[{self.name}] Failure #{self.failure_count}: {exc}")
-        if self.failure_count >= self.failure_threshold:
-            self.state = CircuitState.OPEN
-            logger.error(f"[{self.name}] Threshold {self.failure_threshold} reached. Tripping circuit to OPEN.")
+        with self._lock:
+            self._half_open_in_flight = 0
+            self.failure_count += 1
+            self.last_failure_time = time.time()
+            logger.warning(f"[{self.name}] Failure #{self.failure_count}: {exc}")
+            if self.state == CircuitState.HALF_OPEN or self.failure_count >= self.failure_threshold:
+                self.state = CircuitState.OPEN
+                logger.error(f"[{self.name}] Tripping circuit to OPEN.")
 
     def execute(self, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
-        if not self.can_execute():
-            raise CircuitBreakerOpenException(
-                f"[{self.name}] Circuit is OPEN. Calls are blocked until recovery timeout ({self.recovery_timeout}s)."
-            )
+        with self._lock:
+            if not self.can_execute(reserve_probe=True):
+                raise CircuitBreakerOpenException(
+                    f"[{self.name}] Circuit is OPEN or probe in flight. Calls are blocked until recovery timeout ({self.recovery_timeout}s)."
+                )
+            is_probe = (self.state == CircuitState.HALF_OPEN)
+
+        executed = False
         try:
             result = fn(*args, **kwargs)
+            executed = True
             self.record_success()
             return result
         except Exception as exc:
+            executed = True
             self.record_failure(exc)
             raise
+        finally:
+            if not executed and is_probe:
+                with self._lock:
+                    if self._half_open_in_flight > 0:
+                        self._half_open_in_flight -= 1
 
 
 def retry_with_backoff(

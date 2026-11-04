@@ -1,106 +1,13 @@
-import time
-import os
-import threading
-from typing import Optional, Dict, Tuple
+from typing import Optional
 from fastapi import HTTPException, Depends, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from infra.db.database import get_db, set_db_workspace_context
 from infra.db.repository import ContentOpsRepository
 from packages.security.auth import decode_access_token
+from packages.security.session_cache import AuthSessionCache
 
 security = HTTPBearer(auto_error=False)
-
-
-class AuthSessionCache:
-    """
-    Thread-safe in-memory TTL cache for session validation and RBAC role checks (PERF-01 / Lot 2).
-    Eliminates redundant sequential database hits (3 to 4 per request) during authenticated API traffic.
-    """
-    _lock = threading.Lock()
-    _user_status_cache: Dict[str, Tuple[bool, Optional[float], float]] = {}  # user_id -> (is_active, tokens_valid_after, expires_at)
-    _session_revoked_cache: Dict[str, Tuple[bool, float]] = {}  # jti -> (is_revoked, expires_at)
-    _member_role_cache: Dict[Tuple[str, str], Tuple[Optional[str], float]] = {}  # (ws_id, user_id) -> (role_or_none, expires_at)
-
-    DEFAULT_TTL: float = float(os.getenv("AUTH_CACHE_TTL_SECONDS", "60.0"))
-
-    @classmethod
-    def get_user_status(cls, user_id: str) -> Optional[Tuple[bool, Optional[float]]]:
-        now = time.monotonic()
-        with cls._lock:
-            entry = cls._user_status_cache.get(user_id)
-            if entry and entry[2] > now:
-                return entry[0], entry[1]
-            if entry:
-                cls._user_status_cache.pop(user_id, None)
-            return None
-
-    @classmethod
-    def set_user_status(cls, user_id: str, is_active: bool, tokens_valid_after: Optional[float] = None, ttl: Optional[float] = None) -> None:
-        expires_at = time.monotonic() + (ttl if ttl is not None else cls.DEFAULT_TTL)
-        with cls._lock:
-            cls._user_status_cache[user_id] = (is_active, tokens_valid_after, expires_at)
-
-    @classmethod
-    def is_session_revoked(cls, jti: str) -> Optional[bool]:
-        now = time.monotonic()
-        with cls._lock:
-            entry = cls._session_revoked_cache.get(jti)
-            if entry and entry[1] > now:
-                return entry[0]
-            if entry:
-                cls._session_revoked_cache.pop(jti, None)
-            return None
-
-    @classmethod
-    def set_session_revoked(cls, jti: str, is_revoked: bool, ttl: Optional[float] = None) -> None:
-        expires_at = time.monotonic() + (ttl if ttl is not None else cls.DEFAULT_TTL)
-        with cls._lock:
-            cls._session_revoked_cache[jti] = (is_revoked, expires_at)
-
-    @classmethod
-    def get_member_role(cls, workspace_id: str, user_id: str) -> Optional[str]:
-        now = time.monotonic()
-        key = (workspace_id, user_id)
-        with cls._lock:
-            entry = cls._member_role_cache.get(key)
-            if entry and entry[1] > now:
-                return entry[0]
-            if entry:
-                cls._member_role_cache.pop(key, None)
-            return None
-
-    @classmethod
-    def set_member_role(cls, workspace_id: str, user_id: str, role: Optional[str], ttl: Optional[float] = None) -> None:
-        expires_at = time.monotonic() + (ttl if ttl is not None else cls.DEFAULT_TTL)
-        key = (workspace_id, user_id)
-        with cls._lock:
-            cls._member_role_cache[key] = (role, expires_at)
-
-    @classmethod
-    def invalidate_user(cls, user_id: str) -> None:
-        with cls._lock:
-            cls._user_status_cache.pop(user_id, None)
-            keys_to_del = [k for k in cls._member_role_cache if k[1] == user_id]
-            for k in keys_to_del:
-                cls._member_role_cache.pop(k, None)
-
-    @classmethod
-    def invalidate_session(cls, jti: str) -> None:
-        with cls._lock:
-            cls._session_revoked_cache[jti] = (True, time.monotonic() + cls.DEFAULT_TTL)
-
-    @classmethod
-    def invalidate_member_role(cls, workspace_id: str, user_id: str) -> None:
-        with cls._lock:
-            cls._member_role_cache.pop((workspace_id, user_id), None)
-
-    @classmethod
-    def clear_all(cls) -> None:
-        with cls._lock:
-            cls._user_status_cache.clear()
-            cls._session_revoked_cache.clear()
-            cls._member_role_cache.clear()
 
 
 class UserContext:
@@ -168,7 +75,7 @@ def get_current_user(
                 detail="Compte utilisateur désactivé. Accès refusé.",
                 headers={"WWW-Authenticate": "Bearer"}
             )
-        is_active = user_record.is_active if user_record else True
+        is_active = bool(user_record.is_active) if user_record else True
         tokens_valid_after = None
         if user_record and isinstance(user_record.ui_preferences, dict):
             tva = user_record.ui_preferences.get("_tokens_valid_after")
@@ -247,8 +154,9 @@ def require_roles(*allowed_roles: str):
                     WorkspaceMemberModel.user_id == user.user_id,
                 ).first()
                 if member:
-                    user.role = member.role
-                    AuthSessionCache.set_member_role(user.workspace_id, user.user_id, member.role)
+                    role_str = str(member.role)
+                    user.role = role_str
+                    AuthSessionCache.set_member_role(user.workspace_id, user.user_id, role_str)
                 else:
                     ws = db.query(WorkspaceModel).filter(WorkspaceModel.id == user.workspace_id).first()
                     if ws and str(ws.owner_id) == user.user_id:

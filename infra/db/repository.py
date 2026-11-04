@@ -1,10 +1,11 @@
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy.exc import IntegrityError
-from typing import List, Optional, Dict, Any, Tuple
-from datetime import datetime, timezone, timedelta
+import logging
 import uuid
 import hashlib
 import re
+from typing import List, Optional, Dict, Any, Tuple
+from datetime import datetime, timezone, timedelta
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.exc import IntegrityError
 
 
 from infra.db.models import (
@@ -43,6 +44,8 @@ from infra.db.repos import (
     AuthRepository,
     LLMSettingsRepository,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class NotFoundError(Exception):
@@ -294,23 +297,23 @@ class ContentOpsRepository:
         if not source:
             return None
         if name is not None:
-            source.name = name
+            setattr(source, "name", name)
         if url is not None:
-            source.url = url
+            setattr(source, "url", url)
         if axis is not None:
-            source.axis = axis.lower()
+            setattr(source, "axis", axis.lower())
         if trust_level is not None:
-            source.trust_level = trust_level.upper()
+            setattr(source, "trust_level", trust_level.upper())
         if source_type is not None:
-            source.source_type = source_type.lower()
+            setattr(source, "source_type", source_type.lower())
         if is_active is not None:
-            source.is_active = is_active
+            setattr(source, "is_active", is_active)
         if health_status is not None:
-            source.health_status = health_status
+            setattr(source, "health_status", health_status)
         if error_message is not None:
-            source.error_message = error_message
+            setattr(source, "error_message", error_message)
         if last_polled_at is not None:
-            source.last_polled_at = last_polled_at
+            setattr(source, "last_polled_at", last_polled_at)
         self.db.commit()
         self.db.refresh(source)
         return source
@@ -420,18 +423,18 @@ class ContentOpsRepository:
         run = self.db.query(VeilleRunModel).filter(VeilleRunModel.id == run_id).first()
         if not run:
             return None
-        run.status = status
-        run.sources_contacted = sources_contacted
-        run.sources_failed = sources_failed
-        run.signals_discovered = signals_discovered
-        run.signals_saved = signals_saved
-        run.signals_qualified = signals_qualified
-        run.signals_rejected = signals_rejected
+        setattr(run, "status", status)
+        setattr(run, "sources_contacted", sources_contacted)
+        setattr(run, "sources_failed", sources_failed)
+        setattr(run, "signals_discovered", signals_discovered)
+        setattr(run, "signals_saved", signals_saved)
+        setattr(run, "signals_qualified", signals_qualified)
+        setattr(run, "signals_rejected", signals_rejected)
         if error_summary:
-            run.error_summary = error_summary
+            setattr(run, "error_summary", error_summary)
         if execution_metrics:
-            run.execution_metrics = execution_metrics
-        run.completed_at = utc_now()
+            setattr(run, "execution_metrics", execution_metrics)
+        setattr(run, "completed_at", utc_now())
         self.db.commit()
         self.db.refresh(run)
         return run
@@ -490,12 +493,12 @@ class ContentOpsRepository:
             .first()
         )
         if existing:
-            if qualification_score > existing.qualification_score:
-                existing.qualification_score = round(qualification_score, 2)
-                existing.qualification_criteria = qualification_criteria
-                existing.enrichment_status = enrichment_status
+            if qualification_score > float(existing.qualification_score or 0.0):
+                setattr(existing, "qualification_score", round(qualification_score, 2))
+                setattr(existing, "qualification_criteria", qualification_criteria)
+                setattr(existing, "enrichment_status", enrichment_status)
                 if facts:
-                    existing.facts = facts
+                    setattr(existing, "facts", facts)
                 self.db.commit()
                 self.db.refresh(existing)
             return existing
@@ -556,7 +559,7 @@ class ContentOpsRepository:
         sig = self.get_signal(signal_id, workspace_id)
         if not sig:
             return None
-        sig.status = status
+        setattr(sig, "status", status)
         self.db.commit()
         self.db.refresh(sig)
         return sig
@@ -596,7 +599,7 @@ class ContentOpsRepository:
         )
         if existing:
             if signal_id and not existing.signal_id:
-                existing.signal_id = signal_id
+                setattr(existing, "signal_id", signal_id)
                 self.db.commit()
                 self.db.refresh(existing)
             return existing
@@ -660,7 +663,7 @@ class ContentOpsRepository:
         existing = self.get_idea_by_signal_id(signal_id=signal_id, workspace_id=workspace_id)
         if existing:
             if signal.status != "CONVERTED":
-                signal.status = "CONVERTED"
+                setattr(signal, "status", "CONVERTED")
                 self.db.commit()
             return existing
 
@@ -709,20 +712,20 @@ class ContentOpsRepository:
 
         idea = self.save_idea(
             workspace_id=workspace_id,
-            title=signal.title,
-            angle=signal.executive_takeaway or signal.summary,
+            title=str(signal.title),
+            angle=str(signal.executive_takeaway or signal.summary),
             pillar=pillar,
-            audience=audience,
+            audience=str(audience),
             evidence_refs=evidence_refs,
             novelty_score=novelty,
             relevance_score=relevance,
             effort_score=effort,
             priority=priority,
             risks=["À valider avec le profil de marque avant production"],
-            signal_id=signal.id,
+            signal_id=str(signal.id),
         )
 
-        signal.status = "CONVERTED"
+        setattr(signal, "status", "CONVERTED")
         self.db.commit()
         self.db.refresh(idea)
         return idea
@@ -757,6 +760,21 @@ class ContentOpsRepository:
         self.db.refresh(brief)
         return brief
 
+    def get_brief(self, brief_id: str, workspace_id: Optional[str] = None) -> Optional[ContentBriefModel]:
+        query = self.db.query(ContentBriefModel).filter(ContentBriefModel.id == brief_id)
+        if workspace_id:
+            query = query.filter(ContentBriefModel.workspace_id == workspace_id)
+        return query.first()
+
+    def list_briefs(self, workspace_id: str, limit: int = 50) -> List[ContentBriefModel]:
+        return (
+            self.db.query(ContentBriefModel)
+            .filter(ContentBriefModel.workspace_id == workspace_id)
+            .order_by(ContentBriefModel.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+
     def create_content_package(
         self,
         brief_id: str,
@@ -767,7 +785,7 @@ class ContentOpsRepository:
     ) -> ContentPackageModel:
         if not workspace_id:
             brief = self.db.query(ContentBriefModel).filter(ContentBriefModel.id == brief_id).first()
-            workspace_id = brief.workspace_id if brief else "ws_default"
+            workspace_id = str(brief.workspace_id) if brief else "ws_default"
 
         package = ContentPackageModel(
             id=f"pkg_{uuid.uuid4().hex[:12]}",
@@ -812,7 +830,7 @@ class ContentOpsRepository:
 
         if not workspace_id:
             package = self.db.query(ContentPackageModel).filter(ContentPackageModel.id == package_id).first()
-            workspace_id = package.workspace_id if package else "ws_default"
+            workspace_id = str(package.workspace_id) if package else "ws_default"
 
         variant = ContentVariantModel(
             id=f"var_{uuid.uuid4().hex[:12]}",
@@ -1037,7 +1055,7 @@ class ContentOpsRepository:
     ) -> MetricSnapshotModel:
         if not workspace_id:
             post = self.db.query(PublishedPostModel).filter(PublishedPostModel.id == post_id).first()
-            workspace_id = post.workspace_id if post else "ws_default"
+            workspace_id = str(post.workspace_id) if post else "ws_default"
 
         metric = MetricSnapshotModel(
             id=f"met_{uuid.uuid4().hex[:12]}",
@@ -1361,6 +1379,14 @@ class ContentOpsRepository:
         setattr(user, "full_name", "Compte Supprimé")
         setattr(user, "display_name", None)
         setattr(user, "job_title", None)
+        if user.avatar_url:
+            from pathlib import Path
+            avatar_path = Path("storage/avatars") / Path(str(user.avatar_url)).name
+            try:
+                if avatar_path.is_file():
+                    avatar_path.unlink(missing_ok=True)
+            except Exception as e:
+                logger.warning("Failed to delete avatar file %s during anonymization: %s", avatar_path, e)
         setattr(user, "avatar_url", None)
         setattr(user, "password_hash", None)
         setattr(user, "notification_preferences", {})
@@ -1400,10 +1426,15 @@ class ContentOpsRepository:
             else:
                 self.db.flush()
             try:
-                from apps.api.dependencies import AuthSessionCache
+                from packages.security.session_cache import AuthSessionCache
                 AuthSessionCache.invalidate_member_role(workspace_id, user_id)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning(
+                    "Failed to invalidate member role cache for workspace %s, user %s: %s",
+                    workspace_id,
+                    user_id,
+                    exc,
+                )
             return existing
         member = WorkspaceMemberModel(
             id=f"mem_{uuid.uuid4().hex[:12]}",

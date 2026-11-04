@@ -37,8 +37,9 @@ interface AuthContextType {
   forgotPassword: (email: string) => Promise<string>;
   resetPassword: (token: string, newPassword: string) => Promise<string>;
   startDemo: () => Promise<void>;
+  loginDemo: (role?: UserRole) => Promise<void>;
   switchWorkspace: (workspaceId: string) => Promise<void>;
-  loginWithDevToken: (userId: string, role: UserRole, workspaceId: string) => Promise<void>;
+  loginWithDevToken?: (userId: string, role: UserRole, workspaceId: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -320,11 +321,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
 
-  const startDemo = async () => {
+  const loginDemo = async (role: UserRole = 'Editor') => {
     const res = await fetch('/v1/auth/demo', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role }),
     });
 
     if (!res.ok) {
@@ -335,7 +337,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const data = await res.json();
     const demoSession: UserSession = {
       user_id: data.user_id,
-      role: data.role,
+      role: data.role || role,
       workspace_id: data.workspace_id,
       token: data.access_token,
       user: data.user,
@@ -345,6 +347,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     setSession(demoSession);
     broadcastEvent('LOGIN');
+  };
+
+  const startDemo = async () => {
+    await loginDemo('Editor');
   };
 
   const switchWorkspace = async (workspaceId: string) => {
@@ -379,42 +385,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     broadcastEvent('WORKSPACE_SWITCH', { workspaceId });
   };
 
-  const loginWithDevToken = async (userId: string, role: UserRole, workspaceId: string) => {
-    const res = await fetch('/v1/auth/dev-token', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user_id: userId,
-        role,
-        workspace_id: workspaceId,
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Échec de la génération du jeton');
-    }
-
-    const data = await res.json();
-    const newSession: UserSession = {
-      user_id: userId,
-      role: data.role || role,
-      workspace_id: data.workspace_id || workspaceId,
-      token: data.access_token,
-      workspaces: [
-        {
-          workspace_id: data.workspace_id || workspaceId,
-          name: 'Workspace Dev',
-          role: data.role || role,
-          timezone: 'UTC',
-          is_owner: (data.role || role).toLowerCase() === 'owner',
-        },
-      ],
-      is_demo: false,
-    };
-    setSession(newSession);
-    broadcastEvent('LOGIN');
+  const loginWithDevToken = async (_userId: string, role: UserRole, _workspaceId: string) => {
+    // Deprecated compatibility wrapper: route to official demo endpoint without calling /v1/auth/dev-token
+    await loginDemo(role);
   };
 
   const logout = async () => {
@@ -459,6 +432,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         forgotPassword,
         resetPassword,
         startDemo,
+        loginDemo,
         switchWorkspace,
         loginWithDevToken,
         logout,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { apiClient } from '../lib/api';
 import { BrandProfile } from '../types/api';
 import { Button } from '../components/common/Button';
@@ -21,6 +22,7 @@ import {
 export const BrandProfileScreen: React.FC = () => {
   const { t, language } = useLanguage();
   const { session, canEdit } = useAuth();
+  const { showToast } = useToast();
   const isEn = language === 'en';
 
   const [loading, setLoading] = useState(true);
@@ -95,7 +97,7 @@ export const BrandProfileScreen: React.FC = () => {
       await fetchProfileAndVersions();
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: any) {
-      alert(`Erreur de sauvegarde : ${err.message}`);
+      showToast('error', `Erreur de sauvegarde : ${err.message || 'Impossible de sauvegarder le profil'}`);
     } finally {
       setSaving(false);
     }

@@ -54,6 +54,32 @@ def test_circuit_breaker_trips_after_failures_and_recovers():
     assert cb.failure_count == 0
 
 
+def test_circuit_breaker_thread_safety_under_load():
+    """
+    CONCURRENCY & RESILIENCE (ANOM-21 / CODE-07 / ANOM-39):
+    CircuitBreaker must remain thread-safe under concurrent execution across multiple worker threads.
+    """
+    import concurrent.futures
+
+    cb = CircuitBreaker(failure_threshold=25, recovery_timeout=10.0, name="concurrency_cb")
+
+    def worker_action(idx: int):
+        if idx % 2 == 0:
+            cb.record_failure(ValueError(f"Worker failure {idx}"))
+        else:
+            cb.record_success()
+        return cb.can_execute()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        futures = [executor.submit(worker_action, i) for i in range(50)]
+        results = [f.result() for f in concurrent.futures.as_completed(futures)]
+
+    # Assert that all 50 executions ran cleanly without exceptions
+    assert len(results) == 50
+    assert cb.state in (CircuitState.CLOSED, CircuitState.OPEN)
+    assert cb.failure_count >= 0
+
+
 def test_retry_with_exponential_backoff_and_jitter():
     """
     RELIABILITY P0 (REL-03):

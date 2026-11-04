@@ -534,9 +534,9 @@ export const StyleGuideScreen: React.FC = () => {
                   <span>H1 Display — text-xl sm:text-2xl font-bold</span>
                   <span>Geist Sans (clamp 20px - 28px)</span>
                 </div>
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-txt-primary">
+                <p className="text-xl sm:text-2xl font-bold tracking-tight text-txt-primary">
                   Système Éditorial B2B & Gouvernance Cryptographique
-                </h1>
+                </p>
               </div>
 
               <div className="pt-4 space-y-2">

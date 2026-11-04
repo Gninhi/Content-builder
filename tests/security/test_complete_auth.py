@@ -386,9 +386,12 @@ def test_get_me_and_switch_workspace():
     login_res = client.post("/v1/auth/login", json={"email": email, "password": pwd})
     token = login_res.json()["access_token"]
 
-    # Get me
+    # Get me (deprecated endpoint returning standard deprecation headers RFC 8594)
     me_res = client.get("/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert me_res.status_code == 200
+    assert me_res.headers.get("Deprecation") == "true"
+    assert "Sunset" in me_res.headers
+    assert me_res.headers.get("Link") == '</v1/me>; rel="successor-version"'
     me_data = me_res.json()
     assert len(me_data["workspaces"]) == 2
 

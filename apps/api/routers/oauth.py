@@ -5,7 +5,7 @@ import secrets
 import uuid
 import urllib.parse
 from datetime import datetime, timezone, timedelta
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Body, Request
 from fastapi.responses import HTMLResponse
@@ -460,7 +460,7 @@ def list_connected_accounts(
     )
 
     now_utc = datetime.now(timezone.utc)
-    res_accounts = []
+    res_accounts: List[Dict[str, Any]] = []
     for acc in accounts:
         status_val = str(acc.status)
         if acc.expires_at:

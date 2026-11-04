@@ -58,4 +58,20 @@ describe('useHitlShortcuts Hook', () => {
 
     document.body.removeChild(input);
   });
+
+  it('suppresses shortcuts when typing inside a select element (ANOM-11)', () => {
+    const onApprove = vi.fn();
+    renderHook(() => useHitlShortcuts({ onApprove }));
+
+    const select = document.createElement('select');
+    document.body.appendChild(select);
+
+    const event = new KeyboardEvent('keydown', { key: 'a', bubbles: true });
+    Object.defineProperty(event, 'target', { value: select, enumerable: true });
+
+    window.dispatchEvent(event);
+    expect(onApprove).not.toHaveBeenCalled();
+
+    document.body.removeChild(select);
+  });
 });

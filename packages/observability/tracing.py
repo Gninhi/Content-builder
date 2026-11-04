@@ -86,7 +86,7 @@ class ObservabilityTracer:
             return None
 
         try:
-            from services.orchestration.callbacks.langfuse import SanitizedLangfuseCallbackHandler
+            from packages.observability.callbacks.langfuse import SanitizedLangfuseCallbackHandler
             pub, _, _ = cls._resolve_credentials()
             handler = SanitizedLangfuseCallbackHandler(
                 public_key=pub,

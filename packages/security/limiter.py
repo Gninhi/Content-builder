@@ -68,12 +68,23 @@ def get_client_ip(request: Request) -> str:
     if trust_all or is_ip_in_trusted_proxies(direct_ip, trusted_proxies):
         forwarded_for = request.headers.get("x-forwarded-for") or request.headers.get("X-Forwarded-For")
         if forwarded_for:
-            ips = [ip.strip() for ip in forwarded_for.split(",")]
-            if ips:
-                return ips[0]
+            ips = [ip.strip() for ip in forwarded_for.split(",") if ip.strip()]
+            if trust_all:
+                if ips:
+                    return ips[-1]
+            else:
+                # Traverse right-to-left: the rightmost untrusted IP is the true remote client (RFC 7239)
+                for ip in reversed(ips):
+                    if not is_ip_in_trusted_proxies(ip, trusted_proxies):
+                        return ip
+                # If all forwarded IPs are trusted proxies, fall back to the first hop
+                if ips:
+                    return ips[0]
         real_ip = request.headers.get("x-real-ip") or request.headers.get("X-Real-IP")
         if real_ip:
-            return real_ip.strip()
+            candidate = real_ip.strip()
+            if trust_all or not is_ip_in_trusted_proxies(candidate, trusted_proxies):
+                return candidate
 
     return direct_ip
 
@@ -91,8 +102,8 @@ def get_rate_limit_key(request: Request) -> str:
             ws = claims.get("workspace_id")
             if ws:
                 return f"ws:{ws}"
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not decode bearer token for workspace rate limiting: %s", exc)
     return get_client_ip(request)
 
 

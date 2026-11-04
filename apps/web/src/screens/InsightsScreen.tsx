@@ -37,12 +37,12 @@ export const InsightsScreen: React.FC = () => {
   const [insights, setInsights] = useState<Insight[]>([]);
   const [generatingInsights, setGeneratingInsights] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = async (selectedPeriod: string = period) => {
     setLoading(true);
     setError(null);
     try {
       const [data, insightsRes] = await Promise.all([
-        apiClient<any>('/v1/analytics/overview'),
+        apiClient<any>(`/v1/analytics/overview?period=${selectedPeriod}`),
         apiClient<{ insights: Insight[] }>('/v1/strategy/insights').catch(() => ({ insights: [] })),
       ]);
       setAnalytics(data);
@@ -75,8 +75,8 @@ export const InsightsScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchData();
-  }, [session?.workspace_id]);
+    fetchData(period);
+  }, [session?.workspace_id, period]);
 
   if (loading && !analytics) {
     return (

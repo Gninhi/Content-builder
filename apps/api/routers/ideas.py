@@ -27,7 +27,8 @@ def research_ideas(
         raise HTTPException(status_code=403, detail="Cannot research ideas for another workspace.")
     ws_id = user.workspace_id
     brand_profile = repo.get_latest_brand_profile(ws_id)
-    pillars = req.pillars or (brand_profile.pillars if brand_profile else ["IA générative", "Automatisation"])
+    brand_pillars: list[str] = list(brand_profile.pillars) if brand_profile and brand_profile.pillars else ["IA générative", "Automatisation"]
+    pillars: list[str] = req.pillars if req.pillars else brand_pillars
     audience = req.audience or (brand_profile.audience if brand_profile else ["Tech Leaders"])
 
     # 1. Retrieve qualified monitoring signals and content sources in workspace
@@ -104,7 +105,7 @@ def research_ideas(
                     sig_id = ev["source_id"].replace("signal://", "")
                     break
 
-        pillar = pillars[idx % len(pillars)] if pillars else "Stratégie IA"
+        pillar = str(pillars[idx % len(pillars)]) if pillars else "Stratégie IA"
 
         saved = repo.save_idea(
             workspace_id=ws_id,
@@ -123,19 +124,19 @@ def research_ideas(
 
         persisted_ideas.append(
             IdeaItem(
-                id=saved.id,
-                title=saved.title,
-                angle=saved.angle,
-                target_audience=saved.audience,
+                id=str(saved.id),
+                title=str(saved.title),
+                angle=str(saved.angle),
+                target_audience=str(saved.audience),
                 recommended_formats=idea.get("recommended_formats", ["linkedin", "x"]),
                 evidence=[EvidenceItem(**e) for e in idea["evidence"] if isinstance(e, dict) and "source_id" in e and "claim" in e],
-                novelty_score=saved.novelty_score,
-                relevance_score=saved.relevance_score,
-                effort_score=saved.effort_score,
-                total_score=saved.total_score,
-                priority=saved.priority,
-                risks=saved.risks,
-                signal_id=saved.signal_id
+                novelty_score=float(saved.novelty_score or 0.0),
+                relevance_score=float(saved.relevance_score or 0.0),
+                effort_score=float(saved.effort_score or 0.0),
+                total_score=float(saved.total_score) if saved.total_score is not None else None,
+                priority=str(saved.priority),
+                risks=list(saved.risks or []),
+                signal_id=str(saved.signal_id) if saved.signal_id else None
             )
         )
 

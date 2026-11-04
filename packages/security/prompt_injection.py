@@ -1,4 +1,5 @@
 import re
+import html
 import logging
 from typing import Tuple, List, Optional
 from datetime import datetime, timezone
@@ -16,7 +17,7 @@ SUSPICIOUS_PATTERNS = [
     r"publish\s+without\s+(approval|review|validation)",
     r"delete\s+(all\s+)?(data|database|records)",
     r"bypass\s+(all\s+)?(guardrails|filters|security)",
-    r"</?untrusted(?:_external_data|_content)?>",
+    r"</?untrusted(?:_external_data|_content)?\s*[^>]*>",
     r"<script.*?>.*?</script>",
     r"\{\{.*?\}\}",
     r"(?:call\s+tool|execute\s+command|eval\s*\()",
@@ -47,9 +48,10 @@ def wrap_untrusted_data(content: str, origin: str, timestamp: Optional[str] = No
     Ensures LLM instruction interpreters treat this content solely as analytical data.
     """
     ts = timestamp or datetime.now(timezone.utc).isoformat()
-    # Strip any attempt to close the tag from within the content
-    sanitized = content.replace("</untrusted_external_data>", "[escaped_tag]")
-    return f'<untrusted_external_data origin="{origin}" collected_at="{ts}">\n{sanitized}\n</untrusted_external_data>'
+    # Neutralize any attempt to close or open tags within content
+    sanitized = re.sub(r"</?untrusted(?:_external_data|_content)?\s*[^>]*>", "[escaped_tag]", content, flags=re.IGNORECASE)
+    safe_origin = html.escape(str(origin), quote=True).replace("\n", "").replace("\r", "")
+    return f'<untrusted_external_data origin="{safe_origin}" collected_at="{ts}">\n{sanitized}\n</untrusted_external_data>'
 
 
 def detect_suspicious_instructions(text: str) -> Tuple[bool, List[str]]:

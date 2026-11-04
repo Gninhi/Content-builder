@@ -360,7 +360,8 @@ export const CommandMenu: React.FC<CommandMenuProps> = ({
         <div
           ref={listRef}
           className="max-h-80 overflow-y-auto p-2 space-y-1"
-          role="listbox"
+          role="group"
+          aria-label={isEn ? 'Commands' : 'Commandes disponibles'}
         >
           {filteredItems.length === 0 ? (
             <div className="py-8 text-center text-xs text-txt-muted">
@@ -374,8 +375,6 @@ export const CommandMenu: React.FC<CommandMenuProps> = ({
                 <button
                   key={item.id}
                   type="button"
-                  role="option"
-                  aria-selected={isSelected}
                   onClick={() => item.action()}
                   onMouseEnter={() => setSelectedIndex(index)}
                   className={`flex w-full items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-left text-xs transition-colors ${

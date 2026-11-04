@@ -76,6 +76,9 @@ class DataConnectorSource(str, Enum):
     HACKERNEWS = "hackernews"
     HUGGINGFACE = "huggingface"
     RSS = "rss"
+    WEB = "web"
+    SEMANTIC_SCHOLAR = "semantic_scholar"
+    CROSSREF = "crossref"
 
 
 class OfficialDataSignalItem(BaseModel):

@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from '../context/AuthContext';
 
 // Helper consumer component
 const TestAuthConsumer: React.FC = () => {
-  const { session, isAuthenticated, isOwner, canEdit, canApprove, login, loginWithDevToken, logout } = useAuth();
+  const { session, isAuthenticated, isOwner, canEdit, canApprove, login, loginDemo, logout } = useAuth();
   return (
     <div>
       <span data-testid="auth-status">{isAuthenticated ? 'logged-in' : 'logged-out'}</span>
@@ -13,9 +13,9 @@ const TestAuthConsumer: React.FC = () => {
       <span data-testid="can-edit">{canEdit ? 'yes' : 'no'}</span>
       <span data-testid="can-approve">{canApprove ? 'yes' : 'no'}</span>
       <button onClick={() => login('enterprise@test.com', 'Pass1234!')}>Login Enterprise</button>
-      <button onClick={() => loginWithDevToken('user_test', 'Owner', 'ws_test')}>Login Owner</button>
-      <button onClick={() => loginWithDevToken('user_test', 'Editor', 'ws_test')}>Login Editor</button>
-      <button onClick={() => loginWithDevToken('user_test', 'Viewer', 'ws_test')}>Login Viewer</button>
+      <button onClick={() => loginDemo('Owner')}>Login Owner</button>
+      <button onClick={() => loginDemo('Editor')}>Login Editor</button>
+      <button onClick={() => loginDemo('Viewer')}>Login Viewer</button>
       <button onClick={logout}>Logout</button>
     </div>
   );

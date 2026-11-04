@@ -85,3 +85,4 @@ CREATE POLICY published_posts_isolation_policy ON published_posts FOR ALL USING 
 
 DROP POLICY IF EXISTS metric_snapshots_isolation_policy ON metric_snapshots;
 CREATE POLICY metric_snapshots_isolation_policy ON metric_snapshots FOR ALL USING (workspace_id = current_workspace_id());
+

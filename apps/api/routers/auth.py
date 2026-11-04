@@ -787,12 +787,20 @@ def logout(
     return {"message": "Déconnexion réussie."}
 
 
-@router.get("/me")
+@router.get("/me", deprecated=True, summary="[DEPRECATED] Obtenir le profil utilisateur (utiliser GET /v1/me)")
 def get_me(
+    response: Response,
     user_ctx: UserContext = Depends(get_current_user),
     repo: ContentOpsRepository = Depends(get_repository),
 ):
-    """Returns current user details, memberships, and active workspace metadata."""
+    """
+    [DEPRECATED] Endpoint en doublon historique avec GET /v1/me.
+    Conformément à la RFC 8594 (Sunset) et au plan d'architecture API-04 / ANOM-18,
+    cet endpoint est formellement déprécié au profit exclusif de GET /v1/me.
+    """
+    response.headers["Deprecation"] = "true"
+    response.headers["Sunset"] = "Wed, 31 Dec 2026 23:59:59 GMT"
+    response.headers["Link"] = '</v1/me>; rel="successor-version"'
     user = repo.get_user(user_ctx.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")

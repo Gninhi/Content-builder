@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /ui/
+Disallow: /v1/
+Disallow: /api/
+Sitemap: https://contentops.app/ui/sitemap.xml

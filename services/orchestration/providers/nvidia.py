@@ -494,10 +494,17 @@ class NVIDIAProviderAdapter(BaseLLMAdapter):
             import requests
 
             class _TimeoutSession(requests.Session):
-                def request(self, method: str, url: Any, *args: Any, **req_kwargs: Any) -> requests.Response:
+                def request(
+                    self,
+                    method: str | bytes,
+                    url: str | bytes,
+                    *args: Any,
+                    **req_kwargs: Any
+                ) -> requests.Response:
                     if "timeout" not in req_kwargs or req_kwargs["timeout"] is None:
                         req_kwargs["timeout"] = effective_timeout
-                    return super().request(method, url, *args, **req_kwargs)
+                    str_method = method.decode("utf-8") if isinstance(method, bytes) else method
+                    return super().request(str_method, url, *args, **req_kwargs)
 
             def _session_factory():
                 sess = _TimeoutSession()
@@ -519,4 +526,8 @@ class NVIDIAProviderAdapter(BaseLLMAdapter):
             circuit_breaker=cb,
             timeout=effective_timeout
         )
+
+
+NvidiaAdapter = NVIDIAProviderAdapter
+
 

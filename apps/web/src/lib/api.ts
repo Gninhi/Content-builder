@@ -142,7 +142,9 @@ export async function parseResponseBody(res: Response): Promise<any> {
   return null;
 }
 
-export async function apiClient<T>(
+const inFlightRequests = new Map<string, Promise<any>>();
+
+async function executeFetch<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
@@ -236,4 +238,31 @@ export async function apiClient<T>(
   }
 
   return await parseResponseBody(response);
+}
+
+export async function apiClient<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const method = (options.method || 'GET').toUpperCase();
+  const isGet = method === 'GET';
+
+  // Request deduplication for concurrent in-flight GET requests (ANOM-35)
+  if (isGet && inFlightRequests.has(endpoint)) {
+    return inFlightRequests.get(endpoint) as Promise<T>;
+  }
+
+  const requestPromise = (async () => {
+    try {
+      return await executeFetch<T>(endpoint, options);
+    } finally {
+      inFlightRequests.delete(endpoint);
+    }
+  })();
+
+  if (isGet) {
+    inFlightRequests.set(endpoint, requestPromise);
+  }
+
+  return requestPromise;
 }

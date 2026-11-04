@@ -253,9 +253,30 @@ export interface SessionInfo {
 export interface PersonalDataExport {
   exported_at: string;
   user: Record<string, any>;
-  workspaces: any[];
-  sessions: any[];
-  recent_audit_logs: any[];
+  workspaces: (UserWorkspace | Record<string, any>)[];
+  sessions: SessionInfo[];
+  recent_audit_logs: Record<string, any>[];
+}
+
+export interface BriefCreate {
+  workspace_id?: string;
+  idea_id?: string | null;
+  objective: string;
+  campaign_id?: string | null;
+  platform_targets?: string[];
+  requirements?: Record<string, any>;
+}
+
+export interface BriefResponse {
+  id: string;
+  workspace_id: string;
+  idea_id?: string | null;
+  objective: string;
+  campaign_id?: string | null;
+  platform_targets: string[];
+  requirements: Record<string, any>;
+  created_at: string;
+  updated_at: string;
 }
 
 export type VeilleAxis = 'ia' | 'frameworks' | 'metiers';

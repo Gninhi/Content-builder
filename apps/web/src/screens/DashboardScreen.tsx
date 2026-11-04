@@ -55,49 +55,58 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) 
     setLoading(true);
     setError(null);
     try {
-      // 1. Fetch inbox
-      const inbox = await apiClient<InboxVariant[]>('/v1/inbox');
-      setInboxCount(Array.isArray(inbox) ? inbox.length : 0);
+      const [inboxRes, calRes, analyticsRes, accountsRes] = await Promise.allSettled([
+        apiClient<InboxVariant[]>('/v1/inbox'),
+        apiClient<{ scheduled: any[]; published: any[] }>('/v1/calendar'),
+        apiClient<any>('/v1/analytics/overview'),
+        apiClient<{ accounts: any[] }>('/v1/oauth/accounts'),
+      ]);
 
-      // Check degraded variants in inbox
-      const degraded = Array.isArray(inbox)
-        ? inbox.filter((item) => Boolean(item.is_degraded)).length
-        : 0;
+      // 1. Process Inbox
+      const inbox = inboxRes.status === 'fulfilled' && Array.isArray(inboxRes.value) ? inboxRes.value : [];
+      setInboxCount(inbox.length);
+      const degraded = inbox.filter((item) => Boolean(item.is_degraded)).length;
       setDegradedCount(degraded);
 
-      // 2. Fetch calendar
-      const cal = await apiClient<{ scheduled: any[]; published: any[] }>('/v1/calendar');
+      // 2. Process Calendar
+      const cal = calRes.status === 'fulfilled' && calRes.value ? calRes.value : { scheduled: [], published: [] };
       const scheduled = cal.scheduled || [];
       const published = cal.published || [];
       setScheduledCount(scheduled.length);
       setNextScheduled(scheduled.slice(0, 3));
-
-      // Calculate failed or unknown jobs
       const failed = scheduled.filter(
-        (s) => s.status === 'FAILED' || s.status === 'PUBLISH_UNKNOWN'
+        (s: any) => s.status === 'FAILED' || s.status === 'PUBLISH_UNKNOWN'
       ).length;
       setFailedCount(failed);
 
-      // 3. Fetch analytics overview
-      const analytics = await apiClient<any>('/v1/analytics/overview');
-      setPublishedCount(analytics.published_posts_count || published.length || 0);
-      if (analytics.llm_budget_spent !== undefined) {
+      // 3. Process Analytics
+      const analytics = analyticsRes.status === 'fulfilled' && analyticsRes.value ? analyticsRes.value : null;
+      setPublishedCount(analytics?.published_posts_count || published.length || 0);
+      if (analytics?.llm_budget_spent !== undefined) {
         setLlmBudgetSpent(analytics.llm_budget_spent);
       }
 
-      // 4. Fetch social accounts
-      const accountsRes = await apiClient<{ accounts: any[] }>('/v1/oauth/accounts');
-      const accounts = accountsRes.accounts || [];
-      const liAcc = accounts.find((a) => a.provider?.toLowerCase() === 'linkedin');
+      // 4. Process Social accounts
+      const accounts = accountsRes.status === 'fulfilled' && accountsRes.value?.accounts ? accountsRes.value.accounts : [];
+      const liAcc = accounts.find((a: any) => a.provider?.toLowerCase() === 'linkedin');
       const liStatus = !liAcc ? 'disconnected' : liAcc.status === 'EXPIRED' ? 'expired' : 'connected';
 
-      const xAcc = accounts.find((a) => a.provider?.toLowerCase() === 'x');
+      const xAcc = accounts.find((a: any) => a.provider?.toLowerCase() === 'x');
       const xStat = !xAcc ? 'disconnected' : xAcc.status === 'EXPIRED' ? 'expired' : 'connected';
 
       setLinkedInStatus(liStatus);
       setXStatus(xStat);
+
+      if (
+        inboxRes.status === 'rejected' &&
+        calRes.status === 'rejected' &&
+        analyticsRes.status === 'rejected' &&
+        accountsRes.status === 'rejected'
+      ) {
+        setError(isEn ? 'Failed to load dashboard indicators.' : 'Erreur lors du chargement des indicateurs.');
+      }
     } catch (err: any) {
-      setError(err.message || 'Erreur lors du chargement des indicateurs.');
+      setError(err.message || (isEn ? 'Failed to load dashboard indicators.' : 'Erreur lors du chargement des indicateurs.'));
     } finally {
       setLoading(false);
     }

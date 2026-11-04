@@ -19,6 +19,7 @@ def ingest_source(
     if req.workspace_id and req.workspace_id != user.workspace_id:
         raise HTTPException(status_code=403, detail="Cannot ingest source for another workspace.")
     ws_id = user.workspace_id
+    repo.ensure_workspace(ws_id)
 
     if req.url:
         try:

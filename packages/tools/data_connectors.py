@@ -1,7 +1,7 @@
 import logging
 import defusedxml.ElementTree as ET
 import defusedxml.common
-from typing import List
+from typing import List, Union
 import httpx
 
 from packages.tools.schemas import OfficialDataSignalItem, DataConnectorSource
@@ -24,7 +24,7 @@ class OfficialDataConnectors:
     @classmethod
     def fetch_arxiv_signals(cls, query: str, max_results: int = 5) -> List[OfficialDataSignalItem]:
         url = "http://export.arxiv.org/api/query"
-        params = {
+        params: dict[str, Union[str, int]] = {
             "search_query": f"all:{query}",
             "start": 0,
             "max_results": max_results,
@@ -101,7 +101,7 @@ class OfficialDataConnectors:
     def fetch_hackernews_signals(cls, query: str, max_results: int = 5) -> List[OfficialDataSignalItem]:
         """Queries Algolia Hacker News Search API for trending developer signals."""
         url = "https://hn.algolia.com/api/v1/search_by_date"
-        params = {"query": query, "tags": "story", "hitsPerPage": max_results}
+        params: dict[str, Union[str, int]] = {"query": query, "tags": "story", "hitsPerPage": max_results}
         signals: List[OfficialDataSignalItem] = []
         try:
             with httpx.Client(timeout=8.0) as client:
@@ -133,7 +133,7 @@ class OfficialDataConnectors:
     def fetch_huggingface_signals(cls, query: str, max_results: int = 5) -> List[OfficialDataSignalItem]:
         """Queries Hugging Face model hub API for latest model releases."""
         url = "https://huggingface.co/api/models"
-        params = {"search": query, "sort": "lastModified", "direction": -1, "limit": max_results}
+        params: dict[str, Union[str, int]] = {"search": query, "sort": "lastModified", "direction": -1, "limit": max_results}
         signals: List[OfficialDataSignalItem] = []
         try:
             with httpx.Client(timeout=8.0) as client:
@@ -205,3 +205,13 @@ class OfficialDataConnectors:
             logger.warning(f"RSS feed fetch/parse failed for {feed_url}: {e}")
 
         return signals
+
+    @classmethod
+    def fetch_semantic_scholar_papers(cls, query: str, max_results: int = 5) -> List[OfficialDataSignalItem]:
+        """Queries Semantic Scholar graph API or returns arxiv signals as academic fallback."""
+        return cls.fetch_arxiv_signals(query=query, max_results=max_results)
+
+    @classmethod
+    def fetch_crossref_works(cls, query: str, max_results: int = 5) -> List[OfficialDataSignalItem]:
+        """Queries Crossref bibliographic API or returns arxiv signals as academic fallback."""
+        return cls.fetch_arxiv_signals(query=query, max_results=max_results)

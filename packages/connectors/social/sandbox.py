@@ -39,14 +39,25 @@ class SandboxSocialPublisher(BaseSocialPublisher):
         media_urls: Optional[List[str]] = None,
         options: Optional[Dict[str, Any]] = None
     ) -> PublicationResult:
+        clean_content = (content or "").replace("\x00", "").strip()
+        if not clean_content:
+            raise ValueError("Sandbox publish rejected: content cannot be empty.")
+
+        clean_media: List[str] = []
+        if media_urls:
+            for url in media_urls:
+                if not (url.startswith("http://") or url.startswith("https://")):
+                    raise ValueError(f"Sandbox publish rejected unsafe media URL: {url}")
+                clean_media.append(url)
+
         post_id = f"sandbox_{self._provider.value}_{uuid.uuid4().hex[:12]}"
         now = datetime.now(timezone.utc)
 
         post_data = {
             "id": post_id,
             "provider": self._provider,
-            "content": content,
-            "media_urls": media_urls or [],
+            "content": clean_content,
+            "media_urls": clean_media,
             "options": options or {},
             "status": PublicationStatus.PUBLISHED,
             "published_at": now
@@ -59,7 +70,7 @@ class SandboxSocialPublisher(BaseSocialPublisher):
             status=PublicationStatus.PUBLISHED,
             published_at=now,
             permalink_url=f"https://sandbox.{self._provider.value}.com/posts/{post_id}",
-            metadata={"sandbox": True, "media_count": len(media_urls or [])}
+            metadata={"sandbox": True, "media_count": len(clean_media)}
         )
 
     def schedule(

@@ -211,6 +211,8 @@ class EvidenceMemoryService:
             facts = list(src.extracted_facts or [])
             if not facts:
                 continue
+            provenance: Dict[str, Any] = src.provenance if isinstance(src.provenance, dict) else {}
+            trust_val = float(provenance.get("trust_score", 1.0) or 1.0)
             dossier.append(
                 {
                     "source_type": "content_source",
@@ -220,7 +222,7 @@ class EvidenceMemoryService:
                     "summary": " ".join(str(f) for f in facts[:2])[:400],
                     "facts": facts,
                     "key_quotes": [],
-                    "score": float(src.trust_score or 1.0) * 4.0,
+                    "score": trust_val * 4.0,
                     "enrichment_status": "EXTRACTED",
                 }
             )

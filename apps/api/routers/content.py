@@ -1,5 +1,5 @@
 import os
-from typing import cast, Dict, Any, Optional
+from typing import cast, Dict, Any, Optional, List
 from datetime import datetime
 from langchain_core.runnables import RunnableConfig
 from fastapi import APIRouter, Depends, HTTPException, Body, status, Query
@@ -253,7 +253,7 @@ def rewrite_content_variant(
     cta_policy = dict(brand_profile.cta_policy) if brand_profile and brand_profile.cta_policy else {}
     require_ai_disclosure = bool(cta_policy.get("require_ai_disclosure", False))
 
-    qa_feedback_history = []
+    qa_feedback_history: List[Dict[str, Any]] = []
     max_qa_attempts = 2
     revised_hook = str(variant.hook or "")
     revised_body = str(variant.body or "")
@@ -298,6 +298,11 @@ Garde le style professionnel et direct. Ne génère aucune hallucination."""
             )
 
         # Enforce mandatory Quality Gate on the rewritten variant (Section 7.3)
+        claims_raw: List[Any] = list(variant.claims) if variant.claims is not None and isinstance(variant.claims, (list, tuple)) else []
+        claims_formatted: List[Dict[str, Any]] = [
+            c if (isinstance(c, dict) and c.get("verified")) else {"claim": str(c), "source_id": "rewrite_verified", "verified": True}
+            for c in claims_raw
+        ]
         qa_state: Dict[str, Any] = {
             "workspace_id": user.workspace_id,
             "operation_mode": "rewrite",
@@ -314,10 +319,7 @@ Garde le style professionnel et direct. Ne génère aucune hallucination."""
                     "cta": revised_cta,
                     "hashtags": variant.hashtags or [],
                     "media_spec": variant.media_spec or {},
-                    "claims": [
-                        c if (isinstance(c, dict) and c.get("verified")) else {"claim": str(c), "source_id": "rewrite_verified", "verified": True}
-                        for c in (variant.claims or [])
-                    ],
+                    "claims": claims_formatted,
                 }
             ],
         }
@@ -341,10 +343,10 @@ Garde le style professionnel et direct. Ne génère aucune hallucination."""
     }
     new_hash = compute_payload_hash(new_payload)
 
-    variant.hook = revised_hook
-    variant.body = revised_body
-    variant.cta = revised_cta
-    variant.payload_hash = new_hash
+    setattr(variant, "hook", revised_hook)
+    setattr(variant, "body", revised_body)
+    setattr(variant, "cta", revised_cta)
+    setattr(variant, "payload_hash", new_hash)
 
     qa_passed = bool(qa_info.get("overall_passed", True))
     qa_score = float(evaluated_var.get("qa_score", qa_info.get("overall_score", 100.0)))
@@ -360,12 +362,12 @@ Garde le style professionnel et direct. Ne génère aucune hallucination."""
         ContentStateMachine.transition(ContentStatus.DRAFT, target_final_status)
     elif current_status != target_final_status and ContentStateMachine.can_transition(current_status, target_final_status):
         ContentStateMachine.transition(current_status, target_final_status)
-    variant.status = target_final_status.value
+    setattr(variant, "status", target_final_status.value)
 
     if package:
-        package.version = int(package.version or 1) + 1
-        package.qa_score = qa_score
-        package.status = target_final_status.value
+        setattr(package, "version", int(getattr(package, "version", 1) or 1) + 1)
+        setattr(package, "qa_score", qa_score)
+        setattr(package, "status", target_final_status.value)
         pkg_meta = dict(package.model_metadata or {})
         pkg_meta["last_qa_report"] = {
             "variant_id": variant.id,
@@ -414,7 +416,13 @@ def get_review_inbox(
         pkg = v.package
         pkg_meta = dict(pkg.model_metadata or {}) if pkg else {}
         last_qa = pkg_meta.get("last_qa_report") or {}
-        qa_score = float(last_qa.get("score") if "score" in last_qa else (pkg.qa_score if pkg and pkg.qa_score is not None else 90.0))
+        raw_score = last_qa.get("score")
+        if raw_score is not None:
+            qa_score = float(raw_score)
+        elif pkg and pkg.qa_score is not None:
+            qa_score = float(pkg.qa_score)
+        else:
+            qa_score = 90.0
         checks = last_qa.get("checks") or []
         passed = bool(last_qa.get("passed", v.status != ContentStatus.QA_FAILED.value))
         prohibited_clean = not any(

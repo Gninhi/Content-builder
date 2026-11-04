@@ -223,7 +223,8 @@ def test_real_url_source_ingestion_rejects_fictional_and_ssrf():
         mock_empty_resp.status_code = 200
         mock_empty_resp.url = "https://example.com/empty"
         mock_empty_resp.text = "<html><body><p>Court</p></body></html>"
-        with patch("apps.api.routers.sources.fetch_safe_url", return_value=mock_empty_resp):
+        with patch("apps.api.routers.sources.validate_target_url_security", return_value="93.184.216.34"), \
+             patch("apps.api.routers.sources.fetch_safe_url", return_value=mock_empty_resp):
             resp_short = client.post(
                 "/v1/sources",
                 json={"type": "url", "url": "https://example.com/empty"},
@@ -240,7 +241,8 @@ def test_real_url_source_ingestion_rejects_fictional_and_ssrf():
             "de 45% des incidents de conformité grâce aux contrôles déterministes.</p>"
             "</body></html>"
         )
-        with patch("apps.api.routers.sources.fetch_safe_url", return_value=mock_good_resp):
+        with patch("apps.api.routers.sources.validate_target_url_security", return_value="93.184.216.34"), \
+             patch("apps.api.routers.sources.fetch_safe_url", return_value=mock_good_resp):
             resp_ok = client.post(
                 "/v1/sources",
                 json={"type": "url", "url": "https://example.com/ai-report"},

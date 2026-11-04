@@ -30,7 +30,7 @@ export const InboxDraftList: React.FC<InboxDraftListProps> = ({
 
       <div
         className="space-y-2 max-h-[calc(100vh-260px)] overflow-y-auto pr-1"
-        role="listbox"
+        role="group"
         aria-label={isEn ? 'Drafts queue to review' : 'Liste des brouillons à réviser'}
       >
         {variants.map((item, idx) => {
@@ -40,8 +40,7 @@ export const InboxDraftList: React.FC<InboxDraftListProps> = ({
             <button
               key={item.id}
               type="button"
-              role="option"
-              aria-selected={isSelected}
+              aria-current={isSelected ? 'true' : undefined}
               onClick={() => onSelect(idx)}
               className={`w-full text-left rounded-lg p-3.5 border transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-border-focus ${
                 isSelected

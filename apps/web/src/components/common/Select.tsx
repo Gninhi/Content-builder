@@ -9,12 +9,14 @@ export interface SelectOption {
 export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
+  helperText?: string;
   options: SelectOption[];
 }
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, error, options, id, className, ...props }, ref) => {
-    const selectId = id || props.name;
+  ({ label, error, helperText, options, id, className, ...props }, ref) => {
+    const generatedId = React.useId();
+    const selectId = id || props.name || generatedId;
 
     return (
       <div className="space-y-1.5 w-full">
@@ -28,7 +30,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
           ref={ref}
           id={selectId}
           aria-invalid={!!error}
-          aria-describedby={error ? `${selectId}-error` : undefined}
+          aria-describedby={error ? `${selectId}-error` : helperText ? `${selectId}-helper` : undefined}
           className={clsx(
             'w-full bg-surface border rounded-md px-3 py-2 text-sm text-txt-primary transition-colors duration-150 min-h-[42px] focus:outline-none focus:ring-2 focus:ring-border-focus focus:border-border-focus',
             error
@@ -44,11 +46,15 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             </option>
           ))}
         </select>
-        {error && (
+        {error ? (
           <p id={`${selectId}-error`} className="text-xs text-status-danger-text font-medium" role="alert">
             {error}
           </p>
-        )}
+        ) : helperText ? (
+          <p id={`${selectId}-helper`} className="text-xs text-txt-muted">
+            {helperText}
+          </p>
+        ) : null}
       </div>
     );
   }

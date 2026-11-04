@@ -3,16 +3,52 @@ from packages.domain.state_machine import ContentStatus
 from packages.resilience.circuit_breaker import CycleBudget
 
 
+class SourceEvidenceDict(TypedDict, total=False):
+    title: Optional[str]
+    url: Optional[str]
+    snippet: Optional[str]
+    content: Optional[str]
+    source_id: Optional[str]
+    source_name: Optional[str]
+    score: Optional[float]
+    verified: Optional[bool]
+    confidence_score: Optional[float]
+    claim: Optional[str]
+
+
+class GeneratedIdeaDict(TypedDict, total=False):
+    id: str
+    title: str
+    description: str
+    pillar: str
+    score: float
+    angle: Optional[str]
+    suggested_platforms: List[str]
+    sources: List[Dict[str, Any]]
+
+
+class EnrichmentHistoryDict(TypedDict, total=False):
+    step: Any
+    action: Optional[str]
+    rationale: Optional[str]
+    query_or_url: Optional[str]
+    tool_status: Optional[str]
+    tool_error: Optional[str]
+    timestamp: Optional[str]
+    additions: Optional[int]
+    details: Optional[str]
+
+
 class IdeaResearchState(TypedDict, total=False):
     workspace_id: str
     topic_or_brief: str
     pillars: List[str]
     audience: List[str]
     target_count: int
-    raw_sources: List[Dict[str, Any]]
-    generated_ideas: List[Dict[str, Any]]
+    raw_sources: List[SourceEvidenceDict]
+    generated_ideas: List[GeneratedIdeaDict]
     enrichment_count: int
-    enrichment_history: List[Dict[str, Any]]
+    enrichment_history: List[EnrichmentHistoryDict]
     enable_agentic_enrichment: Optional[bool]
     resolved_llm: Optional[Dict[str, Any]]
     llm_override: Optional[Dict[str, Any]]

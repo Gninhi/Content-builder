@@ -102,23 +102,23 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({
               {isEn ? 'Security Requirements:' : 'Exigences de sécurité :'}
             </span>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-              <div className={`flex items-center gap-2 ${hasMinLength ? 'text-emerald-500' : 'text-txt-muted'}`}>
+              <div className={`flex items-center gap-2 ${hasMinLength ? 'text-status-success-text' : 'text-txt-muted'}`}>
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 <span>{isEn ? '8 characters minimum' : '8 caractères minimum'}</span>
               </div>
-              <div className={`flex items-center gap-2 ${hasUpper ? 'text-emerald-500' : 'text-txt-muted'}`}>
+              <div className={`flex items-center gap-2 ${hasUpper ? 'text-status-success-text' : 'text-txt-muted'}`}>
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 <span>{isEn ? 'One uppercase letter' : 'Une majuscule'}</span>
               </div>
-              <div className={`flex items-center gap-2 ${hasLower ? 'text-emerald-500' : 'text-txt-muted'}`}>
+              <div className={`flex items-center gap-2 ${hasLower ? 'text-status-success-text' : 'text-txt-muted'}`}>
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 <span>{isEn ? 'One lowercase letter' : 'Une minuscule'}</span>
               </div>
-              <div className={`flex items-center gap-2 ${hasNumber ? 'text-emerald-500' : 'text-txt-muted'}`}>
+              <div className={`flex items-center gap-2 ${hasNumber ? 'text-status-success-text' : 'text-txt-muted'}`}>
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 <span>{isEn ? 'One number' : 'Un chiffre'}</span>
               </div>
-              <div className={`flex items-center gap-2 ${hasSpecial ? 'text-emerald-500' : 'text-txt-muted'}`}>
+              <div className={`flex items-center gap-2 ${hasSpecial ? 'text-status-success-text' : 'text-txt-muted'}`}>
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 <span>{isEn ? 'One special character' : 'Un caractère spécial'}</span>
               </div>

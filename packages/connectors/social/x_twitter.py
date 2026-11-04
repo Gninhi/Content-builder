@@ -66,7 +66,8 @@ class XSocialPublisher(BaseSocialPublisher):
         self.current_month_publications = current_month_publications
         self.on_token_refreshed = on_token_refreshed
         self._refresh_lock = threading.Lock()
-        self._client = http_client or httpx.Client(timeout=15.0)
+        timeout_val = float(os.getenv("X_TIMEOUT_SECONDS", os.getenv("SOCIAL_CONNECTORS_TIMEOUT_SECONDS", "15.0")))
+        self._client = http_client or httpx.Client(timeout=timeout_val)
 
     @property
     def provider(self) -> SocialProvider:

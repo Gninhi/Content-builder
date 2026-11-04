@@ -1,11 +1,14 @@
 import io
+import logging
 import re
+import uuid
 from pathlib import Path
 from typing import List, Optional
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from fastapi.responses import FileResponse
+from starlette.concurrency import run_in_threadpool
 from PIL import Image
 
 from apps.api.dependencies import get_current_user, get_repository, UserContext, AuthSessionCache
@@ -26,6 +29,8 @@ from packages.security.passwords import (
     validate_password_strength,
 )
 from packages.security.limiter import get_client_ip
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1", tags=["User Profile"])
 
@@ -110,38 +115,21 @@ def update_my_profile(
     return _to_profile_response(updated_user, workspaces)
 
 
-@router.post("/me/avatar", response_model=AvatarUploadResponse)
-async def upload_avatar(
-    request: Request,
-    file: UploadFile = File(...),
-    user: UserContext = Depends(get_current_user),
-    repo: ContentOpsRepository = Depends(get_repository),
-):
-    """
-    Secure avatar upload:
-    - Inspects file content and magic bytes (JPEG, PNG, WebP only; rejects SVG / HTML / scripts)
-    - Enforces 2MB maximum size limit
-    - Strips EXIF metadata using Pillow re-encoding
-    - Normalizes & resizes image to max 512x512
-    """
-    content = await file.read()
-    if len(content) > MAX_AVATAR_SIZE_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail=f"L'image dépasse la taille maximale autorisée (2 Mo). Taille reçue: {len(content)} octets.",
-        )
+def _delete_avatar_file(avatar_url: Optional[str]) -> None:
+    if not avatar_url:
+        return
+    filename = Path(avatar_url).name
+    if not re.match(r"^avatar_[a-zA-Z0-9_\-]+\.webp$", filename):
+        return
+    file_path = AVATAR_DIR / filename
+    try:
+        if file_path.is_file():
+            file_path.unlink(missing_ok=True)
+    except Exception as exc:
+        logger.warning("Impossible de supprimer le fichier avatar %s: %s", file_path, exc)
 
-    # Magic byte verification
-    is_jpeg = content.startswith(b"\xff\xd8\xff")
-    is_png = content.startswith(b"\x89PNG\r\n\x1a\n")
-    is_webp = len(content) > 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP"
 
-    if not (is_jpeg or is_png or is_webp):
-        raise HTTPException(
-            status_code=415,
-            detail="Format d'image non supporté ou invalide. Formats acceptés : JPEG, PNG, WebP. Les fichiers SVG sont strictement interdits pour des raisons de sécurité.",
-        )
-
+def _process_and_save_avatar(content: bytes, user_id: str) -> tuple[str, Path]:
     try:
         image = Image.open(io.BytesIO(content))
         image.verify()  # Verify structural integrity
@@ -161,10 +149,56 @@ async def upload_avatar(
     # Resize to max 512x512 while maintaining aspect ratio
     clean_image.thumbnail((512, 512), Image.Resampling.LANCZOS)
 
-    # Save to disk as WebP
-    filename = f"avatar_{user.user_id}_{int(datetime.now(timezone.utc).timestamp())}.webp"
+    # Save to disk as WebP with collision-resistant UUID4
+    unique_id = uuid.uuid4().hex[:12]
+    filename = f"avatar_{user_id}_{unique_id}.webp"
     file_path = AVATAR_DIR / filename
     clean_image.save(file_path, format="WEBP", quality=85)
+    return filename, file_path
+
+
+@router.post("/me/avatar", response_model=AvatarUploadResponse)
+async def upload_avatar(
+    request: Request,
+    file: UploadFile = File(...),
+    user: UserContext = Depends(get_current_user),
+    repo: ContentOpsRepository = Depends(get_repository),
+):
+    """
+    Secure avatar upload:
+    - Inspects file content and magic bytes (JPEG, PNG, WebP only; rejects SVG / HTML / scripts)
+    - Enforces 2MB maximum size limit
+    - Strips EXIF metadata using Pillow re-encoding
+    - Normalizes & resizes image to max 512x512
+    - Offloads CPU and disk I/O to worker threadpool
+    - Uses collision-resistant UUID4 filenames
+    - Physically deletes previous avatar file on replacement
+    """
+    content = await file.read()
+    if len(content) > MAX_AVATAR_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"L'image dépasse la taille maximale autorisée (2 Mo). Taille reçue: {len(content)} octets.",
+        )
+
+    # Magic byte verification
+    is_jpeg = content.startswith(b"\xff\xd8\xff")
+    is_png = content.startswith(b"\x89PNG\r\n\x1a\n")
+    is_webp = len(content) > 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP"
+
+    if not (is_jpeg or is_png or is_webp):
+        raise HTTPException(
+            status_code=415,
+            detail="Format d'image non supporté ou invalide. Formats acceptés : JPEG, PNG, WebP. Les fichiers SVG sont strictement interdits pour des raisons de sécurité.",
+        )
+
+    # Delete previous avatar file if exists
+    current_profile = repo.get_user(user.user_id)
+    if current_profile and current_profile.avatar_url:
+        _delete_avatar_file(str(current_profile.avatar_url))
+
+    # Process and save avatar offloaded to threadpool
+    filename, file_path = await run_in_threadpool(_process_and_save_avatar, content, user.user_id)
 
     avatar_url = f"/v1/avatars/{filename}"
     repo.update_user_profile(user.user_id, {"avatar_url": avatar_url})
@@ -429,6 +463,10 @@ def delete_my_account(
         ip_address=client_ip,
         user_agent=ua,
     )
+
+    user_model = repo.get_user(user.user_id)
+    if user_model and user_model.avatar_url:
+        _delete_avatar_file(str(user_model.avatar_url))
 
     success = repo.anonymize_user(user.user_id)
     if not success:

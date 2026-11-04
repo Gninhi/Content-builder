@@ -87,7 +87,7 @@ html:not([data-palette]) {
 
   --text-primary: oklch(0.96 0.005 250);     /* texte contraste max */
   --text-secondary: oklch(0.72 0.020 250);    /* texte atténué (WCAG AA >= 4.5:1) */
-  --text-muted: oklch(0.55 0.020 250);        /* métadonnées discrètes */
+  --text-muted: oklch(0.66 0.015 250);        /* métadonnées lisibles (WCAG AA >= 4.5:1) */
   --text-inverse: oklch(0.12 0.016 250);     /* sur accent plein */
 
   /* Accent Laiton (Brass) dosé et séparé de Warning */
@@ -138,7 +138,7 @@ html.light:not([data-palette]) {
 
   --text-primary: oklch(0.16 0.020 250);     /* #0E141E contraste >= 13:1 */
   --text-secondary: oklch(0.40 0.016 250);   /* #414E5E contraste >= 5.5:1 */
-  --text-muted: oklch(0.54 0.014 250);
+  --text-muted: oklch(0.46 0.014 250);        /* contraste >= 4.8:1 sur fond clair */
   --text-inverse: oklch(1.00 0.000 0);
 
   /* Accent Laiton en mode clair : contraste texte AA garanti */

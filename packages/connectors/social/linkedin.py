@@ -60,7 +60,8 @@ class LinkedInSocialPublisher(BaseSocialPublisher):
         self.author_urn = author_urn
         self.organization_urn = organization_urn or os.getenv("LINKEDIN_ORGANIZATION_URN")
         self.api_version = api_version or os.getenv("LINKEDIN_API_VERSION", "202601")
-        self._client = http_client or httpx.Client(timeout=15.0)
+        timeout_val = float(os.getenv("LINKEDIN_TIMEOUT_SECONDS", os.getenv("SOCIAL_CONNECTORS_TIMEOUT_SECONDS", "15.0")))
+        self._client = http_client or httpx.Client(timeout=timeout_val)
 
     @property
     def provider(self) -> SocialProvider:

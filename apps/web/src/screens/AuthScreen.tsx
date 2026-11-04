@@ -2,11 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
-import { UserRole } from '../types/api';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import {
-  Shield,
   Sparkles,
   AlertCircle,
   CheckCircle2,
@@ -21,7 +19,7 @@ import {
   Zap,
 } from 'lucide-react';
 
-type ScreenView = 'login' | 'register' | 'forgot_password' | 'reset_password' | 'verify_notice' | 'dev';
+type ScreenView = 'login' | 'register' | 'forgot_password' | 'reset_password' | 'verify_notice';
 
 export const AuthScreen: React.FC = () => {
   const {
@@ -32,13 +30,10 @@ export const AuthScreen: React.FC = () => {
     resetPassword,
     resendVerification,
     startDemo,
-    loginWithDevToken,
   } = useAuth();
 
   const { t, language, setLanguage } = useLanguage();
   const { theme, toggleTheme } = useTheme();
-
-  const isDevEnvironment = Boolean((import.meta as any).env?.DEV);
 
   const [currentView, setCurrentView] = useState<ScreenView>('login');
   const [showPassword, setShowPassword] = useState(false);
@@ -61,11 +56,6 @@ export const AuthScreen: React.FC = () => {
   const [forgotEmail, setForgotEmail] = useState('');
   const [resetToken, setResetToken] = useState('');
   const [resetNewPassword, setResetNewPassword] = useState('');
-
-  // Dev form state
-  const [userId, setUserId] = useState('owner_martial');
-  const [role, setRole] = useState<UserRole>('Owner');
-  const [workspaceId, setWorkspaceId] = useState('ws_default');
 
   // UI state
   const [isLoading, setIsLoading] = useState(false);
@@ -322,19 +312,6 @@ export const AuthScreen: React.FC = () => {
     }
   };
 
-  const handleDevSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setErrorMessage(null);
-    try {
-      await loginWithDevToken(userId, role, workspaceId);
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Échec de la génération du jeton.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <main className="relative flex min-h-screen items-center justify-center bg-page px-4 py-8 selection:bg-accent-subtle font-sans text-txt">
       {/* Top Bar: Language & Theme switchers */}
@@ -385,8 +362,8 @@ export const AuthScreen: React.FC = () => {
               : t.auth.title}
           </p>
         </div>
-        {/* Navigation Tabs (Login / Register / Dev) */}
-        {['login', 'register', 'dev'].includes(currentView) && (
+        {/* Navigation Tabs (Login / Register) */}
+        {['login', 'register'].includes(currentView) && (
           <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-subtle p-1 border border-border-subtle text-xs font-medium" role="tablist">
             <button
               type="button"
@@ -504,8 +481,9 @@ export const AuthScreen: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt transition-colors focus:outline-none focus:ring-2 focus:ring-border-focus rounded-sm"
                   title={showPassword ? t.auth.hide_password : t.auth.show_password}
+                  aria-label={showPassword ? t.auth.hide_password : t.auth.show_password}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -613,7 +591,9 @@ export const AuthScreen: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt focus:outline-none focus:ring-2 focus:ring-border-focus rounded-sm"
+                  title={showPassword ? t.auth.hide_password : t.auth.show_password}
+                  aria-label={showPassword ? t.auth.hide_password : t.auth.show_password}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -797,7 +777,9 @@ export const AuthScreen: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt focus:outline-none focus:ring-2 focus:ring-border-focus rounded-sm"
+                  title={showPassword ? t.auth.hide_password : t.auth.show_password}
+                  aria-label={showPassword ? t.auth.hide_password : t.auth.show_password}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -915,81 +897,6 @@ export const AuthScreen: React.FC = () => {
               </button>
             </div>
           </div>
-        )}
-
-        {/* ================================================================= */}
-        {/* VIEW: DEV TOKENS (DEV ONLY)                                       */}
-        {/* ================================================================= */}
-        {currentView === 'dev' && isDevEnvironment && (
-          <form onSubmit={handleDevSubmit} className="space-y-4">
-            <div>
-              <label
-                htmlFor="user-id"
-                className="block text-xs font-medium text-txt mb-1"
-              >
-                {t.auth.user_id}
-              </label>
-              <Input
-                id="user-id"
-                type="text"
-                value={userId}
-                onChange={(e) => setUserId(e.target.value)}
-                required
-                className="font-mono text-xs"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="workspace-id"
-                className="block text-xs font-medium text-txt mb-1"
-              >
-                {t.auth.workspace_id}
-              </label>
-              <Input
-                id="workspace-id"
-                type="text"
-                value={workspaceId}
-                onChange={(e) => setWorkspaceId(e.target.value)}
-                required
-                className="font-mono text-xs"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-txt mb-1.5">
-                {t.auth.select_role}
-              </label>
-              <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Rôle utilisateur">
-                {(['Owner', 'Editor', 'Viewer'] as UserRole[]).map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    role="radio"
-                    aria-checked={role === r}
-                    onClick={() => setRole(r)}
-                    className={`flex flex-col items-center justify-center rounded-xl border p-2 text-xs font-medium transition-all min-h-[40px] ${
-                      role === r
-                        ? 'border-accent bg-accent-subtle text-accent-txt shadow-xs font-semibold'
-                        : 'border-border bg-surface text-txt-secondary hover:border-border-focus hover:text-txt'
-                    }`}
-                  >
-                    <Shield className="h-3.5 w-3.5 mb-0.5" />
-                    <span>{r}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              variant="primary"
-              className="w-full justify-center py-2.5 text-sm font-medium min-h-[44px]"
-              isLoading={isLoading}
-            >
-              {t.auth.dev_login_btn}
-            </Button>
-          </form>
         )}
 
         {/* Security Notice */}

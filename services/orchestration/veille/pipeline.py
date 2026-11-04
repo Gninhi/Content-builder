@@ -19,6 +19,7 @@ from packages.security.prompt_injection import PromptInjectionGuard
 from packages.tools.web_search import WebSearchTool
 from packages.tools.browse import fetch_safe_url, extract_metadata_and_text
 from packages.tools.data_connectors import OfficialDataConnectors, OfficialDataSignalItem
+from packages.tools.schemas import DataConnectorSource
 from packages.connectors.sources.web_extractor import WebExtractorConnector
 from packages.prompts.veille_queries import (
     SUPPORTED_AXES,
@@ -67,8 +68,8 @@ def parse_published_days_old(date_str: Optional[str], allow_none: bool = False) 
                 parsed_tuple = parsed_tuple.replace(tzinfo=timezone.utc)
             delta = (now_utc - parsed_tuple.astimezone(timezone.utc)).total_seconds() / 86400.0
             return max(0, int(delta))
-    except Exception:
-        pass
+    except (TypeError, ValueError) as exc:
+        logger.debug("RFC-2822 date parsing failed for '%s': %s", date_str, exc)
 
     # 2. Try ISO-8601 (e.g. '2026-10-12T14:30:00Z', '2026-10-12')
     try:
@@ -78,8 +79,8 @@ def parse_published_days_old(date_str: Optional[str], allow_none: bool = False) 
             dt = dt.replace(tzinfo=timezone.utc)
         delta = (now_utc - dt.astimezone(timezone.utc)).total_seconds() / 86400.0
         return max(0, int(delta))
-    except Exception:
-        pass
+    except (TypeError, ValueError) as exc:
+        logger.debug("ISO-8601 date parsing failed for '%s': %s", date_str, exc)
 
     return None if allow_none else 14
 
@@ -257,10 +258,13 @@ class VeillePipeline:
 
         if llm_facts:
             for lf in llm_facts:
-                claim = getattr(lf, "claim", None) or (lf.get("claim") if isinstance(lf, dict) else "")
-                quote = getattr(lf, "quote", None) or (lf.get("quote") if isinstance(lf, dict) else "")
-                src_url = getattr(lf, "source_url", None) or (lf.get("source_url") if isinstance(lf, dict) else url) or url
-                is_ver = verify_quote_in_text(quote, full_corpus)
+                raw_quote = getattr(lf, "quote", None) if not isinstance(lf, dict) else lf.get("quote")
+                quote = str(raw_quote or "").strip()
+                raw_claim = getattr(lf, "claim", None) if not isinstance(lf, dict) else lf.get("claim")
+                claim = str(raw_claim or "").strip()
+                raw_src = getattr(lf, "source_url", None) if not isinstance(lf, dict) else lf.get("source_url")
+                src_url = str(raw_src or url or "").strip()
+                is_ver = verify_quote_in_text(quote, full_corpus) if quote else False
                 if is_ver and claim:
                     verified_list.append({
                         "fact": claim[:280],
@@ -459,7 +463,7 @@ class VeillePipeline:
                 collected_signals.append(sig)
 
             self.repo.complete_veille_run(
-                run_id=run.id,
+                run_id=str(run.id),
                 status="COMPLETED",
                 sources_contacted=1,
                 sources_failed=0,
@@ -509,7 +513,7 @@ class VeillePipeline:
                     # Update source health on success
                     if hasattr(self.repo, "update_veille_source"):
                         self.repo.update_veille_source(
-                            source_id=source.id,
+                            source_id=str(source.id),
                             workspace_id=workspace_id,
                             health_status="HEALTHY",
                             error_message=None,
@@ -523,7 +527,7 @@ class VeillePipeline:
                     # Fail-soft: update source health to ERROR but do NOT crash the cycle
                     if hasattr(self.repo, "update_veille_source"):
                         self.repo.update_veille_source(
-                            source_id=source.id,
+                            source_id=str(source.id),
                             workspace_id=workspace_id,
                             health_status="ERROR",
                             error_message=str(e)[:500],
@@ -560,11 +564,11 @@ class VeillePipeline:
                         logger.warning(f"Search engine returned {search_resp.status} for query '{q_text}': {search_resp.error_message}")
                         continue
 
-                    for item in search_resp.results:
+                    for s_item in search_resp.results:
                         signals_discovered += 1
-                        sanitized_title = PromptInjectionGuard.defang_text(item.title)
-                        sanitized_snippet = PromptInjectionGuard.defang_text(item.snippet)
-                        real_days_old = parse_published_days_old(getattr(item, "published_date", None), allow_none=True)
+                        sanitized_title = PromptInjectionGuard.defang_text(s_item.title)
+                        sanitized_snippet = PromptInjectionGuard.defang_text(s_item.snippet)
+                        real_days_old = parse_published_days_old(getattr(s_item, "published_date", None), allow_none=True)
 
                         q_res = compute_qualification_score(
                             trust_level=trust_target,
@@ -578,9 +582,9 @@ class VeillePipeline:
                             workspace_id=workspace_id,
                             title=sanitized_title,
                             summary=sanitized_snippet,
-                            url=item.url,
+                            url=s_item.url,
                             axis=ax,
-                            source_name=item.source_name or "Web Search",
+                            source_name=s_item.source_name or "Web Search",
                             q_res=q_res,
                         )
 
@@ -594,7 +598,7 @@ class VeillePipeline:
                             qualification_criteria=q_res["breakdown"],
                             facts=enriched["facts"],
                             executive_takeaway=enriched["executive_takeaway"],
-                            canonical_url=item.url,
+                            canonical_url=s_item.url,
                             raw_content_ref=enriched["raw_content_ref"],
                             enrichment_status=enriched["enrichment_status"],
                             status="QUALIFIED" if q_res["is_qualified"] else "REJECTED",
@@ -613,7 +617,7 @@ class VeillePipeline:
         # Complete run tracking
         run_status = "COMPLETED" if sources_failed == 0 else ("DEGRADED" if collected_signals else "FAILED")
         self.repo.complete_veille_run(
-            run_id=run.id,
+            run_id=str(run.id),
             status=run_status,
             sources_contacted=sources_contacted,
             sources_failed=sources_failed,
@@ -642,16 +646,21 @@ class VeillePipeline:
         Returns a list of (SignalModel, is_qualified: bool).
         """
         raw_items = []
-        stype = (source.source_type or "web").lower()
+        source_id = str(source.id)
+        source_name = str(source.name or "")
+        source_url = str(source.url or "")
+        source_axis = str(source.axis or "ia")
+        source_trust = str(source.trust_level or "B")
+        stype = str(source.source_type or "web").lower()
 
         if stype == "rss":
-            raw_items = self.connectors.fetch_rss_feed(feed_url=source.url, max_results=max_items)
+            raw_items = self.connectors.fetch_rss_feed(feed_url=source_url, max_results=max_items)
         elif stype == "arxiv":
             query = custom_query or "LLM deep reasoning multi-agent"
             raw_items = self.connectors.fetch_arxiv_signals(query=query, max_results=max_items)
         elif stype == "github":
             # Extract repository name from GitHub URL (e.g. 'https://api.github.com/repos/langchain-ai/langgraph/releases' -> 'langchain-ai/langgraph')
-            parsed = urlparse(source.url)
+            parsed = urlparse(source_url)
             path_parts = [p for p in parsed.path.split("/") if p and p != "repos" and p != "releases"]
             if len(path_parts) >= 2:
                 repo_slug = f"{path_parts[-2]}/{path_parts[-1]}"
@@ -659,24 +668,24 @@ class VeillePipeline:
                 repo_slug = "langchain-ai/langgraph"
             raw_items = self.connectors.fetch_github_releases(repo=repo_slug, max_results=max_items)
         elif stype == "hackernews":
-            query = custom_query or f"AI {source.axis}"
+            query = custom_query or f"AI {source_axis}"
             raw_items = self.connectors.fetch_hackernews_signals(query=query, max_results=max_items)
         elif stype == "huggingface":
-            query = custom_query or source.name or "llm"
+            query = custom_query or source_name or "llm"
             raw_items = self.connectors.fetch_huggingface_signals(query=query, max_results=max_items)
         elif stype == "semantic_scholar":
-            query = custom_query or source.name or "multi-agent LLM"
+            query = custom_query or source_name or "multi-agent LLM"
             raw_items = self.connectors.fetch_semantic_scholar_papers(query=query, max_results=max_items)
         elif stype == "crossref":
-            query = custom_query or source.name or "artificial intelligence governance"
+            query = custom_query or source_name or "artificial intelligence governance"
             raw_items = self.connectors.fetch_crossref_works(query=query, max_results=max_items)
         else:
             # Web source or search engine
-            res = self.search_tool.search(query=source.name, max_results=max_items, workspace_id=workspace_id)
+            res = self.search_tool.search(query=source_name, max_results=max_items, workspace_id=workspace_id)
             if res.results:
                 raw_items = [
                     OfficialDataSignalItem(
-                        source_type="web",
+                        source_type=DataConnectorSource.WEB,
                         identifier=it.url,
                         title=it.title,
                         url=it.url,
@@ -686,26 +695,26 @@ class VeillePipeline:
                     )
                     for it in res.results
                 ]
-            elif source.url and source.url.startswith(("http://", "https://")):
+            elif source_url and source_url.startswith(("http://", "https://")):
                 try:
-                    resp = fetch_safe_url(source.url, timeout=6.0)
+                    resp = fetch_safe_url(source_url, timeout=6.0)
                     if resp.status_code == 200 and resp.text:
                         meta = extract_metadata_and_text(resp.text, str(resp.url))
                         extracted_content = (meta.get("content") or "").strip()
                         if len(extracted_content) >= 40:
                             raw_items = [
                                 OfficialDataSignalItem(
-                                    source_type="web",
+                                    source_type=DataConnectorSource.WEB,
                                     identifier=str(resp.url),
-                                    title=meta.get("title") or source.name,
+                                    title=str(meta.get("title") or source_name),
                                     url=meta.get("canonical_url") or str(resp.url),
                                     summary=extracted_content[:1200],
                                     published_date=meta.get("published_date") or "",
-                                    metadata={"source_name": source.name},
+                                    metadata={"source_name": source_name},
                                 )
                             ]
                 except Exception as web_ex:
-                    logger.debug(f"Direct web extraction fallback failed for {source.url}: {web_ex}")
+                    logger.debug(f"Direct web extraction fallback failed for {source_url}: {web_ex}")
 
         results = []
         for c_item in raw_items:
@@ -716,30 +725,30 @@ class VeillePipeline:
             real_days_old = parse_published_days_old(c_item.published_date, allow_none=True)
 
             q_res = compute_qualification_score(
-                trust_level=source.trust_level,
+                trust_level=source_trust,
                 days_old=real_days_old,
                 attribution_verified=True,
                 title=sanitized_title,
                 text=sanitized_summary,
-                axis=source.axis,
+                axis=source_axis,
             )
             enriched = self._enrich_candidate_if_budget_allows(
                 workspace_id=workspace_id,
                 title=sanitized_title,
                 summary=sanitized_summary,
                 url=c_item.url,
-                axis=source.axis,
-                source_name=source.name,
+                axis=source_axis,
+                source_name=source_name,
                 q_res=q_res,
             )
 
             sig = self.repo.save_signal(
                 workspace_id=workspace_id,
-                source_id=source.id,
+                source_id=source_id,
                 title=sanitized_title,
                 summary=enriched["summary"],
-                axis=source.axis,
-                trust_level=source.trust_level,
+                axis=source_axis,
+                trust_level=source_trust,
                 qualification_score=q_res["score"],
                 qualification_criteria=q_res["breakdown"],
                 facts=enriched["facts"],

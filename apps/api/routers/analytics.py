@@ -5,10 +5,6 @@ from infra.db.repository import ContentOpsRepository
 from infra.db.models import (
     MetricSnapshotModel,
     PublishedPostModel,
-    PublicationJobModel,
-    ContentVariantModel,
-    ContentPackageModel,
-    ContentBriefModel
 )
 from apps.api.dependencies import get_repository, UserContext, require_roles
 
@@ -23,13 +19,9 @@ def record_metric(
 ):
     post = (
         repo.db.query(PublishedPostModel)
-        .join(PublicationJobModel, PublishedPostModel.job_id == PublicationJobModel.id)
-        .join(ContentVariantModel, PublicationJobModel.variant_id == ContentVariantModel.id)
-        .join(ContentPackageModel, ContentVariantModel.package_id == ContentPackageModel.id)
-        .join(ContentBriefModel, ContentPackageModel.brief_id == ContentBriefModel.id)
         .filter(
             PublishedPostModel.id == req.post_id,
-            ContentBriefModel.workspace_id == user.workspace_id
+            PublishedPostModel.workspace_id == user.workspace_id
         )
         .first()
     )
@@ -54,19 +46,13 @@ def get_analytics_overview(
 ) -> Dict[str, Any]:
     posts = (
         repo.db.query(PublishedPostModel)
-        .join(PublicationJobModel, PublishedPostModel.job_id == PublicationJobModel.id)
-        .join(ContentVariantModel, PublicationJobModel.variant_id == ContentVariantModel.id)
-        .join(ContentPackageModel, ContentVariantModel.package_id == ContentPackageModel.id)
-        .join(ContentBriefModel, ContentPackageModel.brief_id == ContentBriefModel.id)
-        .filter(ContentBriefModel.workspace_id == user.workspace_id)
+        .filter(PublishedPostModel.workspace_id == user.workspace_id)
         .all()
     )
-    post_ids = [p.id for p in posts]
     snapshots = (
         repo.db.query(MetricSnapshotModel)
-        .filter(MetricSnapshotModel.post_id.in_(post_ids))
+        .filter(MetricSnapshotModel.workspace_id == user.workspace_id)
         .all()
-        if post_ids else []
     )
 
     total_impressions = sum(int(s.impressions or 0) for s in snapshots)

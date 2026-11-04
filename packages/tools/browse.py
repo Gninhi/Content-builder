@@ -5,10 +5,11 @@ import logging
 import re
 import socket
 import time
-from typing import Set
+from typing import Optional, Set, Union, Dict, Any
 from urllib.parse import urlparse, urljoin
 import urllib.robotparser
 
+import httpcore
 import httpx
 from bs4 import BeautifulSoup
 
@@ -46,10 +47,10 @@ CLOUD_METADATA_HOSTS: Set[str] = {
 ALLOWED_PORTS: Set[int] = {80, 443}
 
 
-def _is_forbidden_ip(ip_obj: ipaddress._BaseAddress) -> bool:
+def _is_forbidden_ip(ip_obj: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]) -> bool:
     """Returns True if an IPv4 or IPv6 address (or its mapped IPv4) is private, loopback, link-local, or reserved."""
     mapped = getattr(ip_obj, "ipv4_mapped", None)
-    if mapped is not None and _is_forbidden_ip(mapped):
+    if mapped is not None and isinstance(mapped, (ipaddress.IPv4Address, ipaddress.IPv6Address)) and _is_forbidden_ip(mapped):
         return True
     return bool(
         ip_obj.is_private
@@ -61,7 +62,47 @@ def _is_forbidden_ip(ip_obj: ipaddress._BaseAddress) -> bool:
     )
 
 
-def validate_target_url_security(url: str) -> None:
+class PinnedIPBackend(httpcore.SyncBackend):
+    """Network backend pinning TCP connection directly to pre-validated IP."""
+
+    def __init__(self, pinned_ip: str):
+        super().__init__()
+        self.pinned_ip = pinned_ip
+
+    def connect_tcp(
+        self,
+        host: str,
+        port: int,
+        timeout: Optional[float] = None,
+        local_address: Optional[str] = None,
+        socket_options = None,
+    ) -> httpcore.NetworkStream:
+        return super().connect_tcp(
+            self.pinned_ip,
+            port,
+            timeout=timeout,
+            local_address=local_address,
+            socket_options=socket_options,
+        )
+
+
+class PinnedIPTransport(httpx.HTTPTransport):
+    """
+    HTTP transport connecting to pre-validated IP while preserving original Host header and TLS SNI.
+    Eliminates TOCTOU DNS rebinding windows.
+    """
+
+    def __init__(self, pinned_ip: str, **kwargs):
+        self.pinned_ip = pinned_ip
+        super().__init__(**kwargs)
+        ssl_ctx = getattr(self._pool, "_ssl_context", None)
+        self._pool = httpcore.ConnectionPool(
+            ssl_context=ssl_ctx,
+            network_backend=PinnedIPBackend(pinned_ip=pinned_ip),
+        )
+
+
+def validate_target_url_security(url: str) -> str:
     """
     Strict SSRF and domain guard:
     1. Rejects non-HTTP(S) protocols and non-standard ports (only 80/443 allowed).
@@ -69,6 +110,7 @@ def validate_target_url_security(url: str) -> None:
     3. Blocks private IPs, loopback, link-local, IPv6 mapped, octal/hex IPs, cloud metadata endpoints.
     4. Blocks scraping targets with strictly enforced official APIs (LinkedIn, X).
     5. Resolves hostname to underlying IP and verifies none are in prohibited ranges.
+    Returns the validated resolved IP address.
     """
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
@@ -113,24 +155,37 @@ def validate_target_url_security(url: str) -> None:
             except OSError:
                 ip_candidate = None
 
+    validated_ip: Optional[str] = None
     if ip_candidate is not None:
         if _is_forbidden_ip(ip_candidate):
             raise PermissionError(
                 f"Sécurité SSRF : L'IP cible ({hostname}) est une adresse privée ou locale interdite."
             )
+        validated_ip = str(ip_candidate)
     else:
         # Resolve hostname to check underlying IP
+        first_valid_ip = None
         try:
             resolved_ips = socket.getaddrinfo(hostname, None)
             for item in resolved_ips:
-                target_ip = item[4][0].split("%")[0]
+                target_ip = str(item[4][0]).split("%")[0]
                 ip_obj = ipaddress.ip_address(target_ip)
                 if _is_forbidden_ip(ip_obj):
                     raise PermissionError(
                         f"Sécurité SSRF : Le domaine '{hostname}' résout vers une IP privée ou locale interdite ({target_ip})."
                     )
-        except socket.gaierror:
-            pass  # DNS resolution will fail naturally later
+                if first_valid_ip is None:
+                    first_valid_ip = str(ip_obj)
+        except socket.gaierror as exc:
+            raise PermissionError(
+                f"Sécurité SSRF : Échec de résolution DNS pour le domaine '{hostname}' : {exc}"
+            ) from exc
+
+        if not first_valid_ip:
+            raise PermissionError(
+                f"Sécurité SSRF : Impossible d'obtenir une adresse IP valide pour le domaine '{hostname}'."
+            )
+        validated_ip = first_valid_ip
 
     # 3. Block non-standard ports on public hosts (only 80 and 443 allowed)
     try:
@@ -143,16 +198,19 @@ def validate_target_url_security(url: str) -> None:
             f"Sécurité SSRF : Port non standard interdit ({port}). Seuls les ports 80 et 443 sont autorisés."
         )
 
+    return validated_ip
+
 
 def fetch_safe_url(
     url: str,
     timeout: float = 8.0,
     max_redirects: int = 3,
     max_bytes: int = MAX_CONTENT_BYTES,
-    headers: dict = None
+    headers: Optional[Dict[str, Any]] = None
 ) -> httpx.Response:
     """
     Safely executes an HTTP GET request with SSRF validation re-checked at every redirect hop,
+    DNS pinning (PinnedIPTransport) preventing TOCTOU / DNS rebinding attacks,
     strict size limits, and robust timeout handling.
     """
     current_url = url
@@ -161,8 +219,9 @@ def fetch_safe_url(
         req_headers.update(headers)
 
     for _ in range(max_redirects + 1):
-        validate_target_url_security(current_url)
-        with httpx.Client(timeout=timeout, follow_redirects=False) as client:
+        validated_ip = validate_target_url_security(current_url)
+        transport = PinnedIPTransport(pinned_ip=validated_ip)
+        with httpx.Client(transport=transport, timeout=timeout, follow_redirects=False) as client:
             resp = client.get(current_url, headers=req_headers)
             if resp.is_redirect:
                 loc = resp.headers.get("location")
@@ -214,8 +273,9 @@ def extract_metadata_and_text(html: str, target_url: str) -> dict:
     title = ""
     if soup.title and soup.title.string:
         title = soup.title.string.strip()
-    elif soup.find("meta", property="og:title"):
-        title = str(soup.find("meta", property="og:title").get("content", ""))
+    og_meta = soup.find("meta", property="og:title")
+    if not title and og_meta and hasattr(og_meta, "get"):
+        title = str(og_meta.get("content", ""))
 
     # Canonical URL
     canon = target_url

@@ -1,7 +1,7 @@
 import os
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Optional, List, cast
+from typing import Dict, Any, Optional, List, cast, NoReturn
 from sqlalchemy.orm import Session
 
 from infra.db.repository import ContentOpsRepository
@@ -10,8 +10,6 @@ from infra.db.models import (
     ContentVariantModel,
     ApprovalModel,
     PublishedPostModel,
-    ContentPackageModel,
-    ContentBriefModel,
     WorkspaceModel,
     ConnectedSocialAccountModel,
 )
@@ -123,7 +121,7 @@ class PublisherWorker:
 
         raise ValueError(f"Unsupported platform: {platform}")
 
-    def _fail_precondition(self, job: PublicationJobModel, error_msg: str) -> None:
+    def _fail_precondition(self, job: PublicationJobModel, error_msg: str) -> NoReturn:
         """Helper to mark job as PUBLISH_FAILED, commit, and raise ValueError."""
         setattr(job, "status", ContentStatus.PUBLISH_FAILED.value)
         setattr(job, "error_message", error_msg)
@@ -175,8 +173,8 @@ class PublisherWorker:
 
         # Degraded mode safety lock: fallback generated content requires explicit human reviewer approval
         is_degraded = getattr(variant, "degraded", False) or bool(variant.media_spec and variant.media_spec.get("degraded", False))
-        if is_degraded:
-            reviewer = (valid_approval.reviewer_id or "").strip().lower()
+        if is_degraded and valid_approval:
+            reviewer = (str(valid_approval.reviewer_id) or "").strip().lower()
             if reviewer in ("system", "auto", "automated", ""):
                 self._fail_precondition(job, "Degraded mode safety lock: Content generated via fallback requires explicit human reviewer approval before publication.")
 
@@ -205,12 +203,8 @@ class PublisherWorker:
             one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
             recent_count = (
                 self.db.query(PublishedPostModel)
-                .join(PublicationJobModel, PublishedPostModel.job_id == PublicationJobModel.id)
-                .join(ContentVariantModel, PublicationJobModel.variant_id == ContentVariantModel.id)
-                .join(ContentPackageModel, ContentVariantModel.package_id == ContentPackageModel.id)
-                .join(ContentBriefModel, ContentPackageModel.brief_id == ContentBriefModel.id)
                 .filter(
-                    ContentBriefModel.workspace_id == workspace.id,
+                    PublishedPostModel.workspace_id == workspace.id,
                     PublishedPostModel.published_at >= one_hour_ago
                 )
                 .count()
@@ -351,13 +345,13 @@ class PublisherWorker:
             try:
                 self.db.rollback()
                 ContentStateMachine.transition(ContentStatus.PUBLISHING, ContentStatus.PUBLISH_UNKNOWN)
-                job.status = ContentStatus.PUBLISH_UNKNOWN.value
-                job.error_message = (
+                setattr(job, "status", ContentStatus.PUBLISH_UNKNOWN.value)
+                setattr(job, "error_message", (
                     f"PUBLISH_UNKNOWN: Post succeeded externally (id={pub_result.platform_post_id}), "
                     f"but local DB transaction failed: {str(exc)}"
-                )
+                ))
                 if variant:
-                    variant.status = ContentStatus.PUBLISH_UNKNOWN.value
+                    setattr(variant, "status", ContentStatus.PUBLISH_UNKNOWN.value)
                 self.db.commit()
             except Exception as rollback_err:
                 logger.critical(f"FATAL: Database error during emergency rollback to PUBLISH_UNKNOWN: {rollback_err}")

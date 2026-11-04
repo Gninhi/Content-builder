@@ -302,3 +302,62 @@ def test_delete_account_anonymizes_non_owner():
         assert u.full_name == "Compte Supprimé"
     finally:
         db.close()
+
+
+def test_avatar_replacement_deletes_old_file_and_uses_uuid4():
+    """Verify that avatar uploads use UUID4 filenames and delete previously stored avatar on disk."""
+    import io
+    import uuid
+    from pathlib import Path
+    from PIL import Image
+
+    user_id = f"user_avatar_{uuid.uuid4().hex[:8]}"
+    token = create_access_token(user_id=user_id, role=Role.EDITOR, workspace_id="ws_profile_test")
+
+    db = SessionLocal()
+    try:
+        repo = ContentOpsRepository(db)
+        repo.get_or_create_user(user_id, default_role="Editor", workspace_id="ws_profile_test")
+    finally:
+        db.close()
+
+    # Upload avatar 1
+    img1 = Image.new("RGB", (100, 100), color="blue")
+    buf1 = io.BytesIO()
+    img1.save(buf1, format="PNG")
+    buf1.seek(0)
+
+    res1 = client.post(
+        "/v1/me/avatar",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("avatar1.png", buf1.getvalue(), "image/png")},
+    )
+    assert res1.status_code == 200
+    avatar1_url = res1.json()["avatar_url"]
+    file1_path = Path("storage/avatars") / Path(avatar1_url).name
+    assert file1_path.is_file(), "Avatar 1 must exist on disk"
+
+    # Upload avatar 2 (replacement)
+    img2 = Image.new("RGB", (100, 100), color="green")
+    buf2 = io.BytesIO()
+    img2.save(buf2, format="JPEG")
+    buf2.seek(0)
+
+    res2 = client.post(
+        "/v1/me/avatar",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("avatar2.jpg", buf2.getvalue(), "image/jpeg")},
+    )
+    assert res2.status_code == 200
+    avatar2_url = res2.json()["avatar_url"]
+    file2_path = Path("storage/avatars") / Path(avatar2_url).name
+
+    assert avatar1_url != avatar2_url, "Filenames must differ via UUID4"
+    assert file2_path.is_file(), "Avatar 2 must exist on disk"
+    assert not file1_path.exists(), "Old avatar file must be deleted upon replacement"
+
+    # Now exercise GDPR right to erasure (DELETE /v1/me)
+    del_res = client.delete("/v1/me", headers={"Authorization": f"Bearer {token}"})
+    assert del_res.status_code == 200
+    assert not file2_path.exists(), "Avatar 2 file must be physically deleted from disk upon GDPR erasure (Art. 17)"
+
